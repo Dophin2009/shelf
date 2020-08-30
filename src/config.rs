@@ -1,6 +1,21 @@
-use std::path::{Path, PathBuf};
+use crate::map::Map;
+
+use std::path::Path;
 
 use serde::Deserialize;
+
+#[derive(Debug, Deserialize)]
+pub struct Config {
+    #[serde(default)]
+    pub variables: Map,
+    pub package: Package,
+}
+
+impl Config {
+    pub fn from_dhall_file<P: AsRef<Path>>(path: P) -> serde_dhall::Result<Self> {
+        serde_dhall::from_file(path.as_ref()).parse()
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct Package {
@@ -19,12 +34,6 @@ pub struct Package {
     pub before_link: Vec<Hook>,
     #[serde(default, rename = "afterLink")]
     pub after_link: Vec<Hook>,
-}
-
-impl Package {
-    pub fn from_dhall_file<P: AsRef<Path>>(path: P) -> serde_dhall::Result<Self> {
-        serde_dhall::from_file(path.as_ref()).parse()
-    }
 }
 
 #[derive(Debug, Deserialize)]

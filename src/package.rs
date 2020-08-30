@@ -1,4 +1,5 @@
 use crate::config;
+use crate::map;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -13,11 +14,11 @@ struct Stew;
 #[derive(Debug)]
 pub struct Package {
     pub path: PathBuf,
-    pub cfg: config::Package,
+    pub cfg: config::Config,
 }
 
 impl Package {
-    pub fn new(path: PathBuf, cfg: config::Package) -> Result<Self> {
+    pub fn new(path: PathBuf, cfg: config::Config) -> Result<Self> {
         Ok(Self {
             path: fs::canonicalize(path)?,
             cfg,
@@ -26,7 +27,7 @@ impl Package {
 
     pub fn from_path(path: PathBuf) -> Result<Self> {
         let cfg_path = path.join("package.dhall");
-        let cfg = config::Package::from_dhall_file(&cfg_path)?;
+        let cfg = config::Config::from_dhall_file(&cfg_path)?;
         Self::new(path, cfg)
     }
 
@@ -60,7 +61,7 @@ impl Linker {
     }
 
     pub fn link(&self) -> Result<()> {
-        info!("Linking {}...", self.cfg().name);
+        info!("Linking {}...", self.package().name);
 
         debug!("Linking dependencies...");
         self.link_dependencies()?;
@@ -85,17 +86,18 @@ impl Linker {
     }
 
     pub fn exec_before_link(&self) -> Result<()> {
-        self.exec_hooks(&self.cfg().before_link)?;
+        self.exec_hooks(&self.package().before_link)?;
         Ok(())
     }
 
     pub fn exec_after_link(&self) -> Result<()> {
-        self.exec_hooks(&self.cfg().after_link)?;
+        self.exec_hooks(&self.package().after_link)?;
         Ok(())
     }
 
     fn exec_hooks(&self, hooks: &Vec<config::Hook>) -> Result<()> {
         for hook in hooks {
+            debug!("Running hook {}", hook.name);
             self.exec_hook(&hook)?;
         }
         Ok(())
@@ -143,7 +145,7 @@ impl Linker {
     }
 
     fn dependency_linkers(&self) -> Result<Vec<Self>> {
-        let dependencies = &self.cfg().dependencies;
+        let dependencies = &self.package().dependencies;
         self.linkers_list(dependencies)
     }
 
@@ -156,7 +158,7 @@ impl Linker {
     }
 
     fn extension_linkers(&self) -> Result<Vec<Self>> {
-        let extensions = &self.cfg().extensions;
+        let extensions = &self.package().extensions;
         self.linkers_list(extensions)
     }
 
@@ -171,7 +173,15 @@ impl Linker {
             .collect::<Result<Vec<Self>>>()
     }
 
-    fn cfg<'a>(&'a self) -> &'a config::Package {
+    fn cfg<'a>(&'a self) -> &'a config::Config {
         &self.package.cfg
+    }
+
+    fn package<'a>(&'a self) -> &'a config::Package {
+        &self.cfg().package
+    }
+
+    fn variables<'a>(&'a self) -> &'a map::Map {
+        &self.cfg().variables
     }
 }

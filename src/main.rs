@@ -1,4 +1,5 @@
 mod config;
+mod map;
 mod package;
 
 use package::{Linker, Package};
