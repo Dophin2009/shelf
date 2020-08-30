@@ -26,6 +26,8 @@ pub struct Package {
     pub extensions: Vec<String>,
     #[serde(default, rename = "defaultLinkType")]
     pub default_link_type: LinkType,
+    #[serde(default, rename = "ignorePatterns")]
+    pub ignore_pattners: Vec<String>,
     #[serde(default)]
     pub files: Vec<FileProcess>,
     #[serde(default, rename = "templateFiles")]

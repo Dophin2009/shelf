@@ -97,7 +97,7 @@ impl Linker {
 
     fn exec_hooks(&self, hooks: &Vec<config::Hook>) -> Result<()> {
         for hook in hooks {
-            debug!("Running hook {}", hook.name);
+            debug!("Running hook {}...", hook.name);
             self.exec_hook(&hook)?;
         }
         Ok(())
@@ -106,7 +106,12 @@ impl Linker {
     fn exec_hook(&self, hook: &config::Hook) -> Result<()> {
         let parts = match shlex::split(&hook.string) {
             Some(v) => v,
-            None => return Err(anyhow!("Failed to run hook {}", hook.name)),
+            None => {
+                return Err(anyhow!(
+                    "Failed to run hook {}: invalid invocation",
+                    hook.name
+                ))
+            }
         };
 
         let bin = match parts.get(0) {
