@@ -1,0 +1,14 @@
+[package]
+name = "stew"
+version = "0.1.0"
+authors = ["Eric Zhao <21zhaoe@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+anyhow = "1.0"
+clap = "3.0.0-beta.1"
+handlebars = "3.4.0"
+log = "0.4.0"
+serde = "1.0.115"
+serde_dhall = "0.6.0"
+stderrlog = "0.4.3"
