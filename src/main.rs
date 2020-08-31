@@ -1,13 +1,15 @@
 mod config;
+mod linker;
 mod map;
-mod package;
+mod symlink;
 
-use package::{Linker, Package};
+use config::Package;
+use linker::Linker;
 
 use std::env;
 use std::process;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use clap::Clap;
 use log::error;
 use stderrlog::ColorChoice;
@@ -44,11 +46,23 @@ fn main() {
 }
 
 fn cli(opts: &Options) -> Result<()> {
-    let cwd = env::current_dir()?;
-    let package_path = cwd.join(&opts.package);
+    let home_key = "HOME";
+    let home = match env::var(home_key) {
+        Ok(val) => val.into(),
+        Err(err) => {
+            return Err(anyhow!(
+                "Environment variable {} not set: {}",
+                home_key,
+                err
+            ))
+        }
+    };
 
-    let package_config = Package::from_path(package_path)?;
-    let linker = Linker::new(package_config, opts.quiet, opts.verbosity);
+    let cwd = env::current_dir()?;
+    let path = cwd.join(&opts.package);
+
+    let package = Package::from_dir(path.clone())?;
+    let linker = Linker::new(package, path, home, opts.quiet, opts.verbosity);
 
     linker.link()?;
 
