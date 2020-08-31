@@ -138,7 +138,7 @@ impl Linker {
 
         let src_str = fs::read_to_string(absolute_src.clone())
             .with_context(|| format!("Failed to read source file {}", absolute_src.display()))?;
-        let rendered_str = Templater::render(&src_str, self.package_variables().clone())
+        let rendered_str = Templater::render(&src_str, self.package_variables().map.clone())
             .with_context(|| {
                 format!("Failed to render template file: {}", absolute_src.display())
             })?;
