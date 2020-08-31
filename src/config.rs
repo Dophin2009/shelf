@@ -176,12 +176,12 @@ pub struct TemplateProcess {
 
 #[derive(Debug, Deserialize)]
 pub enum TemplateEngine {
-    Liquid,
+    Gtmpl,
 }
 
 impl Default for TemplateEngine {
     fn default() -> Self {
-        Self::Liquid
+        Self::Gtmpl
     }
 }
 
