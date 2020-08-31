@@ -1,4 +1,4 @@
-use crate::config::{Config, Hook, LinkType, Package};
+use crate::config::{Config, FileProcess, Hook, LinkType, Package};
 use crate::map::Map;
 use crate::symlink;
 
@@ -91,9 +91,14 @@ impl Linker {
             self.normal_link_file(&link_path)?;
         }
 
+        for file_process in &self.package_cfg().files {
+            self.link_file_process(&file_process)?;
+        }
+
         Ok(())
     }
 
+    /// Link a file relative to the package root to its proper location.
     fn normal_link_file<P: AsRef<Path> + Clone>(&self, path: P) -> Result<()> {
         let absolute = fs::canonicalize(path.clone()).with_context(|| {
             format!(
@@ -108,7 +113,18 @@ impl Linker {
         self.link_file(absolute, dest, &self.package.config.default_link_type)
     }
 
-    /// Link a file relative to the package root to its proper location.
+    fn link_file_process(&self, file_process: &FileProcess) -> Result<()> {
+        let src = PathBuf::from(&file_process.src);
+        let absolute_src = fs::canonicalize(src.clone())
+            .with_context(|| format!("Failed to determine absolute path of {}", src.display()))?;
+
+        let dest = &file_process.dest;
+        let absolute_dest = self.dest.join(dest);
+
+        self.link_file(absolute_src, absolute_dest, &file_process.link_type)
+    }
+
+    /// Symlink or copy a file. `src` and `dest` can be absolute paths, or relative to the package root.
     fn link_file<P: AsRef<Path> + Clone>(
         &self,
         src: P,

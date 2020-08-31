@@ -35,14 +35,12 @@ impl Package {
         }
 
         for file_process in &self.config.files {
-            let path: PathBuf = file_process.path.clone().into();
+            let path: PathBuf = file_process.src.clone().into();
             paths.remove(&path);
 
-            if file_process.shallow {
-                let descendants = self.glob_relative(&path.join("**/*").to_string_lossy())?;
-                for d in descendants {
-                    paths.remove(&d);
-                }
+            let descendants = self.glob_relative(&path.join("**/*").to_string_lossy())?;
+            for d in descendants {
+                paths.remove(&d);
             }
         }
 
@@ -148,11 +146,11 @@ fn default_replace_files() -> bool {
 #[derive(Debug, Deserialize)]
 pub struct FileProcess {
     /// Path of the file, relative to package root.
-    pub path: String,
+    pub src: String,
+    /// Destination of linking, relative to tree root.
+    pub dest: String,
     #[serde(default, rename = "linkType")]
     pub link_type: LinkType,
-    #[serde(default)]
-    pub shallow: bool,
 }
 
 #[derive(Debug, Deserialize)]
