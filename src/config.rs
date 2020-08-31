@@ -3,7 +3,7 @@ use crate::map::Map;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -79,18 +79,13 @@ impl Package {
     /// Glob for files with a pattern relative to the package root.
     fn glob_relative(&self, pattern: &str) -> Result<HashSet<PathBuf>> {
         let paths = glob::glob(pattern)
-            .map_err(|_| anyhow!("Failed to glob invalid pattern {}", pattern))?;
+            .with_context(|| format!("Failed to glob invalid pattern {}", pattern))?;
 
         // Collect and check the glob results.
         let mut set: HashSet<PathBuf> = paths
             .map(|glob_result| {
-                glob_result.map_err(|err| {
-                    anyhow!(
-                        "Failed to stat path in globbing pattern {}: {}",
-                        pattern,
-                        err
-                    )
-                })
+                glob_result
+                    .with_context(|| format!("Failed to stat path in globbing pattern {}", pattern))
             })
             .collect::<Result<_>>()?;
 

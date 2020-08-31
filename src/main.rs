@@ -9,7 +9,7 @@ use linker::Linker;
 use std::env;
 use std::process;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Clap;
 use log::error;
 use stderrlog::ColorChoice;
@@ -58,7 +58,8 @@ fn cli(opts: &Options) -> Result<()> {
         }
     };
 
-    let cwd = env::current_dir()?;
+    let cwd =
+        env::current_dir().with_context(|| "Failed to determine current working directory")?;
     let path = cwd.join(&opts.package);
 
     let package = Package::from_dir(path.clone())?;

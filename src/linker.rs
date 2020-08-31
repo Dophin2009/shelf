@@ -7,8 +7,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-use anyhow::{anyhow, Result};
-use log::{debug, info};
+use anyhow::{anyhow, Context, Result};
+use log::{debug, info, trace};
 
 #[derive(Debug)]
 pub struct Linker {
@@ -40,8 +40,9 @@ impl Linker {
         info!("Linking {}...", self.package_cfg().name);
 
         // Work relative to the package root.
-        let cwd = env::current_dir()?;
-        env::set_current_dir(self.path.clone())?;
+        let cwd = env::current_dir().with_context(|| "Failed to determine current directory")?;
+        env::set_current_dir(self.path.clone())
+            .with_context(|| "Failed to change working directory")?;
 
         debug!("Linking dependencies...");
         self.link_dependencies()?;
@@ -58,7 +59,7 @@ impl Linker {
         debug!("Linking extensions...");
         self.link_extensions()?;
 
-        env::set_current_dir(cwd)?;
+        env::set_current_dir(cwd).with_context(|| "Failed to revert working directory")?;
 
         Ok(())
     }
@@ -74,23 +75,38 @@ impl Linker {
 
     /// Link a file relative to the package root to its proper location.
     fn link_file<P: AsRef<Path> + Clone>(&self, path: P, link_type: &LinkType) -> Result<()> {
-        let absolute = fs::canonicalize(path.clone())?;
+        let absolute = fs::canonicalize(path.clone()).with_context(|| {
+            format!(
+                "Failed to determine absolute path of {}",
+                path.as_ref().display()
+            )
+        })?;
 
         let relative_to_tree = path.as_ref().strip_prefix(self.package.tree_path())?;
         let dest = self.dest.join(relative_to_tree);
 
-        println!("{} -> {}", absolute.display(), dest.display());
+        trace!("Linking {} -> {}", absolute.display(), dest.display());
 
         self.prepare_link_location(&dest)?;
 
         match *link_type {
             LinkType::Link => {
-                symlink::symlink(&absolute, &dest)
-                    .map_err(|err| anyhow!("Failed to create symlink: {}", err))?;
+                symlink::symlink(&absolute, &dest).with_context(|| {
+                    format!(
+                        "Failed to create symlink between {} and {}",
+                        absolute.display(),
+                        dest.display()
+                    )
+                })?;
             }
             LinkType::Copy => {
-                fs::copy(&absolute, &dest)
-                    .map_err(|err| anyhow!("Failed to copy file: {}", err))?;
+                fs::copy(&absolute, &dest).with_context(|| {
+                    format!(
+                        "Failed to copy from {} to {}",
+                        absolute.display(),
+                        dest.display()
+                    )
+                })?;
             }
         };
 
@@ -104,20 +120,20 @@ impl Linker {
             if dest.is_file() {
                 if self.package.config.replace_files {
                     fs::remove_file(dest.clone())
-                        .map_err(|err| anyhow!("Failed to remove file: {}", err))
+                        .with_context(|| format!("Failed to remove file at {}", dest.display()))
                 } else {
                     Err(anyhow!("{} is an existing file", dest.display()))
                 }
             } else if dest.is_dir() {
                 if self.package.config.replace_directories {
                     fs::remove_dir_all(dest)
-                        .map_err(|err| anyhow!("Failed to remove directory: {}", err))
+                        .map_err(|err| anyhow!("Failed to remove directory at {}", err))
                 } else {
                     Err(anyhow!("{} is an existing directory", dest.display()))
                 }
             } else {
                 // Otherwise, return error.
-                Err(anyhow!("Could not stat file at {}", dest.display()))
+                Err(anyhow!("Failed to stat file at {}", dest.display()))
             }
         } else {
             // If dest doesn't exist, check its parent.
@@ -134,12 +150,8 @@ impl Linker {
             } else {
                 // Otherwise, try to create directories recursively and write to a new
                 // file.
-                return fs::create_dir_all(dest_parent.clone()).map_err(|err| {
-                    anyhow!(
-                        "Failed to create directories for {}: {}",
-                        dest_parent.display(),
-                        err
-                    )
+                return fs::create_dir_all(dest_parent.clone()).with_context(|| {
+                    format!("Failed to create directories for {}", dest_parent.display(),)
                 });
             }
         }
