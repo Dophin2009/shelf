@@ -143,6 +143,7 @@ impl Linker {
                 format!("Failed to render template file: {}", absolute_src.display())
             })?;
 
+        self.prepare_link_location(&absolute_dest)?;
         fs::write(&absolute_dest, rendered_str)
             .with_context(|| format!("Failed to write file {}", absolute_dest.display()))
     }
