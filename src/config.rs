@@ -150,6 +150,10 @@ pub struct FileProcess {
     pub dest: String,
     #[serde(default, rename = "linkType")]
     pub link_type: LinkType,
+    #[serde(default, rename = "replaceFiles")]
+    pub replace_files: Option<bool>,
+    #[serde(default, rename = "replaceDirectories")]
+    pub replace_directories: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -172,6 +176,10 @@ pub struct TemplateProcess {
     pub dest: String,
     #[serde(default)]
     pub engine: TemplateEngine,
+    #[serde(default, rename = "replaceFiles")]
+    pub replace_files: Option<bool>,
+    #[serde(default, rename = "replaceDirectories")]
+    pub replace_directories: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

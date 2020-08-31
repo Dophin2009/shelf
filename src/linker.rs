@@ -114,7 +114,13 @@ impl Linker {
         let relative_to_tree = path.as_ref().strip_prefix(self.package.tree_path())?;
         let dest = self.dest.join(relative_to_tree);
 
-        self.link_file(absolute, dest, &self.package.config.default_link_type)
+        self.link_file(
+            absolute,
+            dest,
+            &self.package.config.default_link_type,
+            self.package_cfg().replace_files,
+            self.package_cfg().replace_directories,
+        )
     }
 
     fn link_file_process(&self, file_process: &FileProcess) -> Result<()> {
@@ -125,7 +131,23 @@ impl Linker {
         let dest = &file_process.dest;
         let absolute_dest = self.dest.join(dest);
 
-        self.link_file(absolute_src, absolute_dest, &file_process.link_type)
+        let replace_files = match file_process.replace_files {
+            Some(b) => b,
+            None => self.package_cfg().replace_files,
+        };
+
+        let replace_directories = match file_process.replace_directories {
+            Some(b) => b,
+            None => self.package_cfg().replace_directories,
+        };
+
+        self.link_file(
+            absolute_src,
+            absolute_dest,
+            &file_process.link_type,
+            replace_files,
+            replace_directories,
+        )
     }
 
     fn link_template_process(&self, template_process: &TemplateProcess) -> Result<()> {
@@ -143,7 +165,17 @@ impl Linker {
                 format!("Failed to render template file: {}", absolute_src.display())
             })?;
 
-        self.prepare_link_location(&absolute_dest)?;
+        let replace_files = match template_process.replace_files {
+            Some(b) => b,
+            None => self.package_cfg().replace_files,
+        };
+
+        let replace_directories = match template_process.replace_directories {
+            Some(b) => b,
+            None => self.package_cfg().replace_directories,
+        };
+
+        self.prepare_link_location(&absolute_dest, replace_files, replace_directories)?;
         fs::write(&absolute_dest, rendered_str)
             .with_context(|| format!("Failed to write file {}", absolute_dest.display()))
     }
@@ -154,6 +186,8 @@ impl Linker {
         src: P,
         dest: P,
         link_type: &LinkType,
+        replace_files: bool,
+        replace_directories: bool,
     ) -> Result<()> {
         trace!(
             "Linking {} -> {}",
@@ -161,7 +195,7 @@ impl Linker {
             dest.as_ref().display()
         );
 
-        self.prepare_link_location(&dest)?;
+        self.prepare_link_location(&dest, replace_files, replace_directories)?;
 
         match *link_type {
             LinkType::Link => {
@@ -187,19 +221,24 @@ impl Linker {
         Ok(())
     }
 
-    fn prepare_link_location<P: AsRef<Path>>(&self, dest: P) -> Result<()> {
+    fn prepare_link_location<P: AsRef<Path>>(
+        &self,
+        dest: P,
+        replace_files: bool,
+        replace_directories: bool,
+    ) -> Result<()> {
         let dest = dest.as_ref();
         if dest.exists() {
             // If dest exists, check if it is a file or directory.
             if dest.is_file() {
-                if self.package.config.replace_files {
+                if replace_files {
                     fs::remove_file(dest.clone())
                         .with_context(|| format!("Failed to remove file at {}", dest.display()))
                 } else {
                     Err(anyhow!("{} is an existing file", dest.display()))
                 }
             } else if dest.is_dir() {
-                if self.package.config.replace_directories {
+                if replace_directories {
                     fs::remove_dir_all(dest)
                         .map_err(|err| anyhow!("Failed to remove directory at {}", err))
                 } else {
