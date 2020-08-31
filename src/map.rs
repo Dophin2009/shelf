@@ -32,6 +32,7 @@ pub enum Value {
     Float(f64),
     String(String),
     Bool(bool),
+    Nil,
 }
 
 impl Into<GtmplValue> for Value {
@@ -42,6 +43,7 @@ impl Into<GtmplValue> for Value {
             Value::Float(f) => f.into(),
             Value::String(s) => s.into(),
             Value::Bool(b) => b.into(),
+            Value::Nil => GtmplValue::Nil,
         }
     }
 }
