@@ -1,4 +1,4 @@
-use crate::config::{Config, FileProcess, Hook, LinkType, Package};
+use crate::config::{Config, FileProcess, Hook, LinkType, Package, TemplateProcess};
 use crate::map::Map;
 use crate::symlink;
 
@@ -95,6 +95,10 @@ impl Linker {
             self.link_file_process(&file_process)?;
         }
 
+        for template_process in &self.package_cfg().template_files {
+            self.link_template_process(&template_process)?;
+        }
+
         Ok(())
     }
 
@@ -122,6 +126,25 @@ impl Linker {
         let absolute_dest = self.dest.join(dest);
 
         self.link_file(absolute_src, absolute_dest, &file_process.link_type)
+    }
+
+    fn link_template_process(&self, template_process: &TemplateProcess) -> Result<()> {
+        let src = PathBuf::from(&template_process.src);
+        let absolute_src = fs::canonicalize(src.clone())
+            .with_context(|| format!("Failed to determine absolute path of {}", src.display()))?;
+
+        let dest = &template_process.dest;
+        let absolute_dest = self.dest.join(dest);
+
+        let src_str = fs::read_to_string(absolute_src.clone())
+            .with_context(|| format!("Failed to read source file {}", absolute_src.display()))?;
+        let rendered_str = Templater::render(&src_str, self.package_variables().clone())
+            .with_context(|| {
+                format!("Failed to render template file: {}", absolute_src.display())
+            })?;
+
+        fs::write(&absolute_dest, rendered_str)
+            .with_context(|| format!("Failed to write file {}", absolute_dest.display()))
     }
 
     /// Symlink or copy a file. `src` and `dest` can be absolute paths, or relative to the package root.
@@ -314,5 +337,16 @@ impl Linker {
 
     fn package_variables<'a>(&'a self) -> &'a Map {
         &self.package.variables
+    }
+}
+
+#[derive(Debug)]
+struct Templater;
+
+impl Templater {
+    fn render<T: Into<gtmpl::Value>>(template: &str, context: T) -> Result<String> {
+        let rendered = gtmpl::template(template, context)
+            .map_err(|err| anyhow!("Failed to render template: {}", err))?;
+        Ok(rendered)
     }
 }

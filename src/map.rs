@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
+use gtmpl::Value as GtmplValue;
+use gtmpl_derive::Gtmpl;
 use serde::Deserialize;
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Gtmpl)]
 pub struct Map {
     #[serde(default, flatten)]
     pub map: HashMap<String, Value>,
@@ -22,12 +24,24 @@ impl Default for Map {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 #[serde(untagged)]
 pub enum Value {
-    Object(Map),
+    Object(HashMap<String, Value>),
     Integer(i64),
     Float(f64),
     String(String),
     Bool(bool),
+}
+
+impl Into<GtmplValue> for Value {
+    fn into(self) -> GtmplValue {
+        match self {
+            Value::Object(map) => map.into(),
+            Value::Integer(n) => n.into(),
+            Value::Float(f) => f.into(),
+            Value::String(s) => s.into(),
+            Value::Bool(b) => b.into(),
+        }
+    }
 }

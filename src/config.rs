@@ -16,7 +16,6 @@ pub struct Package {
 
 impl Package {
     pub fn from_dhall_file<P: AsRef<Path>>(path: P) -> serde_dhall::Result<Self> {
-        println!("{}", path.as_ref().display());
         serde_dhall::from_file(path).parse()
     }
 
@@ -169,6 +168,7 @@ impl Default for LinkType {
 pub struct TemplateProcess {
     /// Path to the template, relative to package root.
     pub src: String,
+    /// Destination, relative to tree root.
     pub dest: String,
     #[serde(default)]
     pub engine: TemplateEngine,
