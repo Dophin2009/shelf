@@ -3,15 +3,12 @@ mod linker;
 mod map;
 mod symlink;
 
-use config::Package;
 use linker::Linker;
 
 use std::env;
-use std::process;
 
 use anyhow::{anyhow, Context, Result};
 use clap::Clap;
-use log::error;
 use stderrlog::ColorChoice;
 
 #[derive(Clap, Debug)]
@@ -24,7 +21,7 @@ struct Options {
     package: String,
 }
 
-fn main() {
+fn main() -> Result<()> {
     let opts = Options::parse();
 
     stderrlog::new()
@@ -35,14 +32,7 @@ fn main() {
         .init()
         .unwrap();
 
-    let exit = match cli(&opts) {
-        Ok(_) => 0,
-        Err(err) => {
-            error!("{}", err);
-            1
-        }
-    };
-    process::exit(exit);
+    cli(&opts)
 }
 
 fn cli(opts: &Options) -> Result<()> {
@@ -62,8 +52,7 @@ fn cli(opts: &Options) -> Result<()> {
         env::current_dir().with_context(|| "Failed to determine current working directory")?;
     let path = cwd.join(&opts.package);
 
-    let package = Package::from_dir(path.clone())?;
-    let linker = Linker::new(package, path, home, opts.quiet, opts.verbosity);
+    let linker = Linker::from_path(path, home, opts.quiet, opts.verbosity)?;
 
     linker.link()?;
 

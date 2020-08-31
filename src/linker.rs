@@ -17,23 +17,44 @@ pub struct Linker {
     package: Package,
     quiet: bool,
     verbosity: usize,
+
+    dependency_linkers: Vec<Self>,
+    extension_linkers: Vec<Self>,
 }
 
 impl Linker {
-    pub fn new(
+    pub fn new<P: AsRef<Path>>(
         package: Package,
-        path: PathBuf,
-        dest: PathBuf,
+        path: P,
+        dest: P,
         quiet: bool,
         verbosity: usize,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let mut new = Self {
             package,
-            path,
-            dest,
+            path: path.as_ref().into(),
+            dest: dest.as_ref().into(),
             quiet,
             verbosity,
-        }
+            dependency_linkers: vec![],
+            extension_linkers: vec![],
+        };
+
+        new.dependency_linkers = new.parse_dependency_linkers()?;
+        new.extension_linkers = new.parse_extension_linkers()?;
+
+        Ok(new)
+    }
+
+    pub fn from_path<P: AsRef<Path>>(
+        dir_path: P,
+        dest: P,
+        quiet: bool,
+        verbosity: usize,
+    ) -> Result<Self> {
+        let package = Package::from_dhall_file(dir_path.as_ref().join("package.dhall"))
+            .with_context(|| format!("Failed to parse package configuration"))?;
+        Self::new(package, dir_path, dest, quiet, verbosity)
     }
 
     pub fn link(&self) -> Result<()> {
@@ -67,14 +88,13 @@ impl Linker {
     pub fn link_files(&self) -> Result<()> {
         let normal_link_paths = self.package.normal_link_paths()?;
         for link_path in normal_link_paths {
-            self.link_file(&link_path, &self.package.config.default_link_type)?;
+            self.normal_link_file(&link_path)?;
         }
 
         Ok(())
     }
 
-    /// Link a file relative to the package root to its proper location.
-    fn link_file<P: AsRef<Path> + Clone>(&self, path: P, link_type: &LinkType) -> Result<()> {
+    fn normal_link_file<P: AsRef<Path> + Clone>(&self, path: P) -> Result<()> {
         let absolute = fs::canonicalize(path.clone()).with_context(|| {
             format!(
                 "Failed to determine absolute path of {}",
@@ -85,26 +105,40 @@ impl Linker {
         let relative_to_tree = path.as_ref().strip_prefix(self.package.tree_path())?;
         let dest = self.dest.join(relative_to_tree);
 
-        trace!("Linking {} -> {}", absolute.display(), dest.display());
+        self.link_file(absolute, dest, &self.package.config.default_link_type)
+    }
+
+    /// Link a file relative to the package root to its proper location.
+    fn link_file<P: AsRef<Path> + Clone>(
+        &self,
+        src: P,
+        dest: P,
+        link_type: &LinkType,
+    ) -> Result<()> {
+        trace!(
+            "Linking {} -> {}",
+            src.as_ref().display(),
+            dest.as_ref().display()
+        );
 
         self.prepare_link_location(&dest)?;
 
         match *link_type {
             LinkType::Link => {
-                symlink::symlink(&absolute, &dest).with_context(|| {
+                symlink::symlink(&src, &dest).with_context(|| {
                     format!(
                         "Failed to create symlink between {} and {}",
-                        absolute.display(),
-                        dest.display()
+                        src.as_ref().display(),
+                        dest.as_ref().display()
                     )
                 })?;
             }
             LinkType::Copy => {
-                fs::copy(&absolute, &dest).with_context(|| {
+                fs::copy(&src, &dest).with_context(|| {
                     format!(
                         "Failed to copy from {} to {}",
-                        absolute.display(),
-                        dest.display()
+                        src.as_ref().display(),
+                        dest.as_ref().display()
                     )
                 })?;
             }
@@ -209,53 +243,51 @@ impl Linker {
             }
         }
 
-        let child = cmd.spawn()?;
-        child.wait_with_output()?;
+        let child = cmd.spawn().with_context(|| "Failed to spawn command")?;
+        child
+            .wait_with_output()
+            .with_context(|| "Failed to with on process")?;
 
         Ok(())
     }
 
     pub fn link_dependencies(&self) -> Result<()> {
-        let linkers = self.dependency_linkers()?;
-        for linker in linkers {
+        for linker in &self.dependency_linkers {
+            linker.link()?;
+        }
+        Ok(())
+    }
+
+    pub fn link_extensions(&self) -> Result<()> {
+        for linker in &self.extension_linkers {
             linker.link()?;
         }
         Ok(())
     }
 
     /// Returns Linkers for the dependencies.
-    fn dependency_linkers(&self) -> Result<Vec<Self>> {
+    fn parse_dependency_linkers(&self) -> Result<Vec<Self>> {
         let dependencies = &self.package_cfg().dependencies;
         self.linkers_list(dependencies)
     }
 
-    pub fn link_extensions(&self) -> Result<()> {
-        let linkers = self.extension_linkers()?;
-        for linker in linkers {
-            linker.link()?;
-        }
-        Ok(())
-    }
-
     /// Returns Linkers for the exntension packages.
-    fn extension_linkers(&self) -> Result<Vec<Self>> {
+    fn parse_extension_linkers(&self) -> Result<Vec<Self>> {
         let extensions = &self.package_cfg().extensions;
         self.linkers_list(extensions)
     }
 
-    /// Returns Linkers for the dependencies of the package.
+    /// Returns Linkers for the dependencies/extensions of the package.
     fn linkers_list<P: AsRef<Path>>(&self, paths: &Vec<P>) -> Result<Vec<Self>> {
         paths
             .iter()
             .map(|dep| -> Result<_> {
-                let dep_package = Package::from_dir(dep.as_ref().into())?;
-                Ok(Linker::new(
-                    dep_package,
+                Self::from_path(
                     dep.as_ref().into(),
                     self.dest.clone(),
                     self.quiet,
                     self.verbosity,
-                ))
+                )
             })
             .collect::<Result<Vec<Self>>>()
     }

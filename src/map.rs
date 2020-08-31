@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 pub struct Map {
-    #[serde(flatten)]
+    #[serde(default, flatten)]
     pub map: HashMap<String, Value>,
 }
 

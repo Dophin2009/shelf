@@ -3,7 +3,7 @@ use crate::map::Map;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -15,14 +15,9 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn from_dir(path: PathBuf) -> Result<Self> {
-        let cfg_path = path.join("package.dhall");
-        let package = Self::from_dhall_file(&cfg_path)?;
-        Ok(package)
-    }
-
     pub fn from_dhall_file<P: AsRef<Path>>(path: P) -> serde_dhall::Result<Self> {
-        serde_dhall::from_file(path.as_ref()).parse()
+        println!("{}", path.as_ref().display());
+        serde_dhall::from_file(path).parse()
     }
 
     /// Returns the set of paths (relative to the package root) that should be ignored in normal
