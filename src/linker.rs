@@ -40,8 +40,12 @@ impl Linker {
             extension_linkers: vec![],
         };
 
-        new.dependency_linkers = new.parse_dependency_linkers()?;
-        new.extension_linkers = new.parse_extension_linkers()?;
+        new.dependency_linkers = new
+            .parse_dependency_linkers()
+            .with_context(|| "Failed to parse dependency packages")?;
+        new.extension_linkers = new
+            .parse_extension_linkers()
+            .with_context(|| "Failed to parse extensions packages")?;
 
         Ok(new)
     }
@@ -415,12 +419,8 @@ impl Linker {
         paths
             .iter()
             .map(|dep| -> Result<_> {
-                Self::from_path(
-                    dep.as_ref().into(),
-                    self.dest.clone(),
-                    self.quiet,
-                    self.verbosity,
-                )
+                let path = self.path.join(dep);
+                Self::from_path(path, self.dest.clone(), self.quiet, self.verbosity)
             })
             .collect::<Result<Vec<Self>>>()
     }
