@@ -233,11 +233,7 @@ impl Linker {
         Ok(())
     }
 
-    pub fn copy_dir<U: AsRef<Path>, V: AsRef<Path>>(
-        &self,
-        from: U,
-        to: V,
-    ) -> Result<(), std::io::Error> {
+    pub fn copy_dir<U: AsRef<Path>, V: AsRef<Path>>(&self, from: U, to: V) -> Result<()> {
         let mut stack = Vec::new();
         stack.push(PathBuf::from(from.as_ref()));
 
@@ -270,9 +266,7 @@ impl Linker {
                             let dest_path = dest.join(filename);
                             fs::copy(&path, &dest_path)?;
                         }
-                        None => {
-                            println!("failed: {:?}", path);
-                        }
+                        None => return Err(anyhow!("Failed to copy: {}", path.display())),
                     }
                 }
             }
