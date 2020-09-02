@@ -44,6 +44,10 @@ impl PackageGraph {
             let dep_path_abs = path.join(dep_path_rel);
             let dep_path = fs::canonicalize(dep_path_abs)?;
             let dep = Package::from_directory(&dep_path)?;
+
+            let dep_id = hash_path(&dep_path);
+            self.graph.add_edge(id, dep_id, ());
+
             self.add_package(dep_path, dep)?;
         }
 
@@ -51,7 +55,7 @@ impl PackageGraph {
     }
 
     pub fn topological_order(&self) -> Result<impl Iterator<Item = &(PathBuf, Package)>> {
-        let sorted = match algo::toposort(&self.graph, None) {
+        let mut sorted = match algo::toposort(&self.graph, None) {
             Ok(v) => v,
             Err(cycle) => {
                 return Err(anyhow!(
@@ -60,6 +64,7 @@ impl PackageGraph {
                 ))?
             }
         };
+        sorted.reverse();
 
         let iter: Vec<_> = sorted
             .into_iter()
