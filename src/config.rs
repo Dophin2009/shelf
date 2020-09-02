@@ -15,7 +15,18 @@ pub struct Package {
 }
 
 impl Package {
-    pub fn from_dhall_file<P: AsRef<Path>>(path: P) -> serde_dhall::Result<Self> {
+    pub fn from_directory<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let config_path = path.as_ref().join("package.dhall");
+        let package = Package::from_dhall_file(&config_path).with_context(|| {
+            format!(
+                "Failed to load package configuration from {}",
+                config_path.display()
+            )
+        })?;
+        Ok(package)
+    }
+
+    fn from_dhall_file<P: AsRef<Path>>(path: P) -> serde_dhall::Result<Self> {
         serde_dhall::from_file(path).parse()
     }
 

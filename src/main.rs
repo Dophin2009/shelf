@@ -1,8 +1,10 @@
 mod config;
+mod dependency;
 mod linker;
 mod map;
 mod symlink;
 
+use config::Package;
 use linker::Linker;
 
 use std::env;
@@ -38,7 +40,7 @@ fn main() -> Result<()> {
 fn cli(opts: &Options) -> Result<()> {
     let home_key = "HOME";
     let home = match env::var(home_key) {
-        Ok(val) => val.into(),
+        Ok(val) => val,
         Err(err) => {
             return Err(anyhow!(
                 "Environment variable {} not set: {}",
@@ -52,9 +54,10 @@ fn cli(opts: &Options) -> Result<()> {
         env::current_dir().with_context(|| "Failed to determine current working directory")?;
     let path = cwd.join(&opts.package);
 
-    let linker = Linker::from_path(path, home, opts.quiet, opts.verbosity)?;
+    let package = Package::from_directory(&path)?;
+    let linker = Linker::new(home, opts.quiet, opts.verbosity);
 
-    linker.link()?;
+    linker.link(path.into(), package)?;
 
     Ok(())
 }

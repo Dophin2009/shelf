@@ -1,5 +1,5 @@
-use crate::config::{Config, FileProcess, Hook, LinkType, Package, TemplateProcess};
-use crate::map::Map;
+use crate::config::{FileProcess, Hook, LinkType, Package, TemplateProcess};
+use crate::dependency::PackageGraph;
 use crate::symlink;
 
 use std::env;
@@ -11,66 +11,71 @@ use anyhow::{anyhow, Context, Result};
 use log::{debug, info, trace};
 
 #[derive(Debug)]
+struct Templater;
+
+impl Templater {
+    fn render<T: Into<gtmpl::Value>>(template: &str, context: T) -> Result<String> {
+        let rendered = gtmpl::template(template, context)
+            .map_err(|err| anyhow!("Failed to render template: {}", err))?;
+        Ok(rendered)
+    }
+}
+
+#[derive(Debug)]
 pub struct Linker {
     dest: PathBuf,
-    path: PathBuf,
-    package: Package,
     quiet: bool,
     verbosity: usize,
-
-    dependency_linkers: Vec<Self>,
-    extension_linkers: Vec<Self>,
 }
 
 impl Linker {
-    pub fn new<P: AsRef<Path>>(
-        package: Package,
-        path: P,
-        dest: P,
-        quiet: bool,
-        verbosity: usize,
-    ) -> Result<Self> {
-        let mut new = Self {
-            package,
-            path: path.as_ref().into(),
+    pub fn new<P: AsRef<Path>>(dest: P, quiet: bool, verbosity: usize) -> Self {
+        Self {
             dest: dest.as_ref().into(),
             quiet,
             verbosity,
-            dependency_linkers: vec![],
-            extension_linkers: vec![],
-        };
-
-        new.dependency_linkers = new
-            .parse_dependency_linkers()
-            .with_context(|| "Failed to parse dependency packages")?;
-        new.extension_linkers = new
-            .parse_extension_linkers()
-            .with_context(|| "Failed to parse extensions packages")?;
-
-        Ok(new)
+        }
     }
 
-    pub fn from_path<P: AsRef<Path>>(
-        dir_path: P,
-        dest: P,
-        quiet: bool,
-        verbosity: usize,
-    ) -> Result<Self> {
-        let package = Package::from_dhall_file(dir_path.as_ref().join("package.dhall"))
-            .with_context(|| format!("Failed to parse package configuration"))?;
-        Self::new(package, dir_path, dest, quiet, verbosity)
+    pub fn link(&self, path: PathBuf, package: Package) -> Result<()> {
+        info!("Resolving package dependency graph...");
+        let graph = PackageGraph::from_package(path, package)?;
+
+        info!("Sorting packages...");
+        let order = graph.topological_order()?;
+
+        for (path, package) in order {
+            info!("Linking {}", package.config.name);
+            let state = LinkerState::new(self, path, package);
+            state.link()?;
+        }
+
+        Ok(())
     }
+}
 
-    pub fn link(&self) -> Result<()> {
-        info!("Linking {}...", self.package_cfg().name);
+struct LinkerState<'a> {
+    linker: &'a Linker,
+    path: &'a PathBuf,
+    package: &'a Package,
+}
 
+impl<'a> LinkerState<'a> {
+    fn new(linker: &'a Linker, path: &'a PathBuf, package: &'a Package) -> Self {
+        Self {
+            linker,
+            path,
+            package,
+        }
+    }
+}
+
+impl<'a> LinkerState<'a> {
+    fn link(&self) -> Result<()> {
         // Work relative to the package root.
         let cwd = env::current_dir().with_context(|| "Failed to determine current directory")?;
         env::set_current_dir(self.path.clone())
             .with_context(|| "Failed to change working directory")?;
-
-        debug!("Linking dependencies...");
-        self.link_dependencies()?;
 
         debug!("Running before-link hooks...");
         self.exec_before_link()?;
@@ -81,25 +86,22 @@ impl Linker {
         debug!("Running after-link hooks...");
         self.exec_after_link()?;
 
-        debug!("Linking extensions...");
-        self.link_extensions()?;
-
         env::set_current_dir(cwd).with_context(|| "Failed to revert working directory")?;
 
         Ok(())
     }
 
-    pub fn link_files(&self) -> Result<()> {
+    fn link_files(&self) -> Result<()> {
         let normal_link_paths = self.package.normal_link_paths()?;
         for link_path in normal_link_paths {
             self.normal_link_file(&link_path)?;
         }
 
-        for file_process in &self.package_cfg().files {
+        for file_process in &self.package.config.files {
             self.link_file_process(&file_process)?;
         }
 
-        for template_process in &self.package_cfg().template_files {
+        for template_process in &self.package.config.template_files {
             self.link_template_process(&template_process)?;
         }
 
@@ -116,14 +118,14 @@ impl Linker {
         })?;
 
         let relative_to_tree = path.as_ref().strip_prefix(self.package.tree_path())?;
-        let dest = self.dest.join(relative_to_tree);
+        let dest = self.linker.dest.join(relative_to_tree);
 
         self.link_file(
             absolute,
             dest,
             &self.package.config.default_link_type,
-            self.package_cfg().replace_files,
-            self.package_cfg().replace_directories,
+            self.package.config.replace_files,
+            self.package.config.replace_directories,
         )
     }
 
@@ -133,16 +135,16 @@ impl Linker {
             .with_context(|| format!("Failed to determine absolute path of {}", src.display()))?;
 
         let dest = &file_process.dest;
-        let absolute_dest = self.dest.join(dest);
+        let absolute_dest = self.linker.dest.join(dest);
 
         let replace_files = match file_process.replace_files {
             Some(b) => b,
-            None => self.package_cfg().replace_files,
+            None => self.package.config.replace_files,
         };
 
         let replace_directories = match file_process.replace_directories {
             Some(b) => b,
-            None => self.package_cfg().replace_directories,
+            None => self.package.config.replace_directories,
         };
 
         self.link_file(
@@ -160,23 +162,23 @@ impl Linker {
             .with_context(|| format!("Failed to determine absolute path of {}", src.display()))?;
 
         let dest = &template_process.dest;
-        let absolute_dest = self.dest.join(dest);
+        let absolute_dest = self.linker.dest.join(dest);
 
         let src_str = fs::read_to_string(absolute_src.clone())
             .with_context(|| format!("Failed to read source file {}", absolute_src.display()))?;
-        let rendered_str = Templater::render(&src_str, self.package_variables().map.clone())
+        let rendered_str = Templater::render(&src_str, self.package.variables.map.clone())
             .with_context(|| {
                 format!("Failed to render template file: {}", absolute_src.display())
             })?;
 
         let replace_files = match template_process.replace_files {
             Some(b) => b,
-            None => self.package_cfg().replace_files,
+            None => self.package.config.replace_files,
         };
 
         let replace_directories = match template_process.replace_directories {
             Some(b) => b,
-            None => self.package_cfg().replace_directories,
+            None => self.package.config.replace_directories,
         };
 
         self.prepare_link_location(&absolute_dest, replace_files, replace_directories)?;
@@ -329,12 +331,12 @@ impl Linker {
     }
 
     pub fn exec_before_link(&self) -> Result<()> {
-        self.exec_hooks(&self.package_cfg().before_link)?;
+        self.exec_hooks(&self.package.config.before_link)?;
         Ok(())
     }
 
     pub fn exec_after_link(&self) -> Result<()> {
-        self.exec_hooks(&self.package_cfg().after_link)?;
+        self.exec_hooks(&self.package.config.after_link)?;
         Ok(())
     }
 
@@ -373,9 +375,9 @@ impl Linker {
     }
 
     fn exec_command(&self, mut cmd: Command) -> Result<()> {
-        if !self.quiet {
+        if !self.linker.quiet {
             cmd.stderr(Stdio::inherit());
-            if self.verbosity > 2 {
+            if self.linker.verbosity >= 4 {
                 cmd.stdout(Stdio::inherit());
             }
         }
@@ -386,61 +388,5 @@ impl Linker {
             .with_context(|| "Failed to with on process")?;
 
         Ok(())
-    }
-
-    pub fn link_dependencies(&self) -> Result<()> {
-        for linker in &self.dependency_linkers {
-            linker.link()?;
-        }
-        Ok(())
-    }
-
-    pub fn link_extensions(&self) -> Result<()> {
-        for linker in &self.extension_linkers {
-            linker.link()?;
-        }
-        Ok(())
-    }
-
-    /// Returns Linkers for the dependencies.
-    fn parse_dependency_linkers(&self) -> Result<Vec<Self>> {
-        let dependencies = &self.package_cfg().dependencies;
-        self.linkers_list(dependencies)
-    }
-
-    /// Returns Linkers for the exntension packages.
-    fn parse_extension_linkers(&self) -> Result<Vec<Self>> {
-        let extensions = &self.package_cfg().extensions;
-        self.linkers_list(extensions)
-    }
-
-    /// Returns Linkers for the dependencies/extensions of the package.
-    fn linkers_list<P: AsRef<Path>>(&self, paths: &Vec<P>) -> Result<Vec<Self>> {
-        paths
-            .iter()
-            .map(|dep| -> Result<_> {
-                let path = self.path.join(dep);
-                Self::from_path(path, self.dest.clone(), self.quiet, self.verbosity)
-            })
-            .collect::<Result<Vec<Self>>>()
-    }
-
-    fn package_cfg<'a>(&'a self) -> &'a Config {
-        &self.package.config
-    }
-
-    fn package_variables<'a>(&'a self) -> &'a Map {
-        &self.package.variables
-    }
-}
-
-#[derive(Debug)]
-struct Templater;
-
-impl Templater {
-    fn render<T: Into<gtmpl::Value>>(template: &str, context: T) -> Result<String> {
-        let rendered = gtmpl::template(template, context)
-            .map_err(|err| anyhow!("Failed to render template: {}", err))?;
-        Ok(rendered)
     }
 }
