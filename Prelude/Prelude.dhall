@@ -1,8 +1,8 @@
 { Env = ./Env
 , Package = ./Package/Type
-, LinkType = ./FileProcess/LinkType
-, FileProcess = ./FileProcess/Type
-, TemplateProcess = ./TemplateProcess/Type
-, TemplateEngine = ./TemplateProcess/Engine
+, LinkType = ./File/LinkType
+, File = ./File/Type
+, Template = ./Template/Type
+, TemplateEngine = ./Template/Engine
 , Hook = ./Hook/Type
 }

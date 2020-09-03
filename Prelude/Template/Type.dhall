@@ -1,6 +1,6 @@
 let Engine = ./Engine
 
-let TemplateProcess =
+let Template =
       { Type =
           { src : Text
           , dest : Text
@@ -15,4 +15,4 @@ let TemplateProcess =
         }
       }
 
-in  TemplateProcess
+in  Template

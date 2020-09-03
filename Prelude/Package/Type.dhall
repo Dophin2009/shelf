@@ -1,10 +1,10 @@
 let Hook = ../Hook/Type.dhall
 
-let File = ../FileProcess/Type
+let File = ../File/Type
 
-let LinkType = ../FileProcess/LinkType
+let LinkType = ../File/LinkType
 
-let TemplateProcess = ../TemplateProcess/Type
+let Template = ../Template/Type
 
 let Package =
       { Type =
@@ -13,20 +13,20 @@ let Package =
           , defaultLinkType : LinkType
           , ignorePatterns : List Text
           , files : List File.Type
-          , templateFiles : List TemplateProcess.Type
+          , templateFiles : List Template.Type
           , beforeLink : List Hook
           , afterLink : List Hook
-          , tree : Text
+          , treePath : Text
           }
       , default =
         { dependencies = [] : List Text
         , defaultLinkType = LinkType.Link
         , ignorePatterns = [] : List Text
         , files = [] : List File.Type
-        , templateFiles = [] : List TemplateProcess.Type
+        , templateFiles = [] : List Template.Type
         , beforeLink = [] : List Hook
         , afterLink = [] : List Hook
-        , tree = Some "tree"
+        , treePath = "tree"
         }
       }
 
