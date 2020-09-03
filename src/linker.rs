@@ -51,7 +51,7 @@ impl Linker {
     }
 
     pub fn link_package(&self, path: PathBuf, package: Package) -> Result<()> {
-        info!("Resolving package dependency graph...");
+        debug!("-- Resolving package dependency graph...");
         let graph = PackageGraph::from_package(path, package)?;
 
         self.link_package_graph(&graph)?;
@@ -83,13 +83,13 @@ impl<'a> LinkerState<'a> {
         env::set_current_dir(self.path.clone())
             .with_context(|| "Failed to change working directory")?;
 
-        debug!("Running before-link hooks...");
+        debug!("-- Running before-link hooks...");
         self.exec_before_link()?;
 
-        debug!("Linking files...");
+        debug!("-- Linking files...");
         self.link_files()?;
 
-        debug!("Running after-link hooks...");
+        debug!("-- Running after-link hooks...");
         self.exec_after_link()?;
 
         env::set_current_dir(cwd).with_context(|| "Failed to revert working directory")?;
@@ -349,7 +349,7 @@ impl<'a> LinkerState<'a> {
     /// Executes a list of hook commands.
     fn exec_hooks(&self, hooks: &Vec<Hook>) -> Result<()> {
         for hook in hooks {
-            debug!("Running hook {}...", hook.name);
+            debug!("-- Running hook {}...", hook.name);
             self.exec_hook(&hook)?;
         }
         Ok(())
