@@ -5,12 +5,14 @@ mod map;
 mod symlink;
 
 use config::Package;
+use dependency::PackageGraph;
 use linker::Linker;
 
 use std::env;
 
 use anyhow::{anyhow, Context, Result};
 use clap::Clap;
+use log::info;
 use stderrlog::ColorChoice;
 
 #[derive(Clap, Debug)]
@@ -20,7 +22,7 @@ struct Options {
     verbosity: usize,
     #[clap(short, long, about = "Silence all output")]
     quiet: bool,
-    package: String,
+    packages: Vec<String>,
 }
 
 fn main() -> Result<()> {
@@ -52,12 +54,19 @@ fn cli(opts: &Options) -> Result<()> {
 
     let cwd =
         env::current_dir().with_context(|| "Failed to determine current working directory")?;
-    let path = cwd.join(&opts.package);
 
-    let package = Package::from_directory(&path)?;
     let linker = Linker::new(home, opts.quiet, opts.verbosity);
+    let mut graph = PackageGraph::new();
 
-    linker.link(path.into(), package)?;
+    info!("Resolving package dependency graph...");
+    for package in &opts.packages {
+        let path = cwd.join(package);
+        let package = Package::from_directory(&path)?;
+
+        graph.add_package(path, package)?;
+    }
+
+    linker.link_package_graph(&graph)?;
 
     Ok(())
 }

@@ -18,26 +18,33 @@ pub struct PackageGraph {
 }
 
 impl PackageGraph {
+    pub fn new() -> Self {
+        Self {
+            graph: DiGraphMap::new(),
+            map: HashMap::new(),
+        }
+    }
+
     /// Build a package dependency graph from a package. `path` must be the absolute path of the
     /// package.
     pub fn from_package(path: PathBuf, root: Package) -> Result<Self> {
-        let mut new = PackageGraph {
-            graph: DiGraphMap::new(),
-            map: HashMap::new(),
-        };
-
+        let mut new = Self::new();
         new.add_package(path, root)?;
 
         Ok(new)
     }
 
     /// Add a package to the graph and map by absolute path.
-    fn add_package(&mut self, path: PathBuf, package: Package) -> Result<()> {
+    pub fn add_package(&mut self, path: PathBuf, package: Package) -> Result<()> {
         let dependencies = package.config.dependencies.clone();
 
         let id = hash_path(&path);
+        let existing = self.map.insert(id, (path.clone(), package));
+        if existing.is_some() {
+            return Ok(());
+        }
+
         self.graph.add_node(id);
-        self.map.insert(id, (path.clone(), package));
 
         // Add dependencies of the package.
         for dep_path_rel in &dependencies {

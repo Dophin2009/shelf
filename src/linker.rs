@@ -37,10 +37,7 @@ impl Linker {
         }
     }
 
-    pub fn link(&self, path: PathBuf, package: Package) -> Result<()> {
-        info!("Resolving package dependency graph...");
-        let graph = PackageGraph::from_package(path, package)?;
-
+    pub fn link_package_graph(&self, graph: &PackageGraph) -> Result<()> {
         info!("Sorting packages...");
         let order = graph.topological_order()?;
 
@@ -49,6 +46,15 @@ impl Linker {
             let state = LinkerState::new(self, path, package);
             state.link()?;
         }
+
+        Ok(())
+    }
+
+    pub fn link_package(&self, path: PathBuf, package: Package) -> Result<()> {
+        info!("Resolving package dependency graph...");
+        let graph = PackageGraph::from_package(path, package)?;
+
+        self.link_package_graph(&graph)?;
 
         Ok(())
     }
