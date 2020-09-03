@@ -1,18 +1,18 @@
-let LinkType = ./linktype.dhall
+let Engine = ./Engine
 
-let File =
+let TemplateProcess =
       { Type =
           { src : Text
           , dest : Text
-          , linkType : LinkType
+          , engine : Engine
           , replaceFiles : Optional Bool
           , replaceDirectories : Optional Bool
           }
       , default =
-        { linkType = LinkType.Link
+        { engine = Engine.Gtmpl
         , replaceFiles = None Bool
         , replaceDirectories = None Bool
         }
       }
 
-in  File
+in  TemplateProcess

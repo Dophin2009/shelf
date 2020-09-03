@@ -1,10 +1,10 @@
-let LinkType = ./linktype.dhall
+let Hook = ../Hook/Type.dhall
 
-let Hook = ./hook.dhall
+let File = ../FileProcess/Type
 
-let File = ./file.dhall
+let LinkType = ../FileProcess/LinkType
 
-let TemplateFile = (./template.dhall).File
+let TemplateProcess = ../TemplateProcess/Type
 
 let Package =
       { Type =
@@ -13,7 +13,7 @@ let Package =
           , defaultLinkType : LinkType
           , ignorePatterns : List Text
           , files : List File.Type
-          , templateFiles : List TemplateFile.Type
+          , templateFiles : List TemplateProcess.Type
           , beforeLink : List Hook
           , afterLink : List Hook
           , tree : Text
@@ -23,7 +23,7 @@ let Package =
         , defaultLinkType = LinkType.Link
         , ignorePatterns = [] : List Text
         , files = [] : List File.Type
-        , templateFiles = [] : List TemplateFile.Type
+        , templateFiles = [] : List TemplateProcess.Type
         , beforeLink = [] : List Hook
         , afterLink = [] : List Hook
         , tree = Some "tree"

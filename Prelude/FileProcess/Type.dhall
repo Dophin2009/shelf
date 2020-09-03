@@ -1,18 +1,18 @@
-let Engine = < Gtmpl >
+let LinkType = ./LinkType
 
 let File =
       { Type =
           { src : Text
           , dest : Text
-          , engine : Engine
+          , linkType : LinkType
           , replaceFiles : Optional Bool
           , replaceDirectories : Optional Bool
           }
       , default =
-        { engine = Engine.Gtmpl
+        { linkType = LinkType.Link
         , replaceFiles = None Bool
         , replaceDirectories = None Bool
         }
       }
 
-in  { Engine, File }
+in  File
