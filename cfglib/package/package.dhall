@@ -16,6 +16,7 @@ let Package =
           , templateFiles : List TemplateFile.Type
           , beforeLink : List Hook
           , afterLink : List Hook
+          , tree : Text
           }
       , default =
         { dependencies = [] : List Text
@@ -25,6 +26,7 @@ let Package =
         , templateFiles = [] : List TemplateFile.Type
         , beforeLink = [] : List Hook
         , afterLink = [] : List Hook
+        , tree = Some "tree"
         }
       }
 

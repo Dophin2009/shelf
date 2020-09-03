@@ -119,7 +119,7 @@ impl Package {
     }
 
     pub fn tree_prefix(&self) -> String {
-        String::from("tree")
+        self.config.tree_path.clone()
     }
 }
 
@@ -147,10 +147,16 @@ pub struct Config {
     pub replace_files: bool,
     #[serde(default, rename = "replaceDirectories")]
     pub replace_directories: bool,
+    #[serde(default = "default_tree_path", rename = "treePath")]
+    pub tree_path: String,
 }
 
 fn default_replace_files() -> bool {
     true
+}
+
+fn default_tree_path() -> String {
+    String::from("tree")
 }
 
 #[derive(Debug, Deserialize)]
