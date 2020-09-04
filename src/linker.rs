@@ -1,7 +1,8 @@
-use crate::config::{FileProcess, Hook, LinkType, Package, TemplateProcess};
+use crate::config::{FileProcess, Hook, LinkType, Package, TemplateProcess, Tree};
 use crate::dependency::PackageGraph;
 use crate::symlink;
 
+use std::collections::HashSet;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -98,9 +99,30 @@ impl<'a> LinkerState<'a> {
     }
 
     fn link_files(&self) -> Result<()> {
-        let normal_link_paths = self.package.normal_link_paths()?;
-        for link_path in normal_link_paths {
-            self.normal_link_file(&link_path)?;
+        for tree in &self.package.config.trees {
+            // Get normal link paths with ignore patterns applied.
+            let mut normal_link_paths = self.normal_link_paths(tree)?;
+
+            // Remove special file paths.
+            for file_process in &self.package.config.files {
+                let path: PathBuf = file_process.src.clone().into();
+                normal_link_paths.remove(&path);
+
+                let descendants = self.glob_relative(&path.join("**/*").to_string_lossy())?;
+                for d in descendants {
+                    normal_link_paths.remove(&d);
+                }
+            }
+
+            // Remove template file paths.
+            for template_process in &self.package.config.template_files {
+                let path: PathBuf = template_process.src.clone().into();
+                normal_link_paths.remove(&path);
+            }
+
+            for link_path in normal_link_paths {
+                self.normal_link_file(&link_path, &tree)?;
+            }
         }
 
         for file_process in &self.package.config.files {
@@ -115,7 +137,7 @@ impl<'a> LinkerState<'a> {
     }
 
     /// Link a file relative to the package root to its proper location.
-    fn normal_link_file<P: AsRef<Path> + Clone>(&self, path: P) -> Result<()> {
+    fn normal_link_file<P: AsRef<Path> + Clone>(&self, path: P, tree: &Tree) -> Result<()> {
         let absolute = fs::canonicalize(path.clone()).with_context(|| {
             format!(
                 "Failed to determine absolute path of {}",
@@ -123,16 +145,80 @@ impl<'a> LinkerState<'a> {
             )
         })?;
 
-        let relative_to_tree = path.as_ref().strip_prefix(self.package.tree_path())?;
+        let relative_to_tree = path.as_ref().strip_prefix(&tree.path)?;
         let dest = self.linker.dest.join(relative_to_tree);
+
+        let link_type = match &tree.default_link_type {
+            Some(x) => x,
+            None => &self.package.config.default_link_type,
+        };
+
+        let replace_files = tree
+            .replace_files
+            .unwrap_or(self.package.config.replace_files);
+        let replace_directories = tree
+            .replace_files
+            .unwrap_or(self.package.config.replace_directories);
 
         self.link_file(
             absolute,
             dest,
-            &self.package.config.default_link_type,
-            self.package.config.replace_files,
-            self.package.config.replace_directories,
+            &link_type,
+            replace_files,
+            replace_directories,
         )
+    }
+
+    /// Returns the set of paths (relative to the package root), with ignore patterns applied.
+    pub fn normal_link_paths(&self, tree: &Tree) -> Result<HashSet<PathBuf>> {
+        // Glob all files starting at tree.
+        let mut paths: HashSet<_> = self.glob_relative(&tree.file_path_str("**/*"))?;
+
+        // Glob ignore patterns.
+        let ignored = self.ignored_paths(tree)?;
+
+        // Remove ignored paths.
+        for path in HashSet::intersection(&paths.clone(), &ignored) {
+            paths.remove(path);
+        }
+
+        Ok(paths)
+    }
+
+    /// Returns the set of paths (relative to the package root) that should be ignored in normal
+    /// linking.
+    pub fn ignored_paths(&self, tree: &Tree) -> Result<HashSet<PathBuf>> {
+        let ignore_patterns = &self.package.config.ignore_patterns;
+        let paths_iter = ignore_patterns
+            .iter()
+            .map(|p| self.glob_relative(&tree.file_path_str(p)));
+
+        let mut paths = HashSet::new();
+        for p_result in paths_iter {
+            let p = p_result?;
+            paths.extend(p);
+        }
+
+        Ok(paths)
+    }
+
+    /// Glob for files with a pattern relative to the package root.
+    fn glob_relative(&self, pattern: &str) -> Result<HashSet<PathBuf>> {
+        let paths = glob::glob(pattern)
+            .with_context(|| format!("Failed to glob invalid pattern {}", pattern))?;
+
+        // Collect and check the glob results.
+        let mut set: HashSet<PathBuf> = paths
+            .map(|glob_result| {
+                glob_result
+                    .with_context(|| format!("Failed to stat path in globbing pattern {}", pattern))
+            })
+            .collect::<Result<_>>()?;
+
+        // Filter to only include files.
+        set = set.into_iter().filter(|p| p.is_file()).collect();
+
+        Ok(set)
     }
 
     fn link_file_process(&self, file_process: &FileProcess) -> Result<()> {

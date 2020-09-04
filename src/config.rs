@@ -1,10 +1,11 @@
 use crate::map::Map;
 
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
+
+type IgnorePatterns = Vec<String>;
 
 #[derive(Debug, Deserialize)]
 pub struct Package {
@@ -29,134 +30,98 @@ impl Package {
     fn from_dhall_file<P: AsRef<Path>>(path: P) -> serde_dhall::Result<Self> {
         serde_dhall::from_file(path).parse()
     }
-
-    /// Returns the set of paths (relative to the package root) that should be ignored in normal
-    /// linking.
-    pub fn normal_link_paths(&self) -> Result<HashSet<PathBuf>> {
-        // Glob all files starting at tree.
-        let mut paths: HashSet<_> = self.glob_relative(&self.tree_path_str("**/*"))?;
-
-        // Glob ignore patterns.
-        let ignored = self.ignored_paths()?;
-
-        // Remove ignored paths.
-        for path in HashSet::intersection(&paths.clone(), &ignored) {
-            paths.remove(path);
-        }
-
-        for file_process in &self.config.files {
-            let path: PathBuf = file_process.src.clone().into();
-            paths.remove(&path);
-
-            let descendants = self.glob_relative(&path.join("**/*").to_string_lossy())?;
-            for d in descendants {
-                paths.remove(&d);
-            }
-        }
-
-        for template_process in &self.config.template_files {
-            let path: PathBuf = template_process.src.clone().into();
-            paths.remove(&path);
-        }
-
-        Ok(paths)
-    }
-
-    /// Returns the set of paths (relative to the package root) that should be ignored in normal
-    /// linking.
-    pub fn ignored_paths(&self) -> Result<HashSet<PathBuf>> {
-        let ignore_patterns = &self.config.ignore_patterns;
-        let paths_iter = ignore_patterns
-            .iter()
-            .map(|p| self.glob_relative(&self.tree_path_str(p)));
-
-        let mut paths = HashSet::new();
-        for p_result in paths_iter {
-            let p = p_result?;
-            paths.extend(p);
-        }
-
-        Ok(paths)
-    }
-
-    /// Glob for files with a pattern relative to the package root.
-    fn glob_relative(&self, pattern: &str) -> Result<HashSet<PathBuf>> {
-        let paths = glob::glob(pattern)
-            .with_context(|| format!("Failed to glob invalid pattern {}", pattern))?;
-
-        // Collect and check the glob results.
-        let mut set: HashSet<PathBuf> = paths
-            .map(|glob_result| {
-                glob_result
-                    .with_context(|| format!("Failed to stat path in globbing pattern {}", pattern))
-            })
-            .collect::<Result<_>>()?;
-
-        // Filter to only include files.
-        set = set.into_iter().filter(|p| p.is_file()).collect();
-
-        Ok(set)
-    }
-
-    /// Get the path of some path (relative to the tree root) relative to the project root.
-    pub fn tree_file_path<P: AsRef<Path>>(&self, path: P) -> PathBuf {
-        self.tree_path().join(path)
-    }
-
-    /// Get the path of the tree root relative to the project root.
-    pub fn tree_path(&self) -> PathBuf {
-        self.tree_prefix().into()
-    }
-
-    fn tree_path_str(&self, s: &str) -> String {
-        let p = if s.starts_with("/") {
-            s.chars().skip(1).collect()
-        } else {
-            String::from(s)
-        };
-
-        format!("{}/{}", self.tree_prefix(), p)
-    }
-
-    pub fn tree_prefix(&self) -> String {
-        self.config.tree_path.clone()
-    }
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    /// Name of the package used in logging.
     pub name: String,
+    /// Relative paths to dependencies.
     #[serde(default)]
     pub dependencies: Vec<String>,
+    /// TODO: Remove extensions.
     #[serde(default)]
     pub extensions: Vec<String>,
+    /// Default link type across trees.
     #[serde(default, rename = "defaultLinkType")]
     pub default_link_type: LinkType,
-    /// Ignore patterns, relative to ./tree/
+    /// Global ignore patterns, relative to tree roots.
     #[serde(default, rename = "ignorePatterns")]
-    pub ignore_patterns: Vec<String>,
+    pub ignore_patterns: IgnorePatterns,
+    /// List of specific files to link differently from rest.
     #[serde(default)]
     pub files: Vec<FileProcess>,
+    /// List of specific templates to process and write.
     #[serde(default, rename = "templateFiles")]
     pub template_files: Vec<TemplateProcess>,
+    /// List of hooks to run before linking any files and templates.
     #[serde(default, rename = "beforeLink")]
     pub before_link: Vec<Hook>,
+    /// List of hooks to run after linking any files and templates.
     #[serde(default, rename = "afterLink")]
     pub after_link: Vec<Hook>,
+    /// Flag to replace existing files when linking.
     #[serde(default = "default_replace_files", rename = "replaceFiles")]
     pub replace_files: bool,
+    /// Flag to replace existing directories when linking.
     #[serde(default, rename = "replaceDirectories")]
     pub replace_directories: bool,
-    #[serde(default = "default_tree_path", rename = "treePath")]
-    pub tree_path: String,
+    /// Tree configurations.
+    #[serde(default = "default_trees", rename = "treePath")]
+    pub trees: Vec<Tree>,
 }
 
 fn default_replace_files() -> bool {
     true
 }
 
-fn default_tree_path() -> String {
-    String::from("tree")
+fn default_trees() -> Vec<Tree> {
+    vec![Tree {
+        path: String::from("tree"),
+        default_link_type: None,
+        ignore_patterns: vec![],
+        replace_files: None,
+        replace_directories: None,
+    }]
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Tree {
+    /// Relative path, from package root, to tree root.
+    pub path: String,
+    /// Default link type across trees.
+    #[serde(default, rename = "defaultLinkType")]
+    /// Ignore patterns, relative to tree roots.
+    pub default_link_type: Option<LinkType>,
+    #[serde(default, rename = "ignorePatterns")]
+    pub ignore_patterns: IgnorePatterns,
+    /// Flag to replace existing files when linking.
+    #[serde(default, rename = "replaceFiles")]
+    pub replace_files: Option<bool>,
+    /// Flag to replace existing directories when linking.
+    #[serde(default, rename = "replaceDirectories")]
+    pub replace_directories: Option<bool>,
+}
+
+impl Tree {
+    pub fn file_path_str(&self, s: &str) -> String {
+        let p = if s.starts_with("/") {
+            s.chars().skip(1).collect()
+        } else {
+            String::from(s)
+        };
+
+        format!("{}/{}", self.path, p)
+    }
+
+    /// Get the path of some path (relative to the tree root) relative to the project root.
+    pub fn file_path<P: AsRef<Path>>(&self, path: P) -> PathBuf {
+        self.path_buf().join(path)
+    }
+
+    pub fn path_buf(&self) -> PathBuf {
+        self.path.clone().into()
+    }
 }
 
 #[derive(Debug, Deserialize)]

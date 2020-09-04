@@ -6,6 +6,8 @@ let LinkType = ../File/LinkType
 
 let Template = ../Template/Type
 
+let Tree = ../Tree/Type
+
 let Package =
       { Type =
           { name : Text
@@ -26,7 +28,7 @@ let Package =
         , templateFiles = [] : List Template.Type
         , beforeLink = [] : List Hook
         , afterLink = [] : List Hook
-        , treePath = "tree"
+        , treePath = [ Tree.default ]
         }
       }
 

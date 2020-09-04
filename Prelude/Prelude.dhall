@@ -5,4 +5,5 @@
 , Template = ./Template/Type
 , TemplateEngine = ./Template/Engine
 , Hook = ./Hook/Type
+, Tree = ./Tree/Tree.dhall
 }
