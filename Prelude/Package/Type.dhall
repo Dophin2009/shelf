@@ -8,6 +8,8 @@ let Template = ../Template/Type
 
 let Tree = ../Tree/Type
 
+let Tree/default = ../Tree/default
+
 let Package =
       { Type =
           { name : Text
@@ -18,7 +20,7 @@ let Package =
           , templateFiles : List Template.Type
           , beforeLink : List Hook
           , afterLink : List Hook
-          , treePath : Text
+          , trees : List Tree.Type
           }
       , default =
         { dependencies = [] : List Text
@@ -28,7 +30,7 @@ let Package =
         , templateFiles = [] : List Template.Type
         , beforeLink = [] : List Hook
         , afterLink = [] : List Hook
-        , treePath = [ Tree.default ]
+        , trees = [ Tree/default ]
         }
       }
 
