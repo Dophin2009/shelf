@@ -288,7 +288,7 @@ impl<'a> LinkerState<'a> {
         replace_directories: bool,
     ) -> Result<()> {
         trace!(
-            "Linking {} -> {}",
+            "-- -- Linking {} -> {}",
             src.as_ref().display(),
             dest.as_ref().display()
         );
