@@ -1,8 +1,10 @@
 use crate::map::Map;
 
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use serde::Deserialize;
 
 type IgnorePatterns = Vec<String>;
@@ -17,18 +19,49 @@ pub struct Package {
 
 impl Package {
     pub fn from_directory<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let config_path = path.as_ref().join("package.dhall");
-        let package = Package::from_dhall_file(&config_path).with_context(|| {
-            format!(
-                "Failed to load package configuration from {}",
-                config_path.display()
-            )
-        })?;
-        Ok(package)
+        for ext in &["dhall", "yaml", "json"] {
+            let config_path = path.as_ref().join(format!("package.{}", ext));
+
+            let file = match File::open(&config_path) {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
+
+            let result = match *ext {
+                "dhall" => Package::from_dhall_reader(&file),
+                "yaml" => Package::from_yaml_reader(&file),
+                "json" => Package::from_json_reader(&file),
+                _ => panic!(),
+            };
+
+            let package = result.with_context(|| {
+                format!(
+                    "Failed to load package configuration from {}",
+                    config_path.display()
+                )
+            })?;
+
+            return Ok(package);
+        }
+
+        Err(anyhow!("Failed to read package configuration"))
     }
 
-    fn from_dhall_file<P: AsRef<Path>>(path: P) -> serde_dhall::Result<Self> {
-        serde_dhall::from_file(path).parse()
+    fn from_dhall_reader<R: Read>(mut reader: R) -> Result<Self> {
+        let mut s = String::new();
+        reader.read_to_string(&mut s)?;
+        let parsed = serde_dhall::from_str(&s).parse()?;
+        Ok(parsed)
+    }
+
+    fn from_json_reader<R: Read>(reader: R) -> Result<Self> {
+        let parsed = serde_json::from_reader(reader)?;
+        Ok(parsed)
+    }
+
+    fn from_yaml_reader<R: Read>(reader: R) -> Result<Self> {
+        let parsed = serde_yaml::from_reader(reader)?;
+        Ok(parsed)
     }
 }
 
