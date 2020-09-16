@@ -197,6 +197,7 @@ pub struct TemplateProcess {
 #[derive(Debug, Deserialize)]
 pub enum TemplateEngine {
     Gtmpl,
+    Tera,
 }
 
 impl Default for TemplateEngine {

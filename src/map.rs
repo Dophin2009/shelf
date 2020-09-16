@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use gtmpl::Value as GtmplValue;
 use gtmpl_derive::Gtmpl;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Gtmpl)]
+#[derive(Clone, Debug, Deserialize, Gtmpl, Serialize)]
 pub struct Map {
     #[serde(default, flatten)]
     pub map: HashMap<String, Value>,
@@ -24,7 +24,7 @@ impl Default for Map {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Value {
     Object(HashMap<String, Value>),
