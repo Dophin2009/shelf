@@ -1,1 +1,1 @@
-< Gtmpl, Tera >
+< Gtmpl | Tera >
