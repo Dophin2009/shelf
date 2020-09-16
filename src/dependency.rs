@@ -68,7 +68,7 @@ impl PackageGraph {
                 return Err(anyhow!(
                     "Circular dependency encountered: {}",
                     cycle.node_id()
-                ))?
+                ))
             }
         };
         sorted.reverse();

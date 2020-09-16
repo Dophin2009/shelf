@@ -168,7 +168,7 @@ impl<'a> LinkerState<'a> {
         let ignored = self.ignored_paths(tree)?;
 
         // Remove ignored paths.
-        for path in HashSet::intersection(&paths.clone(), &ignored) {
+        for path in HashSet::intersection(&(paths.clone()), &ignored) {
             paths.remove(path);
         }
 
@@ -375,7 +375,7 @@ impl<'a> LinkerState<'a> {
             // If dest exists, check if it is a file or directory.
             if dest.is_file() {
                 if replace_files {
-                    fs::remove_file(dest.clone())
+                    fs::remove_file(dest)
                         .with_context(|| format!("Failed to remove file at {}", dest.display()))
                 } else {
                     Err(anyhow!("{} is an existing file", dest.display()))
@@ -395,20 +395,19 @@ impl<'a> LinkerState<'a> {
             // If dest doesn't exist, check its parent.
             let dest_parent: PathBuf = dest
                 .parent()
-                .ok_or(anyhow!(
-                    "Failed to determine parent directory of {}",
-                    dest.display()
-                ))?
+                .ok_or_else(|| {
+                    anyhow!("Failed to determine parent directory of {}", dest.display())
+                })?
                 .into();
 
             if dest_parent.is_dir() {
-                return Ok(());
+                Ok(())
             } else {
                 // Otherwise, try to create directories recursively and write to a new
                 // file.
-                return fs::create_dir_all(dest_parent.clone()).with_context(|| {
+                fs::create_dir_all(dest_parent.clone()).with_context(|| {
                     format!("Failed to create directories for {}", dest_parent.display(),)
-                });
+                })
             }
         }
     }

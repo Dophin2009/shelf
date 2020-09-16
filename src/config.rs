@@ -135,7 +135,7 @@ pub struct Tree {
 
 impl Tree {
     pub fn file_path_str(&self, s: &str) -> String {
-        let p = if s.starts_with("/") {
+        let p = if s.starts_with('/') {
             s.chars().skip(1).collect()
         } else {
             String::from(s)
