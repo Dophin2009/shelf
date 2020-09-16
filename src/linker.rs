@@ -1,4 +1,4 @@
-use crate::config::{FileProcess, Hook, LinkType, Package, TemplateProcess, Tree};
+use crate::config::{FileProcess, Hook, LinkType, Package, TemplateEngine, TemplateProcess, Tree};
 use crate::dependency::PackageGraph;
 use crate::symlink;
 use crate::templating::gotemplate;
@@ -248,11 +248,14 @@ impl<'a> LinkerState<'a> {
 
         let src_str = fs::read_to_string(absolute_src.clone())
             .with_context(|| format!("Failed to read source file {}", absolute_src.display()))?;
-        let rendered_str =
-            gotemplate::Templater::render(&src_str, self.package.variables.map.clone())
-                .with_context(|| {
-                    format!("Failed to render template file: {}", absolute_src.display())
-                })?;
+        let rendered_str = match template_process.engine {
+            TemplateEngine::Gtmpl => {
+                gotemplate::Templater::render(&src_str, self.package.variables.map.clone())
+                    .with_context(|| {
+                        format!("Failed to render template file: {}", absolute_src.display())
+                    })?
+            }
+        };
 
         let replace_files = match template_process.replace_files {
             Some(b) => b,
