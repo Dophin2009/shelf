@@ -1,1 +1,1 @@
-pub mod gotemplate;
+pub mod gotmpl;
