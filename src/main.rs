@@ -3,6 +3,7 @@ mod dependency;
 mod linker;
 mod map;
 mod symlink;
+mod templating;
 
 use config::Package;
 use dependency::PackageGraph;
