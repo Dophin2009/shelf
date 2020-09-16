@@ -72,9 +72,6 @@ pub struct Config {
     /// Relative paths to dependencies.
     #[serde(default)]
     pub dependencies: Vec<String>,
-    /// TODO: Remove extensions.
-    #[serde(default)]
-    pub extensions: Vec<String>,
     /// Default link type across trees.
     #[serde(default, rename = "defaultLinkType")]
     pub default_link_type: LinkType,
