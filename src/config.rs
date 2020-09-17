@@ -28,7 +28,7 @@ impl Package {
             };
 
             let result = match *ext {
-                "dhall" => Package::from_dhall_reader(&file),
+                "dhall" => Package::from_dhall_file(&config_path),
                 "yaml" => Package::from_yaml_reader(&file),
                 "json" => Package::from_json_reader(&file),
                 _ => panic!(),
@@ -47,10 +47,8 @@ impl Package {
         Err(anyhow!("Failed to read package configuration"))
     }
 
-    fn from_dhall_reader<R: Read>(mut reader: R) -> Result<Self> {
-        let mut s = String::new();
-        reader.read_to_string(&mut s)?;
-        let parsed = serde_dhall::from_str(&s).parse()?;
+    fn from_dhall_file<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let parsed = serde_dhall::from_file(&path).parse()?;
         Ok(parsed)
     }
 
