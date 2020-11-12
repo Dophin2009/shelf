@@ -1,11 +1,11 @@
-use crate::config::{FileProcess, Hook, LinkType, Package, TemplateEngine, TemplateProcess, Tree};
-use crate::dependency::PackageGraph;
-use crate::symlink;
-use crate::templating::{gotmpl, tera};
+use crate::loader::PackageGraph;
+use crate::package::{FileProcess, Hook, LinkType, Package, TemplateEngine, TemplateProcess, Tree};
+use crate::template::{gotmpl, tera};
 
 use std::collections::HashSet;
 use std::env;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -31,21 +31,11 @@ impl Linker {
     pub fn link_package_graph(&self, graph: &PackageGraph) -> Result<()> {
         info!("Sorting packages...");
         let order = graph.topological_order()?;
-
         for (path, package) in order {
             info!("Linking {}", package.config.name);
             let state = LinkerState::new(self, path, package);
             state.link()?;
         }
-
-        Ok(())
-    }
-
-    pub fn link_package(&self, path: PathBuf, package: Package) -> Result<()> {
-        debug!("-- Resolving package dependency graph...");
-        let graph = PackageGraph::from_package(path, package)?;
-
-        self.link_package_graph(&graph)?;
 
         Ok(())
     }
@@ -291,7 +281,7 @@ impl<'a> LinkerState<'a> {
 
         match *link_type {
             LinkType::Link => {
-                symlink::symlink(&src, &dest).with_context(|| {
+                symlink(&src, &dest).with_context(|| {
                     format!(
                         "Failed to create symlink between {} and {}",
                         src.as_ref().display(),
@@ -474,4 +464,16 @@ impl<'a> LinkerState<'a> {
 
         Ok(())
     }
+}
+
+#[cfg(windows)]
+pub fn symlink<P: AsRef<Path>>(src: P, dest: P) -> io::Result<()> {
+    use std::os::windows;
+    windows::fs::symlink_file(src, dest)
+}
+
+#[cfg(unix)]
+pub fn symlink<P: AsRef<Path>>(src: P, dest: P) -> io::Result<()> {
+    use std::os::unix;
+    unix::fs::symlink(src, dest)
 }

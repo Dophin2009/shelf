@@ -1,13 +1,6 @@
-mod config;
-mod dependency;
-mod linker;
-mod map;
-mod symlink;
-mod templating;
-
-use config::Package;
-use dependency::PackageGraph;
-use linker::Linker;
+use stew::dependency::PackageGraph;
+use stew::linker::Linker;
+use stew::package::Package;
 
 use std::env;
 
@@ -62,9 +55,9 @@ fn cli(opts: &Options) -> Result<()> {
     info!("Resolving package dependency graph...");
     for package in &opts.packages {
         let path = cwd.join(package);
-        let package = Package::from_directory(&path)?;
+        // let package = Package::from_directory(&path)?;
 
-        graph.add_package(path, package)?;
+        // graph.add_package(path, package)?;
     }
 
     linker.link_package_graph(&graph)?;
