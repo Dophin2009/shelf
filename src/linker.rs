@@ -28,6 +28,7 @@ impl Linker {
         }
     }
 
+    // TODO: Verify paths exist and are valid before actually linking.
     pub fn link_package_graph(&self, graph: &PackageGraph) -> Result<()> {
         info!("Sorting packages...");
         let order = graph.topological_order()?;
@@ -416,7 +417,7 @@ impl<'a> LinkerState<'a> {
     }
 
     /// Executes a list of hook commands.
-    fn exec_hooks(&self, hooks: &Vec<Hook>) -> Result<()> {
+    fn exec_hooks(&self, hooks: &[Hook]) -> Result<()> {
         for hook in hooks {
             debug!("-- Running hook {}...", hook.name);
             self.exec_hook(&hook)?;

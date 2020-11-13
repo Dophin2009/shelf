@@ -12,14 +12,11 @@ use mlua::{FromLua, Lua, Result as LuaResult, Value as LuaValue};
 use petgraph::algo;
 use petgraph::graphmap::DiGraphMap;
 
-pub struct Loader {
-    lua: Lua,
-}
+pub struct Loader {}
 
 impl Loader {
     pub fn new() -> Self {
-        let lua = Lua::new();
-        Self { lua }
+        Self {}
     }
 
     /// Load a package and all its dependencies into a package graph.
@@ -28,7 +25,7 @@ impl Loader {
     }
 
     pub fn load_multi(&self, paths: &[impl AsRef<Path>]) -> Result<PackageGraph> {
-        let mut state = LoaderState::new(&self.lua);
+        let mut state = LoaderState::new();
 
         paths
             .iter()
@@ -48,17 +45,19 @@ impl Default for Loader {
     }
 }
 
-struct LoaderState<'a> {
-    lua: &'a Lua,
+struct LoaderState {
     pg: PackageGraph,
 }
 
-impl<'a> LoaderState<'a> {
-    fn new(lua: &'a Lua) -> Self {
+impl LoaderState {
+    fn new() -> Self {
         Self {
-            lua,
             pg: PackageGraph::new(),
         }
+    }
+
+    fn lua_instance(&self) -> Lua {
+        Lua::new()
     }
 
     fn load_package_data<P: AsRef<Path>>(&self, path: P) -> Result<Package> {
@@ -72,17 +71,31 @@ impl<'a> LoaderState<'a> {
         let configuration = fs::read_to_string(&config_path)
             .with_context(|| format!("Failed to read {}", config_path.to_string_lossy()))?;
 
-        let chunk = self.lua.load(&configuration);
+        let lua = self.lua_instance();
 
-        // TODO: Handle error properly
+        // Modify package.path
+        let globals = lua.globals();
+        let package_table = globals.get::<_, mlua::Table>("package")?;
+        let old_packagepath = package_table.get::<_, String>("path")?;
+        let new_packagepath = format!("{}/?.lua;{}", path.to_string_lossy(), old_packagepath);
+        package_table.set("path", new_packagepath)?;
+
+        // Load and evaluate lua code
+        let chunk = lua.load(&configuration);
         let package: Package = chunk.eval().with_context(|| "Error in evalulating lua")?;
+
+        // Restore package.path
+        package_table.set("path", old_packagepath)?;
 
         Ok(package)
     }
 
     fn add_package<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
         let package = self.load_package_data(&path).with_context(|| {
-            format!("Failed to load package {}", path.as_ref().to_string_lossy())
+            format!(
+                "Failed to load package configuration: {}",
+                path.as_ref().to_string_lossy()
+            )
         })?;
 
         self.insert_package(PathBuf::from(path.as_ref()), package)
