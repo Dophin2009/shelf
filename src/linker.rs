@@ -158,7 +158,7 @@ impl<'a> LinkerState<'a> {
         let ignored = self.ignored_paths(tree)?;
 
         // Remove ignored paths.
-        for path in HashSet::intersection(&(paths.clone()), &ignored) {
+        for path in HashSet::intersection(&paths.clone(), &ignored) {
             paths.remove(path);
         }
 

@@ -103,9 +103,10 @@ impl<'a> LoaderState<'a> {
         // Add dependencies of the package.
         for dep_path_rel in &dependencies {
             let dep_path_abs = path.join(dep_path_rel);
-            let dep_path = fs::canonicalize(dep_path_abs)?;
+            let dep_path = fs::canonicalize(dep_path_abs)
+                .with_context(|| format!("Failed to resolve dependency: {}", dep_path_rel))?;
             let dep = self.load_package_data(&dep_path).with_context(|| {
-                format!("Failed to load package: {}", dep_path.to_string_lossy())
+                format!("Failed to load dependency: {}", dep_path.to_string_lossy())
             })?;
 
             let dep_id = hash_path(&dep_path);
@@ -209,7 +210,7 @@ impl<'lua> FromLua<'lua> for Config {
             LuaValue::Table(t) => {
                 let name = t_get!(t, "name", lua);
                 let dependencies = t_get!(t, "dependencies", lua);
-                let default_link_type = t_get!(t, "default_link_type", lua);
+                let default_link_type = t_get!(t, "link_type", lua);
                 let ignore_patterns = t_get!(t, "ignore_patterns", lua);
                 let files = t_get!(t, "files", lua);
                 let template_files = t_get!(t, "templates", lua);
