@@ -21,7 +21,7 @@ gtmpl_derive = "0.3.3"
 gtmpl_value = "0.3.3"
 handlebars = "3.4.0"
 log = "0.4.0"
-mlua = { version = "0.4", features = ["lua53"] }
+mlua = { version = "0.4", features = ["lua53", "send"] }
 mlua_derive = "0.4"
 petgraph = "0.5.1"
 serde = { version = "1.0.115", features = ["derive"] }

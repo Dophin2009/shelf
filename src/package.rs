@@ -4,14 +4,21 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-type IgnorePatterns = Vec<String>;
-
 #[derive(Clone, Debug, Deserialize)]
 pub struct Package {
     #[serde(default)]
     pub variables: Map,
     #[serde(flatten)]
     pub config: Config,
+}
+
+impl Package {
+    pub fn new_optional(config: Config, variables: Option<Map>) -> Self {
+        Self {
+            config,
+            variables: variables.unwrap_or_default(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -26,7 +33,7 @@ pub struct Config {
     pub default_link_type: LinkType,
     /// Global ignore patterns, relative to tree roots.
     #[serde(default)]
-    pub ignore_patterns: IgnorePatterns,
+    pub ignore_patterns: Vec<String>,
     /// List of specific files to link differently from rest.
     #[serde(default)]
     pub files: Vec<FileProcess>,
@@ -40,28 +47,59 @@ pub struct Config {
     #[serde(default)]
     pub after_link: Vec<Hook>,
     /// Flag to replace existing files when linking.
-    #[serde(default = "default_replace_files")]
+    #[serde(default = "Config::default_replace_files")]
     pub replace_files: bool,
     /// Flag to replace existing directories when linking.
     #[serde(default, rename = "replace_dirs")]
     pub replace_directories: bool,
     /// Tree configurations.
-    #[serde(default = "default_trees")]
+    #[serde(default = "Config::default_trees")]
     pub trees: Vec<Tree>,
 }
 
-fn default_replace_files() -> bool {
-    true
-}
+impl Config {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_optional(
+        name: String,
+        dependencies: Option<Vec<String>>,
+        default_link_type: Option<LinkType>,
+        ignore_patterns: Option<Vec<String>>,
+        files: Option<Vec<FileProcess>>,
+        template_files: Option<Vec<TemplateProcess>>,
+        before_link: Option<Vec<Hook>>,
+        after_link: Option<Vec<Hook>>,
+        replace_file: Option<bool>,
+        replace_directories: Option<bool>,
+        trees: Option<Vec<Tree>>,
+    ) -> Self {
+        Self {
+            name,
+            dependencies: dependencies.unwrap_or_default(),
+            default_link_type: default_link_type.unwrap_or_default(),
+            ignore_patterns: ignore_patterns.unwrap_or_default(),
+            files: files.unwrap_or_default(),
+            template_files: template_files.unwrap_or_default(),
+            before_link: before_link.unwrap_or_default(),
+            after_link: after_link.unwrap_or_default(),
+            replace_files: replace_file.unwrap_or_else(Self::default_replace_files),
+            replace_directories: replace_directories.unwrap_or_default(),
+            trees: trees.unwrap_or_else(Self::default_trees),
+        }
+    }
 
-fn default_trees() -> Vec<Tree> {
-    vec![Tree {
-        path: String::from("tree"),
-        default_link_type: None,
-        ignore_patterns: vec![],
-        replace_files: None,
-        replace_directories: None,
-    }]
+    fn default_replace_files() -> bool {
+        true
+    }
+
+    fn default_trees() -> Vec<Tree> {
+        vec![Tree {
+            path: String::from("tree"),
+            default_link_type: None,
+            ignore_patterns: vec![],
+            replace_files: None,
+            replace_directories: None,
+        }]
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -73,7 +111,7 @@ pub struct Tree {
     /// Ignore patterns, relative to tree roots.
     pub default_link_type: Option<LinkType>,
     #[serde(default)]
-    pub ignore_patterns: IgnorePatterns,
+    pub ignore_patterns: Vec<String>,
     /// Flag to replace existing files when linking.
     #[serde(default)]
     pub replace_files: Option<bool>,
@@ -83,6 +121,22 @@ pub struct Tree {
 }
 
 impl Tree {
+    pub fn new_optional(
+        path: String,
+        default_link_type: Option<LinkType>,
+        ignore_patterns: Option<Vec<String>>,
+        replace_files: Option<bool>,
+        replace_directories: Option<bool>,
+    ) -> Self {
+        Self {
+            path,
+            default_link_type,
+            ignore_patterns: ignore_patterns.unwrap_or_default(),
+            replace_files,
+            replace_directories,
+        }
+    }
+
     pub fn file_path_str(&self, s: &str) -> String {
         let p = if s.starts_with('/') {
             s.chars().skip(1).collect()
@@ -117,6 +171,24 @@ pub struct FileProcess {
     pub replace_directories: Option<bool>,
 }
 
+impl FileProcess {
+    pub fn new_optional(
+        src: String,
+        dest: String,
+        link_type: Option<LinkType>,
+        replace_files: Option<bool>,
+        replace_directories: Option<bool>,
+    ) -> Self {
+        Self {
+            src,
+            dest,
+            link_type: link_type.unwrap_or_default(),
+            replace_files,
+            replace_directories,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub enum LinkType {
     Link,
@@ -143,6 +215,24 @@ pub struct TemplateProcess {
     pub replace_directories: Option<bool>,
 }
 
+impl TemplateProcess {
+    pub fn new_optional(
+        src: String,
+        dest: String,
+        engine: Option<TemplateEngine>,
+        replace_files: Option<bool>,
+        replace_directories: Option<bool>,
+    ) -> Self {
+        Self {
+            src,
+            dest,
+            engine: engine.unwrap_or_default(),
+            replace_files,
+            replace_directories,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub enum TemplateEngine {
     Gtmpl,
@@ -159,4 +249,10 @@ impl Default for TemplateEngine {
 pub struct Hook {
     pub string: String,
     pub name: String,
+}
+
+impl Hook {
+    pub fn new(name: String, string: String) -> Self {
+        Self { string, name }
+    }
 }

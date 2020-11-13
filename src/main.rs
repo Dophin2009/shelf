@@ -1,6 +1,4 @@
-use stew::dependency::PackageGraph;
-use stew::linker::Linker;
-use stew::package::Package;
+use stew::{Linker, Loader};
 
 use std::env;
 
@@ -46,21 +44,16 @@ fn cli(opts: &Options) -> Result<()> {
         }
     };
 
-    let cwd =
-        env::current_dir().with_context(|| "Failed to determine current working directory")?;
+    info!("Resolving package dependency graph...");
+    let loader = Loader::new();
+    let graph = loader
+        .load_multi(&opts.packages)
+        .with_context(|| "Failed to resolve packages")?;
 
     let linker = Linker::new(home, opts.quiet, opts.verbosity);
-    let mut graph = PackageGraph::new();
-
-    info!("Resolving package dependency graph...");
-    for package in &opts.packages {
-        let path = cwd.join(package);
-        // let package = Package::from_directory(&path)?;
-
-        // graph.add_package(path, package)?;
-    }
-
-    linker.link_package_graph(&graph)?;
+    linker
+        .link_package_graph(&graph)
+        .with_context(|| "Failed to link packages")?;
 
     Ok(())
 }
