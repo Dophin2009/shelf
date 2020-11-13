@@ -14,6 +14,8 @@ struct Options {
     verbosity: usize,
     #[clap(short, long, about = "Silence all output")]
     quiet: bool,
+    #[clap(short, long, about = "Do not link, copy, or write files")]
+    noop: bool,
     packages: Vec<String>,
 }
 
@@ -51,9 +53,14 @@ fn cli(opts: &Options) -> Result<()> {
         .with_context(|| "Failed to resolve packages")?;
 
     let linker = Linker::new(home, opts.quiet, opts.verbosity);
-    linker
-        .link_package_graph(&graph)
-        .with_context(|| "Failed to link packages")?;
+
+    if !opts.noop {
+        linker
+            .link(&graph)
+            .with_context(|| "Failed to link packages")?;
+    } else {
+        linker.link_noop(&graph)?;
+    }
 
     Ok(())
 }

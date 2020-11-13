@@ -29,12 +29,20 @@ impl Linker {
     }
 
     // TODO: Verify paths exist and are valid before actually linking.
-    pub fn link_package_graph(&self, graph: &PackageGraph) -> Result<()> {
+    pub fn link(&self, graph: &PackageGraph) -> Result<()> {
+        self.link_internal(graph, false)
+    }
+
+    pub fn link_noop(&self, graph: &PackageGraph) -> Result<()> {
+        self.link_internal(graph, true)
+    }
+
+    fn link_internal(&self, graph: &PackageGraph, noop: bool) -> Result<()> {
         info!("Sorting packages...");
         let order = graph.topological_order()?;
         for (path, package) in order {
             info!("Linking {}", package.config.name);
-            let state = LinkerState::new(self, path, package);
+            let state = LinkerState::new(self, path, package, noop);
             state.link()?;
         }
 
@@ -46,14 +54,16 @@ struct LinkerState<'a> {
     linker: &'a Linker,
     path: &'a PathBuf,
     package: &'a Package,
+    noop: bool,
 }
 
 impl<'a> LinkerState<'a> {
-    fn new(linker: &'a Linker, path: &'a PathBuf, package: &'a Package) -> Self {
+    fn new(linker: &'a Linker, path: &'a PathBuf, package: &'a Package, noop: bool) -> Self {
         Self {
             linker,
             path,
             package,
+            noop,
         }
     }
 }
@@ -258,9 +268,13 @@ impl<'a> LinkerState<'a> {
             None => self.package.config.replace_directories,
         };
 
-        self.prepare_link_location(&absolute_dest, replace_files, replace_directories)?;
-        fs::write(&absolute_dest, rendered_str)
-            .with_context(|| format!("Failed to write file {}", absolute_dest.display()))
+        if !self.noop {
+            self.prepare_link_location(&absolute_dest, replace_files, replace_directories)?;
+            fs::write(&absolute_dest, rendered_str)
+                .with_context(|| format!("Failed to write file {}", absolute_dest.display()))?;
+        }
+
+        Ok(())
     }
 
     /// Symlink or copy a file. `src` and `dest` can be absolute paths, or relative to the package root.
@@ -278,40 +292,42 @@ impl<'a> LinkerState<'a> {
             dest.as_ref().display()
         );
 
-        self.prepare_link_location(&dest, replace_files, replace_directories)?;
+        if !self.noop {
+            self.prepare_link_location(&dest, replace_files, replace_directories)?;
 
-        match *link_type {
-            LinkType::Link => {
-                symlink(&src, &dest).with_context(|| {
-                    format!(
-                        "Failed to create symlink between {} and {}",
-                        src.as_ref().display(),
-                        dest.as_ref().display()
-                    )
-                })?;
-            }
-            LinkType::Copy => {
-                if src.as_ref().is_file() {
-                    fs::copy(&src, &dest).with_context(|| {
+            match *link_type {
+                LinkType::Link => {
+                    symlink(&src, &dest).with_context(|| {
                         format!(
-                            "Failed to copy from {} to {}",
+                            "Failed to create symlink between {} and {}",
                             src.as_ref().display(),
                             dest.as_ref().display()
                         )
                     })?;
-                } else if src.as_ref().is_dir() {
-                    self.copy_dir(&src, &dest).with_context(|| {
-                        format!(
-                            "Failed to copy dir from {} to {}",
-                            src.as_ref().display(),
-                            dest.as_ref().display()
-                        )
-                    })?;
-                } else {
-                    return Err(anyhow!("Cannot copy from path: {}", src.as_ref().display()));
                 }
-            }
-        };
+                LinkType::Copy => {
+                    if src.as_ref().is_file() {
+                        fs::copy(&src, &dest).with_context(|| {
+                            format!(
+                                "Failed to copy from {} to {}",
+                                src.as_ref().display(),
+                                dest.as_ref().display()
+                            )
+                        })?;
+                    } else if src.as_ref().is_dir() {
+                        self.copy_dir(&src, &dest).with_context(|| {
+                            format!(
+                                "Failed to copy dir from {} to {}",
+                                src.as_ref().display(),
+                                dest.as_ref().display()
+                            )
+                        })?;
+                    } else {
+                        return Err(anyhow!("Cannot copy from path: {}", src.as_ref().display()));
+                    }
+                }
+            };
+        }
 
         Ok(())
     }
@@ -418,9 +434,11 @@ impl<'a> LinkerState<'a> {
 
     /// Executes a list of hook commands.
     fn exec_hooks(&self, hooks: &[Hook]) -> Result<()> {
-        for hook in hooks {
-            debug!("-- Running hook {}...", hook.name);
-            self.exec_hook(&hook)?;
+        if !self.noop {
+            for hook in hooks {
+                debug!("-- Running hook {}...", hook.name);
+                self.exec_hook(&hook)?;
+            }
         }
         Ok(())
     }
