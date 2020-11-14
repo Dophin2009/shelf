@@ -2,6 +2,10 @@
 name = "stew"
 version = "0.1.0"
 authors = ["Eric Zhao <21zhaoe@protonmail.com>"]
+description = "Dotfiles package manager."
+homepage = "https://github.com/Dophin2009/stew"
+repository = "https://github.com/Dophin2009/stew.git"
+license = "GPL-3.0-or-later"
 edition = "2018"
 
 [lib]
