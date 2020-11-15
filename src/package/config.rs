@@ -1,25 +1,6 @@
-pub use crate::map::{Map, Value};
-
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct Package {
-    #[serde(default)]
-    pub variables: Map,
-    #[serde(flatten)]
-    pub config: Config,
-}
-
-impl Package {
-    pub fn new_optional(config: Config, variables: Option<Map>) -> Self {
-        Self {
-            config,
-            variables: variables.unwrap_or_default(),
-        }
-    }
-}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Config {

@@ -1,6 +1,5 @@
 pub mod linker;
 pub mod loader;
-pub mod map;
 
 pub mod package;
 pub mod template;
