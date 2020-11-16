@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use gtmpl::Value as GtmplValue;
-use gtmpl_derive::Gtmpl;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Deserialize, Gtmpl, Serialize)]
@@ -33,17 +31,4 @@ pub enum Value {
     String(String),
     Bool(bool),
     Nil,
-}
-
-impl Into<GtmplValue> for Value {
-    fn into(self) -> GtmplValue {
-        match self {
-            Value::Object(map) => map.into(),
-            Value::Integer(n) => n.into(),
-            Value::Float(f) => f.into(),
-            Value::String(s) => s.into(),
-            Value::Bool(b) => b.into(),
-            Value::Nil => GtmplValue::Nil,
-        }
-    }
 }

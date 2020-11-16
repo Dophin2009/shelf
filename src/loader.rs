@@ -1,6 +1,4 @@
-use crate::package::{
-    Config, FileProcess, Hook, LinkType, Map, Package, TemplateEngine, TemplateProcess, Tree, Value,
-};
+use crate::package::{Hook, LinkType, Map, MapValue, Package, Template, TemplateType, Tree};
 
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::fs;
@@ -354,8 +352,8 @@ impl<'lua> FromLua<'lua> for Hook {
         // TODO: Properly handle invalid values.
         match lua_value {
             LuaValue::Table(t) => {
-                let string = t_get!(t, "string", lua);
                 let name = t_get!(t, "name", lua);
+                let string = t_get!(t, "string", lua);
                 Ok(Self::new(name, string))
             }
             _ => panic!(),
@@ -375,16 +373,16 @@ impl<'lua> FromLua<'lua> for Map {
     }
 }
 
-impl<'lua> FromLua<'lua> for Value {
+impl<'lua> FromLua<'lua> for MapValue {
     fn from_lua(lua_value: LuaValue<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
         match lua_value {
-            LuaValue::Boolean(b) => Ok(Value::Bool(b)),
-            LuaValue::Integer(n) => Ok(Value::Integer(n)),
-            LuaValue::String(s) => Ok(Value::String(s.to_str()?.into())),
-            LuaValue::Number(n) => Ok(Value::Float(n)),
+            LuaValue::Boolean(b) => Ok(Self::Bool(b)),
+            LuaValue::Integer(n) => Ok(Self::Integer(n)),
+            LuaValue::String(s) => Ok(Self::String(s.to_str()?.into())),
+            LuaValue::Number(n) => Ok(Self::Float(n)),
             LuaValue::Table(t) => {
                 let hm = t.pairs().collect::<LuaResult<_>>()?;
-                Ok(Value::Object(hm))
+                Ok(Self::Object(hm))
             }
             // TODO: Properly handle unsupported values.
             _ => panic!(),

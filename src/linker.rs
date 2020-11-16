@@ -41,7 +41,7 @@ impl Linker {
         info!("Sorting packages...");
         let order = graph.topological_order()?;
         for (path, package) in order {
-            info!("Linking {}", package.config.name);
+            info!("Linking {}", package.name);
             let state = LinkerState::new(self, path, package, noop);
             state.link()?;
         }
@@ -90,7 +90,7 @@ impl<'a> LinkerState<'a> {
     }
 
     fn link_files(&self) -> Result<()> {
-        for tree in &self.package.config.trees {
+        for tree in &self.package.trees {
             // Get normal link paths with ignore patterns applied.
             let mut normal_link_paths = self.normal_link_paths(tree)?;
 
