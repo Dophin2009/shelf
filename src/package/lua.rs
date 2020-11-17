@@ -168,7 +168,7 @@ impl<'lua> FromLua<'lua> for TemplateType {
             Some("invalid template type, should be 'handlebars', 'gotmpl', or 'tera'".to_string());
         match lua_value {
             LuaValue::Table(t) => {
-                let ty: String = t_get!(t, "type", lua);
+                let ty: String = t_get!(t, "engine", lua);
                 match ty.to_lowercase().as_str() {
                     "handlebars" => {
                         let partials: HashMap<String, String> = t_get!(t, "partials", lua);
