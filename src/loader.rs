@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
-use mlua::{Lua, Value as LuaValue};
+use mlua::{FromLua, Lua, Table as LuaTable, Value as LuaValue};
 use petgraph::algo;
 use petgraph::graphmap::DiGraphMap;
 
@@ -54,7 +54,7 @@ impl LoaderState {
         }
     }
 
-    fn lua_instance(&self) -> Result<Lua> {
+    fn lua_instance(&self, extra_path: Option<String>) -> Result<Lua> {
         fn empty_vec<'a>() -> Vec<LuaValue<'a>> {
             vec![]
         }
@@ -89,6 +89,14 @@ impl LoaderState {
         {
             let globals = lua.globals();
             globals.set("pkg", pkg)?;
+
+            // Prepend to package.path
+            if let Some(extra_path) = extra_path {
+                let package: LuaTable = globals.get("package")?;
+                let path: String = package.get("path")?;
+                let new_path = format!("{}/?.lua;{}", extra_path, path);
+                package.set("path", new_path)?;
+            }
         }
 
         Ok(lua)
@@ -106,11 +114,17 @@ impl LoaderState {
             .with_context(|| format!("Failed to read {}", config_path.to_string_lossy()))?;
 
         // Load and evaluate lua code
-        let lua = self.lua_instance()?;
+        let lua = self.lua_instance(Some(path.to_string_lossy().into_owned()))?;
         let chunk = lua.load(&configuration);
         chunk.exec().with_context(|| "Error in executing lua")?;
 
-        let package = lua.globals().get("pkg")?;
+        let package_table: LuaTable = lua
+            .globals()
+            .get("pkg")
+            .with_context(|| "Global `pkg` must be set")?;
+        let package = FromLua::from_lua(LuaValue::Table(package_table), &lua)
+            .with_context(|| "Invalid `pkg` structure")?;
+
         Ok(PackageState {
             path,
             data: package,
