@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Deserialize, Gtmpl, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Map {
     #[serde(default, flatten)]
     pub map: HashMap<String, Value>,
