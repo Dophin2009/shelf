@@ -81,7 +81,6 @@ impl<'a> LinkerState<'a> {
         debug!("-- Running before-link hooks...");
         self.exec_pre()?;
 
-        debug!("-- Linking files...");
         self.link_files()?;
 
         debug!("-- Running after-link hooks...");
@@ -96,16 +95,19 @@ impl<'a> LinkerState<'a> {
         let files = &self.package.files;
 
         // Link trees.
+        debug!("-- Linking trees...");
         for tree in &files.trees {
             self.link_tree(&tree)?;
         }
 
         // Link extra files.
+        debug!("-- Linking extra files...");
         for extra in &files.extra {
             self.link_extra(extra)?;
         }
 
         // Link template files.
+        debug!("-- Linking templates...");
         for template in &files.templates {
             self.link_template(&template)?;
         }
@@ -179,6 +181,7 @@ impl<'a> LinkerState<'a> {
             .replace_dirs
             .unwrap_or_else(|| self.package.files.replace_dirs);
 
+        trace!("-- -- Templating {} -> {}", src.display(), dest.display());
         if !self.noop {
             self.prepare_link_location(&absolute_dest, replace_files, replace_dirs)?;
             fs::write(&absolute_dest, rendered_str)

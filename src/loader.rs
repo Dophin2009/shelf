@@ -1,4 +1,4 @@
-use crate::package::Package;
+use crate::package::{Package, Tree};
 
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::fs;
@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
-use mlua::{FromLua, Lua, Table as LuaTable, Value as LuaValue};
+use mlua::{FromLua, Lua, Table as LuaTable, ToLua, Value as LuaValue};
 use petgraph::algo;
 use petgraph::graphmap::DiGraphMap;
 
@@ -52,54 +52,6 @@ impl LoaderState {
         Self {
             pg: PackageGraph::new(),
         }
-    }
-
-    fn lua_instance(&self, extra_path: Option<String>) -> Result<Lua> {
-        fn empty_vec<'a>() -> Vec<LuaValue<'a>> {
-            vec![]
-        }
-        let lua = Lua::new();
-
-        // Add global `pkg` to be modified
-        let pkg = lua.create_table()?;
-
-        let default_tree = lua.create_table()?;
-        default_tree.set("path", "tree")?;
-        default_tree.set("link_type", "link")?;
-        default_tree.set("ignore", empty_vec())?;
-        default_tree.set("replace_files", LuaValue::Nil)?;
-        default_tree.set("replace_dirs", LuaValue::Nil)?;
-
-        let files = lua.create_table()?;
-        files.set("trees", vec![default_tree])?;
-        files.set("extra", empty_vec())?;
-        files.set("templates", empty_vec())?;
-        files.set("replace_files", true)?;
-        files.set("replace_dirs", false)?;
-
-        let hooks = lua.create_table()?;
-        hooks.set("pre", empty_vec())?;
-        hooks.set("post", empty_vec())?;
-
-        pkg.set("dependencies", empty_vec())?;
-        pkg.set("files", files)?;
-        pkg.set("hooks", hooks)?;
-        pkg.set("variables", lua.create_table()?)?;
-
-        {
-            let globals = lua.globals();
-            globals.set("pkg", pkg)?;
-
-            // Prepend to package.path
-            if let Some(extra_path) = extra_path {
-                let package: LuaTable = globals.get("package")?;
-                let path: String = package.get("path")?;
-                let new_path = format!("{}/?.lua;{}", extra_path, path);
-                package.set("path", new_path)?;
-            }
-        }
-
-        Ok(lua)
     }
 
     fn load_package_data<P: AsRef<Path>>(&self, path: P) -> Result<PackageState> {
@@ -172,6 +124,68 @@ impl LoaderState {
         }
 
         Ok(())
+    }
+
+    fn lua_instance(&self, extra_path: Option<String>) -> Result<Lua> {
+        fn vec_table<'a, T: ToLua<'a>>(
+            lua: &'a Lua,
+            values: Option<Vec<T>>,
+        ) -> Result<LuaTable<'a>> {
+            let table = match values {
+                Some(v) => lua.create_sequence_from(v.into_iter())?,
+                None => lua.create_table()?,
+            };
+
+            let meta = lua.create_table()?;
+            let globals = lua.globals();
+            let table_meta: LuaTable = globals.get("table")?;
+            meta.set("__index", table_meta)?;
+            table.set_metatable(Some(meta));
+            Ok(table)
+        }
+
+        let lua = Lua::new();
+
+        // Add global `pkg` to be modified
+        let pkg = lua.create_table()?;
+
+        let default_tree = lua.create_table()?;
+        default_tree.set("path", "tree")?;
+        default_tree.set("link_type", "link")?;
+        default_tree.set("ignore", vec_table::<LuaValue>(&lua, None)?)?;
+        default_tree.set("replace_files", LuaValue::Nil)?;
+        default_tree.set("replace_dirs", LuaValue::Nil)?;
+
+        let files = lua.create_table()?;
+        files.set("trees", vec_table(&lua, Some(vec![default_tree]))?)?;
+        files.set("extra", vec_table::<LuaValue>(&lua, None)?)?;
+        files.set("templates", vec_table::<LuaValue>(&lua, None)?)?;
+        files.set("replace_files", true)?;
+        files.set("replace_dirs", false)?;
+
+        let hooks = lua.create_table()?;
+        hooks.set("pre", vec_table::<LuaValue>(&lua, None)?)?;
+        hooks.set("post", vec_table::<LuaValue>(&lua, None)?)?;
+
+        pkg.set("dependencies", vec_table::<LuaValue>(&lua, None)?)?;
+        pkg.set("files", files)?;
+        pkg.set("hooks", hooks)?;
+        pkg.set("variables", vec_table::<LuaValue>(&lua, None)?)?;
+
+        {
+            let globals = lua.globals();
+            globals.set("pkg", pkg)?;
+
+            // Prepend to package.path
+            if let Some(extra_path) = extra_path {
+                let package: LuaTable = globals.get("package")?;
+                let path: String = package.get("path")?;
+                let new_path = format!("{}/?.lua;{0}/?/init.lua;{}", extra_path, path);
+                package.set("path", new_path)?;
+            }
+        }
+
+        Ok(lua)
     }
 }
 
