@@ -9,6 +9,10 @@ use mlua::{Error as LuaError, FromLua, Function, Lua, Result as LuaResult, Value
 use uuid::Uuid;
 
 macro_rules! t_get {
+    ($table:ident, $key:expr, $typ:ty, $lua:ident) => {{
+        let a: $typ = FromLua::from_lua($table.get($key)?, $lua)?;
+        a
+    }};
     ($table:ident, $key:expr, $lua:ident) => {
         FromLua::from_lua($table.get($key)?, $lua)?
     };
@@ -17,15 +21,23 @@ macro_rules! t_get {
     };
 }
 
+macro_rules! t_get_opt {
+    ($table:ident, $key:expr, $lua:ident) => {
+        t_get!($table, $key, Option<_>, $lua)
+    };
+}
+
 impl<'lua> FromLua<'lua> for Package {
     fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
         match lua_value {
             LuaValue::Table(t) => Ok(Self {
                 name: t_get!(t, "name", lua),
-                dependencies: t_get!(t, "dependencies", lua),
+                // Optional, default to empty
+                dependencies: t_get_opt!(t, "dependencies", lua).unwrap_or_default(),
                 files: t_get!(t, "files", lua),
                 hooks: t_get!(t, "hooks", lua),
-                variables: t_get!(t, "variables", lua),
+                // Optional, default to empty
+                variables: t_get_opt!(t, "variables", lua).unwrap_or_default(),
             }),
             _ => conv_err(lua_value, "Package", "table"),
         }
@@ -36,13 +48,18 @@ impl<'lua> FromLua<'lua> for PackageFiles {
     fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
         match lua_value {
             LuaValue::Table(t) => Ok(Self {
-                trees: t_get!(t, "trees", lua),
-                extra: t_get!(t, "extra", lua),
-                templates: t_get!(t, "templates", lua),
-                link_type: t_get!(t, "link_type", lua),
-                ignore: t_get!(t, "ignore", lua),
-                replace_files: t_get!(t, "replace_files", lua),
-                replace_dirs: t_get!(t, "replace_dirs", lua),
+                // Optional, default to empty
+                trees: t_get_opt!(t, "trees", lua).unwrap_or_default(),
+                // Optional, default to empty
+                extra: t_get_opt!(t, "extra", lua).unwrap_or_default(),
+                // Optional, default to empty
+                templates: t_get_opt!(t, "templates", lua).unwrap_or_default(),
+                // Optional, default to Link
+                link_type: t_get_opt!(t, "link_type", lua).unwrap_or_else(|| LinkType::Link),
+                // Optional, default to true
+                replace_files: t_get_opt!(t, "replace_files", lua).unwrap_or_else(|| true),
+                // Optional, default to false
+                replace_dirs: t_get_opt!(t, "replace_dirs", lua).unwrap_or_else(|| false),
             }),
             _ => conv_err(lua_value, "PackageFiles", "table"),
         }
@@ -53,9 +70,12 @@ impl<'lua> FromLua<'lua> for PackageHooks {
     fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
         match lua_value {
             LuaValue::Table(t) => Ok(Self {
-                pre: t_get!(t, "pre", lua),
-                install: t_get!(t, "install", lua),
-                post: t_get!(t, "pre", lua),
+                // Optional, default to empty
+                pre: t_get_opt!(t, "pre", lua).unwrap_or_default(),
+                // Optional, default to None
+                install: t_get_opt!(t, "install", lua),
+                // Optional, default to empty
+                post: t_get_opt!(t, "pre", lua).unwrap_or_default(),
             }),
             _ => conv_err(lua_value, "PackageHooks", "table"),
         }
@@ -69,10 +89,14 @@ impl<'lua> FromLua<'lua> for Tree {
                 let path: String = t_get!(t, "path", lua);
                 Ok(Self {
                     path: path.into(),
-                    link_type: t_get!(t, "link_type", lua),
-                    ignore: t_get!(t, "ignore", lua),
-                    replace_files: t_get!(t, "replace_files", lua),
-                    replace_dirs: t_get!(t, "replace_dirs", lua),
+                    // Optional, default to None
+                    link_type: t_get_opt!(t, "link_type", lua),
+                    // Optional, default to empty
+                    ignore: t_get_opt!(t, "ignore", lua).unwrap_or_default(),
+                    // Optional, default to None
+                    replace_files: t_get_opt!(t, "replace_files", lua),
+                    // Optional, default to None
+                    replace_dirs: t_get_opt!(t, "replace_dirs", lua),
                 })
             }
             _ => conv_err(lua_value, "Tree", "table"),
@@ -89,8 +113,11 @@ impl<'lua> FromLua<'lua> for File {
                 Ok(Self {
                     src: src.into(),
                     dest: dest.into(),
+                    // Optional, default to None
                     link_type: t_get!(t, "link_type", lua),
+                    // Optional, default to None
                     replace_files: t_get!(t, "replace_files", lua),
+                    // Optional, default to None
                     replace_dirs: t_get!(t, "replace_dirs", lua),
                 })
             }
@@ -118,7 +145,9 @@ impl<'lua> FromLua<'lua> for Template {
             LuaValue::Table(t) => {
                 let src: String = t_get!(t, "src", lua);
                 let dest: String = t_get!(t, "dest", lua);
+                // Optional, default to None
                 let replace_files = t_get!(t, "replace_files", lua);
+                // Optional, default to None
                 let replace_dirs = t_get!(t, "replace_dirs", lua);
                 Ok(Self {
                     src: src.into(),
@@ -171,8 +200,9 @@ impl<'lua> FromLua<'lua> for Hook {
             LuaValue::Table(t) => {
                 let name = t_get!(t, "name", lua);
                 let body = if t.contains_key("path")? {
-                    let path: String = t_get!(t, "path", lua);
-                    HookBody::Executable { path: path.into() }
+                    HookBody::Executable {
+                        command: t_get!(t, "command", lua),
+                    }
                 } else if t.contains_key("fn")? {
                     let func: Function<'lua> = t_get!(t, "fn", lua);
                     let name: String = Uuid::new_v4().to_string();
@@ -197,7 +227,7 @@ impl<'lua> FromLua<'lua> for HookBody {
     fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
         match lua_value {
             LuaValue::String(s) => Ok(HookBody::Executable {
-                path: s.to_str()?.into(),
+                command: s.to_str()?.to_string(),
             }),
             LuaValue::Function(func) => {
                 let name: String = Uuid::new_v4().to_string();

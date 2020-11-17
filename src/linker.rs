@@ -1,5 +1,5 @@
-use crate::loader::PackageGraph;
-use crate::package::{FileProcess, Hook, LinkType, Package, TemplateEngine, TemplateProcess, Tree};
+use crate::loader::{PackageGraph, PackageState};
+use crate::package::{File, Hook, HookBody, LinkType, Package, Template, TemplateType, Tree};
 use crate::template::{gotmpl, tera};
 
 use std::collections::HashSet;
@@ -11,6 +11,7 @@ use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, Context, Result};
 use log::{debug, info, trace};
+use mlua::{Function as LuaFunction, Lua};
 
 #[derive(Debug)]
 pub struct Linker {
@@ -40,9 +41,9 @@ impl Linker {
     fn link_internal(&self, graph: &PackageGraph, noop: bool) -> Result<()> {
         info!("Sorting packages...");
         let order = graph.topological_order()?;
-        for (path, package) in order {
-            info!("Linking {}", package.name);
-            let state = LinkerState::new(self, path, package, noop);
+        for package in order {
+            info!("Linking {}", package.data.name);
+            let state = LinkerState::new(self, package, noop);
             state.link()?;
         }
 
@@ -54,15 +55,17 @@ struct LinkerState<'a> {
     linker: &'a Linker,
     path: &'a PathBuf,
     package: &'a Package,
+    lua: &'a Lua,
     noop: bool,
 }
 
 impl<'a> LinkerState<'a> {
-    fn new(linker: &'a Linker, path: &'a PathBuf, package: &'a Package, noop: bool) -> Self {
+    fn new(linker: &'a Linker, package: &'a PackageState, noop: bool) -> Self {
         Self {
             linker,
-            path,
-            package,
+            path: &package.path,
+            package: &package.data,
+            lua: &package.lua,
             noop,
         }
     }
@@ -76,13 +79,13 @@ impl<'a> LinkerState<'a> {
             .with_context(|| "Failed to change working directory")?;
 
         debug!("-- Running before-link hooks...");
-        self.exec_before_link()?;
+        self.exec_pre()?;
 
         debug!("-- Linking files...");
         self.link_files()?;
 
         debug!("-- Running after-link hooks...");
-        self.exec_after_link()?;
+        self.exec_post()?;
 
         env::set_current_dir(cwd).with_context(|| "Failed to revert working directory")?;
 
@@ -90,186 +93,94 @@ impl<'a> LinkerState<'a> {
     }
 
     fn link_files(&self) -> Result<()> {
-        for tree in &self.package.trees {
-            // Get normal link paths with ignore patterns applied.
-            let mut normal_link_paths = self.normal_link_paths(tree)?;
+        let files = &self.package.files;
 
-            // Remove special file paths.
-            for file_process in &self.package.config.files {
-                let path: PathBuf = file_process.src.clone().into();
-                normal_link_paths.remove(&path);
-
-                let descendants = self.glob_relative(&path.join("**/*").to_string_lossy())?;
-                for d in descendants {
-                    normal_link_paths.remove(&d);
-                }
-            }
-
-            // Remove template file paths.
-            for template_process in &self.package.config.template_files {
-                let path: PathBuf = template_process.src.clone().into();
-                normal_link_paths.remove(&path);
-            }
-
-            for link_path in normal_link_paths {
-                self.normal_link_file(&link_path, &tree)?;
-            }
+        // Link trees.
+        for tree in &files.trees {
+            self.link_tree(&tree)?;
         }
 
-        for file_process in &self.package.config.files {
-            self.link_file_process(&file_process)?;
+        // Link extra files.
+        for extra in &files.extra {
+            self.link_extra(extra)?;
         }
 
-        for template_process in &self.package.config.template_files {
-            self.link_template_process(&template_process)?;
+        // Link template files.
+        for template in &files.templates {
+            self.link_template(&template)?;
         }
 
         Ok(())
     }
 
     /// Link a file relative to the package root to its proper location.
-    fn normal_link_file<P: AsRef<Path> + Clone>(&self, path: P, tree: &Tree) -> Result<()> {
-        let absolute = fs::canonicalize(path.clone()).with_context(|| {
-            format!(
-                "Failed to determine absolute path of {}",
-                path.as_ref().display()
-            )
-        })?;
+    fn link_tree(&self, tree: &Tree) -> Result<()> {
+        // Get normal link paths with ignore patterns applied.
+        let normal_link_paths = self.normal_link_paths(tree)?;
+        for path in normal_link_paths {
+            let absolute = fs::canonicalize(path.clone()).with_context(|| {
+                format!("Failed to determine absolute path of {}", path.display())
+            })?;
 
-        let relative_to_tree = path.as_ref().strip_prefix(&tree.path)?;
-        let dest = self.linker.dest.join(relative_to_tree);
+            let rel_to_tree = path.strip_prefix(&tree.path)?;
+            let dest = self.linker.dest.join(rel_to_tree);
 
-        let link_type = match &tree.default_link_type {
-            Some(x) => x,
-            None => &self.package.config.default_link_type,
-        };
-
-        let replace_files = tree
-            .replace_files
-            .unwrap_or(self.package.config.replace_files);
-        let replace_directories = tree
-            .replace_files
-            .unwrap_or(self.package.config.replace_directories);
-
-        self.link_file(
-            absolute,
-            dest,
-            &link_type,
-            replace_files,
-            replace_directories,
-        )
-    }
-
-    /// Returns the set of paths (relative to the package root), with ignore patterns applied.
-    pub fn normal_link_paths(&self, tree: &Tree) -> Result<HashSet<PathBuf>> {
-        // Glob all files starting at tree.
-        let mut paths: HashSet<_> = self.glob_relative(&tree.file_path_str("**/*"))?;
-
-        // Glob ignore patterns.
-        let ignored = self.ignored_paths(tree)?;
-
-        // Remove ignored paths.
-        for path in HashSet::intersection(&paths.clone(), &ignored) {
-            paths.remove(path);
+            self.link_file(
+                absolute,
+                dest,
+                &tree.link_type,
+                &tree.replace_files,
+                &tree.replace_dirs,
+            )?;
         }
-
-        Ok(paths)
+        Ok(())
     }
 
-    /// Returns the set of paths (relative to the package root) that should be ignored in normal
-    /// linking.
-    pub fn ignored_paths(&self, tree: &Tree) -> Result<HashSet<PathBuf>> {
-        let ignore_patterns = &self.package.config.ignore_patterns;
-        let paths_iter = ignore_patterns
-            .iter()
-            .map(|p| self.glob_relative(&tree.file_path_str(p)));
-
-        let mut paths = HashSet::new();
-        for p_result in paths_iter {
-            let p = p_result?;
-            paths.extend(p);
-        }
-
-        Ok(paths)
-    }
-
-    /// Glob for files with a pattern relative to the package root.
-    fn glob_relative(&self, pattern: &str) -> Result<HashSet<PathBuf>> {
-        let paths = glob::glob(pattern)
-            .with_context(|| format!("Failed to glob invalid pattern {}", pattern))?;
-
-        // Collect and check the glob results.
-        let mut set: HashSet<PathBuf> = paths
-            .map(|glob_result| {
-                glob_result
-                    .with_context(|| format!("Failed to stat path in globbing pattern {}", pattern))
-            })
-            .collect::<Result<_>>()?;
-
-        // Filter to only include files.
-        set = set.into_iter().filter(|p| p.is_file()).collect();
-
-        Ok(set)
-    }
-
-    fn link_file_process(&self, file_process: &FileProcess) -> Result<()> {
-        let src = PathBuf::from(&file_process.src);
+    fn link_extra(&self, file: &File) -> Result<()> {
+        let src = PathBuf::from(&file.src);
         let absolute_src = fs::canonicalize(src.clone())
             .with_context(|| format!("Failed to determine absolute path of {}", src.display()))?;
 
-        let dest = &file_process.dest;
+        let dest = &file.dest;
         let absolute_dest = self.linker.dest.join(dest);
-
-        let replace_files = match file_process.replace_files {
-            Some(b) => b,
-            None => self.package.config.replace_files,
-        };
-
-        let replace_directories = match file_process.replace_directories {
-            Some(b) => b,
-            None => self.package.config.replace_directories,
-        };
 
         self.link_file(
             absolute_src,
             absolute_dest,
-            &file_process.link_type,
-            replace_files,
-            replace_directories,
+            &file.link_type,
+            &file.replace_files,
+            &file.replace_dirs,
         )
     }
 
-    fn link_template_process(&self, template_process: &TemplateProcess) -> Result<()> {
-        let src = PathBuf::from(&template_process.src);
+    fn link_template(&self, template: &Template) -> Result<()> {
+        let src = PathBuf::from(&template.src);
         let absolute_src = fs::canonicalize(src.clone())
             .with_context(|| format!("Failed to determine absolute path of {}", src.display()))?;
 
-        let dest = &template_process.dest;
+        let dest = &template.dest;
         let absolute_dest = self.linker.dest.join(dest);
 
         let src_str = fs::read_to_string(absolute_src.clone())
             .with_context(|| format!("Failed to read source file {}", absolute_src.display()))?;
-        let rendered_result = match template_process.engine {
-            TemplateEngine::Gtmpl => gotmpl::render(&src_str, self.package.variables.map.clone()),
-            TemplateEngine::Tera => tera::render(&src_str, &self.package.variables.map),
+        let rendered_result = match template.ty {
+            TemplateType::Gotmpl => gotmpl::render(&src_str, self.package.variables.map.clone()),
+            TemplateType::Tera => tera::render(&src_str, &self.package.variables.map),
+            _ => unimplemented!(),
         };
-
         let rendered_str = rendered_result.with_context(|| {
             format!("Failed to render template file: {}", absolute_src.display())
         })?;
 
-        let replace_files = match template_process.replace_files {
-            Some(b) => b,
-            None => self.package.config.replace_files,
-        };
-
-        let replace_directories = match template_process.replace_directories {
-            Some(b) => b,
-            None => self.package.config.replace_directories,
-        };
+        let replace_files = template
+            .replace_files
+            .unwrap_or_else(|| self.package.files.replace_files);
+        let replace_dirs = template
+            .replace_dirs
+            .unwrap_or_else(|| self.package.files.replace_dirs);
 
         if !self.noop {
-            self.prepare_link_location(&absolute_dest, replace_files, replace_directories)?;
+            self.prepare_link_location(&absolute_dest, replace_files, replace_dirs)?;
             fs::write(&absolute_dest, rendered_str)
                 .with_context(|| format!("Failed to write file {}", absolute_dest.display()))?;
         }
@@ -282,9 +193,9 @@ impl<'a> LinkerState<'a> {
         &self,
         src: P,
         dest: P,
-        link_type: &LinkType,
-        replace_files: bool,
-        replace_directories: bool,
+        link_type: &Option<LinkType>,
+        replace_files: &Option<bool>,
+        replace_directories: &Option<bool>,
     ) -> Result<()> {
         trace!(
             "-- -- Linking {} -> {}",
@@ -292,10 +203,18 @@ impl<'a> LinkerState<'a> {
             dest.as_ref().display()
         );
 
+        let link_type = match link_type {
+            Some(t) => t,
+            None => &self.package.files.link_type,
+        };
+        let replace_files = replace_files.unwrap_or_else(|| self.package.files.replace_files);
+        let replace_directories =
+            replace_directories.unwrap_or_else(|| self.package.files.replace_dirs);
+
         if !self.noop {
             self.prepare_link_location(&dest, replace_files, replace_directories)?;
 
-            match *link_type {
+            match link_type {
                 LinkType::Link => {
                     symlink(&src, &dest).with_context(|| {
                         format!(
@@ -422,21 +341,72 @@ impl<'a> LinkerState<'a> {
         }
     }
 
-    pub fn exec_before_link(&self) -> Result<()> {
-        self.exec_hooks(&self.package.config.before_link)?;
+    /// Returns the set of paths (relative to the package root), with ignore patterns applied.
+    pub fn normal_link_paths(&self, tree: &Tree) -> Result<HashSet<PathBuf>> {
+        // Glob all files starting at tree.
+        let mut paths: HashSet<_> = self.glob_relative(&tree.file_path_str("**/*"))?;
+
+        // Glob ignore patterns.
+        let ignored = self.ignored_paths(tree)?;
+
+        // Remove ignored paths.
+        for path in HashSet::intersection(&paths.clone(), &ignored) {
+            paths.remove(path);
+        }
+
+        Ok(paths)
+    }
+
+    /// Returns the set of paths (relative to the package root) that should be ignored in normal
+    /// linking.
+    pub fn ignored_paths(&self, tree: &Tree) -> Result<HashSet<PathBuf>> {
+        // Process global ignore.
+        let paths: Vec<HashSet<PathBuf>> = tree
+            .ignore
+            .iter()
+            .map(|p| self.glob_relative(&tree.file_path_str(p)))
+            .collect::<Result<_>>()?;
+
+        Ok(paths
+            .into_iter()
+            .flat_map(|set| set)
+            .collect::<HashSet<_>>())
+    }
+
+    /// Glob for files with a pattern relative to the package root.
+    fn glob_relative(&self, pattern: &str) -> Result<HashSet<PathBuf>> {
+        let paths = glob::glob(pattern)
+            .with_context(|| format!("Failed to glob invalid pattern {}", pattern))?;
+
+        // Collect and check the glob results.
+        let mut set: HashSet<PathBuf> = paths
+            .map(|glob_result| {
+                glob_result
+                    .with_context(|| format!("Failed to stat path in globbing pattern {}", pattern))
+            })
+            .collect::<Result<_>>()?;
+
+        // Filter to only include files.
+        set = set.into_iter().filter(|p| p.is_file()).collect();
+
+        Ok(set)
+    }
+
+    pub fn exec_pre(&self) -> Result<()> {
+        self.exec_hooks(&self.package.hooks.pre)?;
         Ok(())
     }
 
-    pub fn exec_after_link(&self) -> Result<()> {
-        self.exec_hooks(&self.package.config.after_link)?;
+    pub fn exec_post(&self) -> Result<()> {
+        self.exec_hooks(&self.package.hooks.post)?;
         Ok(())
     }
 
     /// Executes a list of hook commands.
     fn exec_hooks(&self, hooks: &[Hook]) -> Result<()> {
-        if !self.noop {
-            for hook in hooks {
-                debug!("-- Running hook {}...", hook.name);
+        for hook in hooks {
+            debug!("-- Running hook {}...", hook.name);
+            if !self.noop {
                 self.exec_hook(&hook)?;
             }
         }
@@ -445,27 +415,37 @@ impl<'a> LinkerState<'a> {
 
     /// Executes a hook command.
     fn exec_hook(&self, hook: &Hook) -> Result<()> {
-        let parts = match shlex::split(&hook.string) {
-            Some(v) => v,
-            None => {
-                return Err(anyhow!(
-                    "Failed to run hook {}: invalid invocation",
-                    hook.name
-                ))
+        match &hook.body {
+            HookBody::Executable { command } => {
+                let parts = match shlex::split(&command) {
+                    Some(v) => v,
+                    None => {
+                        return Err(anyhow!(
+                            "Failed to run hook {}: invalid invocation",
+                            hook.name
+                        ))
+                    }
+                };
+
+                let bin = match parts.get(0) {
+                    Some(p) => p,
+                    None => return Ok(()),
+                };
+                let args = &parts[1..];
+
+                let mut cmd = Command::new(bin);
+                cmd.args(args);
+
+                self.exec_command(cmd)
+                    .map_err(|err| anyhow!("Failed to run hook {}: {}", hook.name, err))
             }
-        };
+            HookBody::LuaFunction { name } => {
+                let func: LuaFunction = self.lua.named_registry_value(&name)?;
+                func.call::<(), ()>(())?;
 
-        let bin = match parts.get(0) {
-            Some(p) => p,
-            None => return Ok(()),
-        };
-        let args = &parts[1..];
-
-        let mut cmd = Command::new(bin);
-        cmd.args(args);
-
-        self.exec_command(cmd)
-            .map_err(|err| anyhow!("Failed to run hook {}: {}", hook.name, err))
+                Ok(())
+            }
+        }
     }
 
     fn exec_command(&self, mut cmd: Command) -> Result<()> {

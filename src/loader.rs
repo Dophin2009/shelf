@@ -1,4 +1,4 @@
-use crate::package::{Hook, LinkType, Map, MapValue, Package, Template, TemplateType, Tree};
+use crate::package::Package;
 
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::fs;
@@ -6,7 +6,7 @@ use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
-use mlua::{FromLua, Lua, Result as LuaResult, Value as LuaValue};
+use mlua::{Lua, Value as LuaValue};
 use petgraph::algo;
 use petgraph::graphmap::DiGraphMap;
 
@@ -54,11 +54,47 @@ impl LoaderState {
         }
     }
 
-    fn lua_instance(&self) -> Lua {
-        Lua::new()
+    fn lua_instance(&self) -> Result<Lua> {
+        fn empty_vec<'a>() -> Vec<LuaValue<'a>> {
+            vec![]
+        }
+        let lua = Lua::new();
+
+        // Add global `pkg` to be modified
+        let pkg = lua.create_table()?;
+
+        let default_tree = lua.create_table()?;
+        default_tree.set("path", "tree")?;
+        default_tree.set("link_type", "link")?;
+        default_tree.set("ignore", empty_vec())?;
+        default_tree.set("replace_files", LuaValue::Nil)?;
+        default_tree.set("replace_dirs", LuaValue::Nil)?;
+
+        let files = lua.create_table()?;
+        files.set("trees", vec![default_tree])?;
+        files.set("extra", empty_vec())?;
+        files.set("templates", empty_vec())?;
+        files.set("replace_files", true)?;
+        files.set("replace_dirs", false)?;
+
+        let hooks = lua.create_table()?;
+        hooks.set("pre", empty_vec())?;
+        hooks.set("post", empty_vec())?;
+
+        pkg.set("dependencies", empty_vec())?;
+        pkg.set("files", files)?;
+        pkg.set("hooks", hooks)?;
+        pkg.set("variables", lua.create_table()?)?;
+
+        {
+            let globals = lua.globals();
+            globals.set("pkg", pkg)?;
+        }
+
+        Ok(lua)
     }
 
-    fn load_package_data<P: AsRef<Path>>(&self, path: P) -> Result<Package> {
+    fn load_package_data<P: AsRef<Path>>(&self, path: P) -> Result<PackageState> {
         let path = if path.as_ref().is_relative() {
             fs::canonicalize(&path)?
         } else {
@@ -69,23 +105,17 @@ impl LoaderState {
         let configuration = fs::read_to_string(&config_path)
             .with_context(|| format!("Failed to read {}", config_path.to_string_lossy()))?;
 
-        let lua = self.lua_instance();
-
-        // Modify package.path
-        let globals = lua.globals();
-        let package_table = globals.get::<_, mlua::Table>("package")?;
-        let old_packagepath = package_table.get::<_, String>("path")?;
-        let new_packagepath = format!("{}/?.lua;{}", path.to_string_lossy(), old_packagepath);
-        package_table.set("path", new_packagepath)?;
-
         // Load and evaluate lua code
+        let lua = self.lua_instance()?;
         let chunk = lua.load(&configuration);
-        let package: Package = chunk.eval().with_context(|| "Error in evalulating lua")?;
+        chunk.exec().with_context(|| "Error in executing lua")?;
 
-        // Restore package.path
-        package_table.set("path", old_packagepath)?;
-
-        Ok(package)
+        let package = lua.globals().get("pkg")?;
+        Ok(PackageState {
+            path,
+            data: package,
+            lua,
+        })
     }
 
     fn add_package<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
@@ -96,15 +126,16 @@ impl LoaderState {
             )
         })?;
 
-        self.insert_package(PathBuf::from(path.as_ref()), package)
+        self.insert_package(package)
     }
 
     /// Add a package to the graph and map by absolute path.
-    fn insert_package(&mut self, path: PathBuf, package: Package) -> Result<()> {
-        let dependencies = package.config.dependencies.clone();
+    fn insert_package(&mut self, package: PackageState) -> Result<()> {
+        let dependencies = package.data.dependencies.clone();
 
-        let id = hash_path(&path);
-        let existing = self.pg.map.insert(id, (path.clone(), package));
+        let path = &package.path.clone();
+        let id = hash_path(path);
+        let existing = self.pg.map.insert(id, package);
         if existing.is_some() {
             return Ok(());
         }
@@ -123,19 +154,24 @@ impl LoaderState {
             let dep_id = hash_path(&dep_path);
             self.pg.graph.add_edge(id, dep_id, ());
 
-            self.insert_package(dep_path, dep)?;
+            self.insert_package(dep)?;
         }
 
         Ok(())
     }
 }
 
-#[derive(Debug)]
+pub struct PackageState {
+    pub path: PathBuf,
+    pub data: Package,
+    pub lua: Lua,
+}
+
 pub struct PackageGraph {
     /// Directional graph of package dependencies.
     graph: DiGraphMap<u64, ()>,
     /// Map storing the path and package
-    map: HashMap<u64, (PathBuf, Package)>,
+    map: HashMap<u64, PackageState>,
 }
 
 impl PackageGraph {
@@ -150,11 +186,11 @@ impl PackageGraph {
         &self.graph
     }
 
-    pub fn package_map(&self) -> &HashMap<u64, (PathBuf, Package)> {
+    pub fn package_map(&self) -> &HashMap<u64, PackageState> {
         &self.map
     }
 
-    pub fn topological_order(&self) -> Result<impl Iterator<Item = &(PathBuf, Package)>> {
+    pub fn topological_order(&self) -> Result<impl Iterator<Item = &PackageState>> {
         let mut sorted = match algo::toposort(&self.graph, None) {
             Ok(v) => v,
             Err(cycle) => {
@@ -190,202 +226,4 @@ fn hash_path(path: &PathBuf) -> u64 {
     let mut s = DefaultHasher::new();
     path.hash(&mut s);
     s.finish()
-}
-
-macro_rules! t_get {
-    ($table:ident, $key:expr, $lua:ident) => {
-        FromLua::from_lua($table.get($key)?, $lua)?;
-    };
-}
-
-impl<'lua> FromLua<'lua> for Package {
-    fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
-        match lua_value {
-            LuaValue::Table(t) => {
-                let variables: Option<_> = t_get!(t, "variables", lua);
-                let config = FromLua::from_lua(LuaValue::Table(t), lua)?;
-                Ok(Self {
-                    variables: variables.unwrap_or_else(Map::new),
-                    config,
-                })
-            }
-            // TODO: Properly handle invalid value.
-            _ => panic!(),
-        }
-    }
-}
-impl<'lua> FromLua<'lua> for Config {
-    fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
-        // TODO: Properly handle invalid values.
-        match lua_value {
-            LuaValue::Table(t) => {
-                let name = t_get!(t, "name", lua);
-                let dependencies = t_get!(t, "dependencies", lua);
-                let default_link_type = t_get!(t, "link_type", lua);
-                let ignore_patterns = t_get!(t, "ignore_patterns", lua);
-                let files = t_get!(t, "files", lua);
-                let template_files = t_get!(t, "templates", lua);
-                let before_link = t_get!(t, "before_link", lua);
-                let after_link = t_get!(t, "after_link", lua);
-                let replace_files = t_get!(t, "replace_files", lua);
-                let replace_directories = t_get!(t, "replace_dirs", lua);
-                let trees = t_get!(t, "trees", lua);
-
-                Ok(Self::new_optional(
-                    name,
-                    dependencies,
-                    default_link_type,
-                    ignore_patterns,
-                    files,
-                    template_files,
-                    before_link,
-                    after_link,
-                    replace_files,
-                    replace_directories,
-                    trees,
-                ))
-            }
-            _ => panic!(),
-        }
-    }
-}
-
-impl<'lua> FromLua<'lua> for FileProcess {
-    fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
-        // TODO: Properly handle invalid values.
-        match lua_value {
-            LuaValue::Table(t) => {
-                let src = t_get!(t, "src", lua);
-                let dest = t_get!(t, "dest", lua);
-                let link_type = t_get!(t, "link_type", lua);
-                let replace_files = t_get!(t, "replace_files", lua);
-                let replace_directories = t_get!(t, "replace_dirs", lua);
-                Ok(Self::new_optional(
-                    src,
-                    dest,
-                    link_type,
-                    replace_files,
-                    replace_directories,
-                ))
-            }
-            _ => panic!(),
-        }
-    }
-}
-
-impl<'lua> FromLua<'lua> for TemplateProcess {
-    fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
-        // TODO: Properly handle invalid values.
-        match lua_value {
-            LuaValue::Table(t) => {
-                let src = t_get!(t, "src", lua);
-                let dest = t_get!(t, "dest", lua);
-                let engine = t_get!(t, "engine", lua);
-                let replace_files = t_get!(t, "replace_files", lua);
-                let replace_directories = t_get!(t, "replace_dirs", lua);
-                Ok(Self::new_optional(
-                    src,
-                    dest,
-                    engine,
-                    replace_files,
-                    replace_directories,
-                ))
-            }
-            _ => panic!(),
-        }
-    }
-}
-
-impl<'lua> FromLua<'lua> for TemplateEngine {
-    // TODO: Properly handle invalid value.
-    fn from_lua(lua_value: LuaValue<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
-        match lua_value {
-            LuaValue::String(s) => match s.to_str()?.to_lowercase().as_str() {
-                "gtmpl" => Ok(TemplateEngine::Gtmpl),
-                "tera" => Ok(TemplateEngine::Tera),
-                _ => panic!(),
-            },
-            _ => panic!(),
-        }
-    }
-}
-
-impl<'lua> FromLua<'lua> for Tree {
-    fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
-        // TODO: Properly handle invalid values.
-        match lua_value {
-            LuaValue::Table(t) => {
-                let path = t_get!(t, "path", lua);
-                let default_link_type = t_get!(t, "link_type", lua);
-                let ignore_patterns = t_get!(t, "ignore_patterns", lua);
-                let replace_files = t_get!(t, "replace_files", lua);
-                let replace_directories = t_get!(t, "replace_dirs", lua);
-                Ok(Self::new_optional(
-                    path,
-                    default_link_type,
-                    ignore_patterns,
-                    replace_files,
-                    replace_directories,
-                ))
-            }
-            _ => panic!(),
-        }
-    }
-}
-
-impl<'lua> FromLua<'lua> for LinkType {
-    // TODO: Properly handle invalid value.
-    fn from_lua(lua_value: LuaValue<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
-        match lua_value {
-            LuaValue::String(s) => match s.to_str()?.to_lowercase().as_str() {
-                "link" => Ok(LinkType::Link),
-                "copy" => Ok(LinkType::Copy),
-                _ => panic!(),
-            },
-            _ => panic!(),
-        }
-    }
-}
-
-impl<'lua> FromLua<'lua> for Hook {
-    fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
-        // TODO: Properly handle invalid values.
-        match lua_value {
-            LuaValue::Table(t) => {
-                let name = t_get!(t, "name", lua);
-                let string = t_get!(t, "string", lua);
-                Ok(Self::new(name, string))
-            }
-            _ => panic!(),
-        }
-    }
-}
-
-impl<'lua> FromLua<'lua> for Map {
-    fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua Lua) -> LuaResult<Self> {
-        match lua_value {
-            LuaValue::Table(t) => Ok(Self {
-                map: FromLua::from_lua(LuaValue::Table(t), lua)?,
-            }),
-            // TODO: Properly handle invalid value.
-            _ => panic!(),
-        }
-    }
-}
-
-impl<'lua> FromLua<'lua> for MapValue {
-    fn from_lua(lua_value: LuaValue<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
-        match lua_value {
-            LuaValue::Boolean(b) => Ok(Self::Bool(b)),
-            LuaValue::Integer(n) => Ok(Self::Integer(n)),
-            LuaValue::String(s) => Ok(Self::String(s.to_str()?.into())),
-            LuaValue::Number(n) => Ok(Self::Float(n)),
-            LuaValue::Table(t) => {
-                let hm = t.pairs().collect::<LuaResult<_>>()?;
-                Ok(Self::Object(hm))
-            }
-            // TODO: Properly handle unsupported values.
-            _ => panic!(),
-        }
-    }
 }
