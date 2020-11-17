@@ -30,6 +30,7 @@ impl Linker {
     }
 
     // TODO: Verify paths exist and are valid before actually linking.
+    // TODO: Make logging less hacky.
     pub fn link(&self, graph: &PackageGraph) -> Result<()> {
         self.link_internal(graph, false)
     }
@@ -181,7 +182,11 @@ impl<'a> LinkerState<'a> {
             .replace_dirs
             .unwrap_or_else(|| self.package.files.replace_dirs);
 
-        trace!("-- -- Templating {} -> {}", src.display(), dest.display());
+        trace!(
+            "-- -- Templating {} -> {}",
+            absolute_src.display(),
+            absolute_dest.display()
+        );
         if !self.noop {
             self.prepare_link_location(&absolute_dest, replace_files, replace_dirs)?;
             fs::write(&absolute_dest, rendered_str)
