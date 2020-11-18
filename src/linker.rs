@@ -1,6 +1,6 @@
 use crate::loader::{PackageGraph, PackageState};
 use crate::package::{File, Hook, HookBody, LinkType, Package, Template, TemplateType, Tree};
-use crate::template::{gotmpl, tera};
+use crate::template::{gotmpl, hbs, tera};
 
 use std::collections::HashSet;
 use std::env;
@@ -169,7 +169,9 @@ impl<'a> LinkerState<'a> {
         let rendered_result = match template.ty {
             TemplateType::Gotmpl => gotmpl::render(&src_str, self.package.variables.map.clone()),
             TemplateType::Tera => tera::render(&src_str, &self.package.variables.map),
-            _ => unimplemented!(),
+            TemplateType::Handlebars { ref partials } => {
+                hbs::render(&src_str, &self.package.variables.map, partials)
+            }
         };
         let rendered_str = rendered_result.with_context(|| {
             format!("Failed to render template file: {}", absolute_src.display())

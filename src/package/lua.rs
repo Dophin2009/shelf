@@ -171,7 +171,11 @@ impl<'lua> FromLua<'lua> for TemplateType {
                 let ty: String = t_get!(t, "engine", lua);
                 match ty.to_lowercase().as_str() {
                     "handlebars" => {
-                        let partials: HashMap<String, String> = t_get!(t, "partials", lua);
+                        let partials: HashMap<String, String> = match t_get_opt!(t, "partials", lua)
+                        {
+                            Some(v) => v,
+                            None => HashMap::with_capacity(0),
+                        };
                         Ok(Self::Handlebars {
                             partials: partials.into_iter().map(|(k, v)| (k, v.into())).collect(),
                         })
