@@ -27,6 +27,7 @@ fn main() -> Result<()> {
         .quiet(opts.quiet)
         .verbosity(opts.verbosity)
         .color(ColorChoice::Never)
+        .module(module_path!())
         .init()
         .unwrap();
 
