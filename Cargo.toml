@@ -1,6 +1,6 @@
 [package]
 name = "stew"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Eric Zhao <21zhaoe@protonmail.com>"]
 description = "Dotfiles package manager."
 homepage = "https://github.com/Dophin2009/stew"
