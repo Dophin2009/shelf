@@ -1,6 +1,7 @@
-use crate::package::{Package, Tree};
+use crate::package::Package;
 
 use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::env;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
@@ -61,6 +62,10 @@ impl LoaderState {
             path.as_ref().into()
         };
 
+        // Work relative to the package root.
+        let cwd = env::current_dir().with_context(|| "Failed to determine current directory")?;
+        env::set_current_dir(&path).with_context(|| "Failed to change working directory")?;
+
         let config_path = path.join("package.lua");
         let configuration = fs::read_to_string(&config_path)
             .with_context(|| format!("Failed to read {}", config_path.to_string_lossy()))?;
@@ -76,6 +81,8 @@ impl LoaderState {
             .with_context(|| "Global `pkg` must be set")?;
         let package = FromLua::from_lua(LuaValue::Table(package_table), &lua)
             .with_context(|| "Invalid `pkg` structure")?;
+
+        env::set_current_dir(cwd).with_context(|| "Failed to revert working directory")?;
 
         Ok(PackageState {
             path,
