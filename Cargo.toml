@@ -16,6 +16,9 @@ path = "src/lib.rs"
 name = "stew"
 path = "src/main.rs"
 
+[features]
+unsafe = []
+
 [dependencies]
 anyhow = "1.0"
 clap = "3.0.0-beta.1"
