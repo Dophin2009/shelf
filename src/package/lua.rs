@@ -75,7 +75,7 @@ impl<'lua> FromLua<'lua> for PackageHooks {
                 // Optional, default to None
                 install: t_get_opt!(t, "install", lua),
                 // Optional, default to empty
-                post: t_get_opt!(t, "pre", lua).unwrap_or_default(),
+                post: t_get_opt!(t, "post", lua).unwrap_or_default(),
             }),
             _ => conv_err(lua_value, "PackageHooks", "table"),
         }
@@ -199,7 +199,7 @@ impl<'lua> FromLua<'lua> for Hook {
         match lua_value {
             LuaValue::Table(t) => {
                 let name = t_get!(t, "name", lua);
-                let body = if t.contains_key("path")? {
+                let body = if t.contains_key("command")? {
                     HookBody::Executable {
                         command: t_get!(t, "command", lua),
                     }
