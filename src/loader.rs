@@ -1,4 +1,4 @@
-use crate::package::{Package, Tree};
+use crate::package::Package;
 
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::fs;
@@ -144,7 +144,10 @@ impl LoaderState {
             Ok(table)
         }
 
+        #[cfg(not(feature = "unsafe"))]
         let lua = Lua::new();
+        #[cfg(feature = "unsafe")]
+        let lua = unsafe { Lua::unsafe_new() };
 
         // Add global `pkg` to be modified
         let pkg = lua.create_table()?;
@@ -182,6 +185,10 @@ impl LoaderState {
                 let path: String = package.get("path")?;
                 let new_path = format!("{}/?.lua;{0}/?/init.lua;{}", extra_path, path);
                 package.set("path", new_path)?;
+
+                let cpath: String = package.get("cpath")?;
+                let new_cpath = format!("{}/?.so;{}", extra_path, cpath);
+                package.set("cpath", new_cpath)?;
             }
         }
 
