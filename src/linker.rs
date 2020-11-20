@@ -125,7 +125,8 @@ impl<'a> LinkerState<'a> {
                 format!("Failed to determine absolute path of {}", path.display())
             })?;
 
-            let rel_to_tree = path.strip_prefix(&tree.path)?;
+            let tree_absolute = fs::canonicalize(&tree.path)?;
+            let rel_to_tree = absolute.strip_prefix(&tree_absolute)?;
             let dest = self.linker.dest.join(rel_to_tree);
 
             self.link_file(
