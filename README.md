@@ -9,3 +9,4 @@ More detailed docs coming soon.
 -   [ ] Pass certain variables to package context
 -   [ ] Provide temporary processing directory
 -   [ ] Optional priority assignment to template processing
+-   [ ] Template-specific (extra?) variables
