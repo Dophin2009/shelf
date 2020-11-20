@@ -8,7 +8,7 @@ use log::info;
 use stderrlog::ColorChoice;
 
 #[derive(Clap, Debug)]
-#[clap(version = "0.1.0", author = "Eric Zhao <21zhaoe@protonmail.com>")]
+#[clap(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
 struct Options {
     #[clap(short, long, parse(from_occurrences), about = "Message verbosity")]
     verbosity: usize,
