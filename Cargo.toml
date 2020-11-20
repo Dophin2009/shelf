@@ -18,7 +18,7 @@ name = "stew"
 path = "src/main.rs"
 
 [features]
-default = []
+default = ["lua54"]
 lua51 = ["mlua51"]
 lua52 = ["mlua52"]
 lua53 = ["mlua53"]
