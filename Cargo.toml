@@ -1,20 +1,20 @@
 [package]
-name = "stew"
-version = "0.2.0"
+name = "tidy"
+version = "0.3.0"
 authors = ["Eric Zhao <21zhaoe@protonmail.com>"]
-description = "Dotfiles package manager."
-homepage = "https://github.com/Dophin2009/stew"
-repository = "https://github.com/Dophin2009/stew.git"
+description = "Keep your dotfiles tidy."
+homepage = "https://github.com/Dophin2009/tidy"
+repository = "https://github.com/Dophin2009/tidy.git"
 license = "GPL-3.0-or-later"
 edition = "2018"
 build = "build.rs"
 
 [lib]
-name = "stew"
+name = "tidy"
 path = "src/lib.rs"
 
 [[bin]]
-name = "stew"
+name = "tidy"
 path = "src/main.rs"
 
 [features]

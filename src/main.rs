@@ -1,4 +1,4 @@
-use stew::{Linker, Loader};
+use tidy::{Linker, Loader};
 
 use std::env;
 
