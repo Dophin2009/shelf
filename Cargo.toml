@@ -19,18 +19,19 @@ path = "src/main.rs"
 
 [features]
 default = []
-lua51 = ["mlua.lua51"]
-lua52 = ["mlua.lua52"]
-lua53 = ["mlua.lua53"]
-lua54 = ["mlua.lua54"]
-luajit = ["mlua.luajit"]
+lua51 = ["mlua/lua51"]
+lua52 = ["mlua/lua52"]
+lua53 = ["mlua/lua53"]
+lua54 = ["mlua/lua54"]
+luajit = ["mlua/luajit"]
 unsafe = []
 
 [dependencies]
 anyhow = "1.0"
 clap = "3.0.0-beta.2"
 log = "0.4"
-mlua = { version = "0.6", features = ["send", "serialize"] }
-petgraph = "0.5"
+mlua = { version = "0.6", features = ["macros", "send", "serialize"] }
+path-clean = "0.1"
+petgraph = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 stderrlog = "0.5"

@@ -1,11 +1,10 @@
-use tidy::{Linker, Loader};
-
 use std::env;
 
 use anyhow::{anyhow, Context, Result};
 use clap::Clap;
 use log::info;
 use stderrlog::ColorChoice;
+use tidy::Loader;
 
 #[derive(Clap, Debug)]
 #[clap(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
@@ -14,7 +13,7 @@ struct Options {
     verbosity: usize,
     #[clap(short, long, about = "Silence all output")]
     quiet: bool,
-    #[clap(short, long, about = "Do not link, copy, or write files")]
+    #[clap(short, long, about = "Pretend to process")]
     noop: bool,
     packages: Vec<String>,
 }
@@ -34,34 +33,25 @@ fn main() -> Result<()> {
     cli(&opts)
 }
 
-fn cli(opts: &Options) -> Result<()> {
-    let home_key = "HOME";
-    let home = match env::var(home_key) {
-        Ok(val) => val,
-        Err(err) => {
-            return Err(anyhow!(
-                "Environment variable {} not set: {}",
-                home_key,
-                err
-            ))
-        }
-    };
+static HOME_VAR: &str = "HOME";
 
-    info!("Resolving package dependency graph...");
+fn cli(opts: &Options) -> Result<()> {
+    let home =
+        env::var(HOME_VAR).with_context(|| format!("Environment variable {} not set", HOME_VAR))?;
+
     let loader = Loader::new();
     let graph = loader
         .load_multi(&opts.packages)
-        .with_context(|| "Failed to resolve packages")?;
+        .with_context(|| "Couldn't resolve packages")?;
 
-    let linker = Linker::new(home, opts.quiet, opts.verbosity);
-
-    if !opts.noop {
-        linker
-            .link(&graph)
-            .with_context(|| "Failed to link packages")?;
-    } else {
-        linker.link_noop(&graph)?;
-    }
+    println!(
+        "{:#?}",
+        graph
+            .data()
+            .into_iter()
+            .map(|(_, ps)| ps.data.clone())
+            .collect::<Vec<_>>()
+    );
 
     Ok(())
 }
