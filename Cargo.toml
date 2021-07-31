@@ -19,57 +19,18 @@ path = "src/main.rs"
 
 [features]
 default = []
-lua51 = ["mlua51"]
-lua52 = ["mlua52"]
-lua53 = ["mlua53"]
-lua54 = ["mlua54"]
-luajit = ["mluajit"]
+lua51 = ["mlua.lua51"]
+lua52 = ["mlua.lua52"]
+lua53 = ["mlua.lua53"]
+lua54 = ["mlua.lua54"]
+luajit = ["mlua.luajit"]
 unsafe = []
 
 [dependencies]
 anyhow = "1.0"
-clap = "3.0.0-beta.1"
-dyn-clone = "1.0.3"
-glob = "0.3.0"
-gtmpl = "0.5.7"
-gtmpl_derive = "0.3.3"
-gtmpl_value = "0.3.3"
-handlebars = "3.4.0"
-log = "0.4.0"
-mlua_derive = "0.4"
-petgraph = "0.5.1"
-serde = { version = "1.0.115", features = ["derive"] }
-shlex = "0.1.1"
-stderrlog = "0.5.0"
-tera = "1.5.0"
-uuid = { version = "0.8", features = ["v4"] }
-
-[dependencies.mlua51]
-package = "mlua"
-version = "0.4"
-features = ["lua51", "send"]
-optional = true
-
-[dependencies.mlua52]
-package = "mlua"
-version = "0.4"
-features = ["lua52", "send"]
-optional = true
-
-[dependencies.mlua53]
-package = "mlua"
-version = "0.4"
-features = ["lua53", "send"]
-optional = true
-
-[dependencies.mlua54]
-package = "mlua"
-version = "0.4"
-features = ["lua54", "send"]
-optional = true
-
-[dependencies.mluajit]
-package = "mlua"
-version = "0.4"
-features = ["luajit", "send"]
-optional = true
+clap = "3.0.0-beta.2"
+log = "0.4"
+mlua = { version = "0.6", features = ["send", "serialize"] }
+petgraph = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+stderrlog = "0.5"
