@@ -25,6 +25,7 @@ pub struct Dep {
 #[derive(Debug, Clone)]
 pub enum File {
     Regular(RegularFile),
+    Tree(TreeFile),
     Templated(TemplatedFile),
     Generated(GeneratedFile),
 }
@@ -40,6 +41,18 @@ pub struct RegularFile {
     /// Files can be symlinked or copied to the destination.
     pub link_type: LinkType,
 }
+
+#[derive(Debug, Clone)]
+pub struct TreeFile {
+    pub src: PathBuf,
+    pub dest: Option<PathBuf>,
+
+    pub link_type: LinkType,
+    pub ignore: IgnorePatterns,
+}
+
+pub type IgnorePatterns = Vec<IgnorePattern>;
+pub type IgnorePattern = String;
 
 #[derive(Debug, Clone)]
 pub enum LinkType {

@@ -13,9 +13,9 @@ use uuid::Uuid;
 use crate::graph::{PackageGraph, PackageState};
 use crate::spec::{
     CmdHook, Dep, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile, GeneratedFileTyp,
-    HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType, LiquidTemplatedFile, RegularFile,
-    Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType, TomlGeneratedFile,
-    YamlGeneratedFile,
+    HandlebarsTemplatedFile, Hook, IgnorePatterns, JsonGeneratedFile, LinkType,
+    LiquidTemplatedFile, RegularFile, Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType,
+    TomlGeneratedFile, TreeFile, YamlGeneratedFile,
 };
 use crate::tree::Tree;
 
@@ -238,11 +238,19 @@ impl UserData for SpecObject {
             Ok(())
         });
 
-        method!("file"; (src; String, dest; Option<String>, link_type; LinkType);
+        method!("file"; (src; String, dest; Option<String>, link_type; Option<LinkType>);
         File; File::Regular(RegularFile {
             src: src.into(),
             dest: dest.map(Into::into),
-            link_type
+            link_type: link_type.unwrap_or(LinkType::Link)
+        }));
+
+        method!("tree"; (src; String, dest; Option<String>, link_type; Option<LinkType>, ignore; IgnorePatterns);
+        File; File::Tree(TreeFile {
+            src: src.into(),
+            dest: dest.map(Into::into),
+            link_type: link_type.unwrap_or(LinkType::Link),
+            ignore,
         }));
 
         method!("hbs"; (src; String, dest; String, vars; Option<Tree>, partials; HashMap<String, String>);

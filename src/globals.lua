@@ -29,8 +29,38 @@ function file(arg)
         error('invalid file directive')
     end
 
-    local link_type = link_type or "Link"
     pkg:file(src, dest, link_type)
+end
+
+-- tree 'tree'
+-- tree {'tree'}
+-- tree {'tree', '.config'}
+-- tree {'tree', type = 'Copy'}
+-- tree {'tree', ignore = '**/*.log'}
+-- tree {'tree', '.config', type = 'Copy'}
+-- tree {'tree', '.config', ignore = '**/*.log'}
+-- tree {'tree', '.config', type = 'Copy', ignore = '**/*.log'}
+function tree(arg)
+    local src, dest, link_type, ignore
+    if type(arg) == "string" then
+        src = arg
+        dest = nil
+        link_type = nil
+        ignore = {}
+    elseif type(arg) == "table" then
+        src = arg[1] or error('tree src path was not provided')
+        dest = arg[2]
+        link_type = arg.type
+        ignore = arg.ignore or {}
+        
+        if type(ignore) == "string" then
+            ignore = {ignore}
+        end
+    else
+        error('tree arg must be a string or table')
+    end
+
+    pkg:tree(src, dest, link_type, ignore)
 end
 
 -- template {'d.hbs', 'j.txt', engine = 'handlebars', vars = {}}
