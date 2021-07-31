@@ -89,7 +89,7 @@ function str(arg)
         local contents = arg[2] or error('str contents was not provided')
         pkg:str(dest, contents)
     else
-        error('string arg must be a table')
+        error('str arg must be a table')
     end
 end
 
@@ -102,7 +102,7 @@ function yaml(arg)
         local header = arg.header
         pkg:yaml(dest, values, header)
     else
-        error('string arg must be a table')
+        error('yaml arg must be a table')
     end
 end
 
@@ -115,7 +115,7 @@ function toml(arg)
         local header = arg.header
         pkg:toml(dest, values, header)
     else
-        error('string arg must be a table')
+        error('toml arg must be a table')
     end
 end
 
@@ -126,6 +126,25 @@ function json(arg)
         local values = arg[2] or error('toml values were not provided')
         pkg:json(dest, values)
     else
-        error('string arg must be a table')
+        error('json arg must be a table')
     end
+end
+
+-- cmd [[echo "a"]]
+-- cmd {[[echo "a"]], quiet = true}
+-- cmd {[[echo "a"]], start = "tree"}
+-- cmd {[[echo "a"]], quiet = true, start = "tree"}
+function cmd(arg)
+    local command, quiet, start
+    if type(arg) == "string" then
+        command = arg; 
+    elseif type(arg) == "table" then
+        command = arg[1] or error('cmd command was not provided') 
+        quiet = arg.quiet
+        start = arg.start
+    else
+        error('cmd arg must be a string or table')
+    end
+
+    pkg:cmd(command, quiet, start)
 end

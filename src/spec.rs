@@ -131,6 +131,9 @@ pub enum Hook {
 #[derive(Debug, Clone)]
 pub struct CmdHook {
     pub command: String,
+
+    pub quiet: Option<bool>,
+    pub start: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone)]

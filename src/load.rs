@@ -12,11 +12,12 @@ use path_clean::PathClean;
 use crate::graph::{PackageGraph, PackageState};
 use crate::spec::{
     Dep, Directive, EmptyGeneratedFile, File, GeneratedFile, GeneratedFileTyp, HandlebarsPartials,
-    HandlebarsTemplatedFile, JsonGeneratedFile, LinkType, LiquidTemplatedFile, RegularFile, Spec,
-    TemplatedFile, TemplatedFileType, TomlGeneratedFile, Vars, YamlGeneratedFile,
+    HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType, LiquidTemplatedFile, RegularFile,
+    Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType, TomlGeneratedFile, Vars,
+    YamlGeneratedFile,
 };
 use crate::tree::Tree;
-use crate::StringGeneratedFile;
+use crate::CmdHook;
 
 static CONFIG_FILE: &str = "package.lua";
 
@@ -219,6 +220,9 @@ impl UserData for SpecObject {
             ($name:expr; ($($arg:ident; $ty:ty),*); Gen; $drct:expr) => {
                 method!($name; ($($arg; $ty),*); Directive::File(File::Generated($drct)))
             };
+            ($name:expr; ($($arg:ident; $ty:ty),*); Hook; $drct:expr) => {
+                method!($name; ($($arg; $ty),*); Directive::Hook($drct))
+            };
         }
 
         methods.add_method_mut("name", |_, this, name: String| {
@@ -279,5 +283,9 @@ impl UserData for SpecObject {
         Gen; GeneratedFile {
             dest: dest.into(), typ: GeneratedFileTyp::Json(JsonGeneratedFile { values })
         });
+
+        method!("cmd"; (command; String, quiet; Option<bool>, start; Option<String>);
+        Hook; Hook::Cmd(CmdHook { command, quiet, start: start.map(Into::into) })
+        );
     }
 }
