@@ -131,20 +131,47 @@ function json(arg)
 end
 
 -- cmd [[echo "a"]]
+-- cmd {[[echo "a"]]}
 -- cmd {[[echo "a"]], quiet = true}
 -- cmd {[[echo "a"]], start = "tree"}
+-- cmd {[[echo "a"]], shell = "zsh"}
 -- cmd {[[echo "a"]], quiet = true, start = "tree"}
+-- cmd {[[echo "a"]], quiet = true, shell = "zsh"}
+-- cmd {[[echo "a"]], start = "tree", shell = "zsh"}
+-- cmd {[[echo "a"]], quiet = true, start = "tree", shell = "zsh"}
 function cmd(arg)
-    local command, quiet, start
+    local command, quiet, start, shell
     if type(arg) == "string" then
-        command = arg; 
+        command = arg;
+        quiet = nil
+        start = nil
+        shell = nil
     elseif type(arg) == "table" then
-        command = arg[1] or error('cmd command was not provided') 
+        command = arg[1] or error('cmd command was not provided')
         quiet = arg.quiet
         start = arg.start
+        shell = arg.shell
     else
         error('cmd arg must be a string or table')
     end
 
-    pkg:cmd(command, quiet, start)
+    pkg:cmd(command, quiet, start, shell)
+end
+
+-- fn(function() print("a") end)
+-- fn {function() print("a") end}
+-- fn {function() print("a") end, quiet = true}
+function fn(arg)
+    local fun, quiet
+    if type(arg) == "function" then
+        fun = arg
+        quiet = nil
+    elseif type(arg) == "table" then
+        fun = arg[1] or error('fn function was not provided')
+        quiet = arg.quiet
+    else
+        error('fn arg must be a function or table')
+    end
+
+    pkg:fn(fun, quiet)
 end

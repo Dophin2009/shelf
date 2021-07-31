@@ -8,16 +8,16 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use mlua::{FromLua, Function, Lua, UserData, UserDataMethods, Variadic};
 use path_clean::PathClean;
+use uuid::Uuid;
 
 use crate::graph::{PackageGraph, PackageState};
 use crate::spec::{
-    Dep, Directive, EmptyGeneratedFile, File, GeneratedFile, GeneratedFileTyp, HandlebarsPartials,
-    HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType, LiquidTemplatedFile, RegularFile,
-    Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType, TomlGeneratedFile, Vars,
-    YamlGeneratedFile,
+    CmdHook, Dep, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile, GeneratedFileTyp,
+    HandlebarsPartials, HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType,
+    LiquidTemplatedFile, RegularFile, Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType,
+    TomlGeneratedFile, Vars, YamlGeneratedFile,
 };
 use crate::tree::Tree;
-use crate::CmdHook;
 
 static CONFIG_FILE: &str = "package.lua";
 
@@ -208,7 +208,7 @@ impl UserData for SpecObject {
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         macro_rules! method {
             ($name:expr; ($($arg:ident; $ty:ty),*); $drct:expr) => {
-                methods.add_method_mut($name, |_, this, arg: ($($ty),*)| {
+                methods.add_method_mut($name, |lua, this, arg: ($($ty),*)| {
                     let ($($arg),*) = arg;
                     this.spec.directives.push($drct);
                     Ok(())
@@ -284,8 +284,19 @@ impl UserData for SpecObject {
             dest: dest.into(), typ: GeneratedFileTyp::Json(JsonGeneratedFile { values })
         });
 
-        method!("cmd"; (command; String, quiet; Option<bool>, start; Option<String>);
-        Hook; Hook::Cmd(CmdHook { command, quiet, start: start.map(Into::into) })
+        method!("cmd"; (command; String, quiet; Option<bool>, start; Option<String>, shell; Option<String>);
+        Hook; Hook::Cmd(CmdHook { command, quiet, start: start.map(Into::into), shell })
         );
+
+        methods.add_method_mut("fn", |lua, this, arg: (Function, Option<bool>)| {
+            let (fun, quiet) = arg;
+
+            let name = Uuid::new_v4().to_string();
+            lua.set_named_registry_value(&name, fun);
+
+            let drct = Directive::Hook(Hook::Fun(FunHook { name, quiet }));
+            this.spec.directives.push(drct);
+            Ok(())
+        });
     }
 }

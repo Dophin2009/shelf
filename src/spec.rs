@@ -134,11 +134,14 @@ pub struct CmdHook {
 
     pub quiet: Option<bool>,
     pub start: Option<PathBuf>,
+    pub shell: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FunHook {
     pub name: String,
+
+    pub quiet: Option<bool>,
 }
 
 mod lua {

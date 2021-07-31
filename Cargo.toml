@@ -35,3 +35,4 @@ path-clean = "0.1"
 petgraph = "0.6"
 serde = { version = "1.0", features = ["derive"] }
 stderrlog = "0.5"
+uuid = { version="0.8", features = ["v4"] }
