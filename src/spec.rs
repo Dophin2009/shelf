@@ -12,15 +12,9 @@ pub struct Spec {
 
 #[derive(Debug, Clone)]
 pub enum Directive {
-    Var(Vars),
     Dep(Dep),
     File(File),
     Hook(Hook),
-}
-
-#[derive(Debug, Clone)]
-pub struct Vars {
-    pub values: Tree,
 }
 
 #[derive(Debug, Clone)]
