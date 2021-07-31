@@ -85,34 +85,46 @@ end
 -- string {'n.txt', 'contents'}
 function str(arg)
     if type(arg) == "table" then
-        pkg:str(arg[1], arg[2])
+        local dest = arg[1] or error('str dest was not provided')
+        local contents = arg[2] or error('str contents was not provided')
+        pkg:str(dest, contents)
     else
         error('string arg must be a table')
     end
 end
 
 -- yaml {'o.txt', {}}
+-- yaml {'p.txt', {}, header = '# header'}
 function yaml(arg)
     if type(arg) == "table" then
-        pkg:yaml(arg[1], arg[2])
+        local dest = arg[1] or error('yaml dest was not provided')
+        local values = arg[2] or error('yaml values were not provided')
+        local header = arg.header
+        pkg:yaml(dest, values, header)
     else
         error('string arg must be a table')
     end
 end
 
--- toml {'p.txt', {}}
+-- toml {'q.txt', {}}
+-- toml {'r.txt', {}, header = '# header'}
 function toml(arg)
     if type(arg) == "table" then
-        pkg:toml(arg[1], arg[2])
+        local dest = arg[1] or error('toml dest was not provided')
+        local values = arg[2] or error('toml values were not provided')
+        local header = arg.header
+        pkg:toml(dest, values, header)
     else
         error('string arg must be a table')
     end
 end
 
--- json {'q.txt', {}}
+-- json {'s.txt', {}}
 function json(arg)
     if type(arg) == "table" then
-        pkg:json(arg[1], arg[2])
+        local dest = arg[1] or error('toml dest was not provided')
+        local values = arg[2] or error('toml values were not provided')
+        pkg:json(dest, values)
     else
         error('string arg must be a table')
     end

@@ -281,11 +281,3 @@ impl UserData for SpecObject {
         });
     }
 }
-
-#[inline]
-fn generated_file_directive(dest: String, typ: GeneratedFileTyp) -> Directive {
-    Directive::File(File::Generated(GeneratedFile {
-        dest: dest.into(),
-        typ,
-    }))
-}
