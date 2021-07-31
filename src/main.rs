@@ -1,8 +1,7 @@
 use std::env;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use clap::Clap;
-use log::info;
 use stderrlog::ColorChoice;
 use tidy::Loader;
 
@@ -33,12 +32,7 @@ fn main() -> Result<()> {
     cli(&opts)
 }
 
-static HOME_VAR: &str = "HOME";
-
 fn cli(opts: &Options) -> Result<()> {
-    let home =
-        env::var(HOME_VAR).with_context(|| format!("Environment variable {} not set", HOME_VAR))?;
-
     let loader = Loader::new();
     let graph = loader
         .load_multi(&opts.packages)

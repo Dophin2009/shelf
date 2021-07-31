@@ -13,9 +13,9 @@ use uuid::Uuid;
 use crate::graph::{PackageGraph, PackageState};
 use crate::spec::{
     CmdHook, Dep, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile, GeneratedFileTyp,
-    HandlebarsPartials, HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType,
-    LiquidTemplatedFile, RegularFile, Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType,
-    TomlGeneratedFile, Vars, YamlGeneratedFile,
+    HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType, LiquidTemplatedFile, RegularFile,
+    Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType, TomlGeneratedFile,
+    YamlGeneratedFile,
 };
 use crate::tree::Tree;
 
@@ -154,7 +154,7 @@ impl LoaderState {
         #[cfg(feature = "unsafe")]
         let lua = unsafe { Lua::unsafe_new() };
 
-        lua.globals().set("pkg", SpecObject::new());
+        lua.globals().set("pkg", SpecObject::new())?;
         lua.load(std::include_str!("globals.lua")).exec()?;
 
         Ok(lua)
@@ -208,7 +208,8 @@ impl UserData for SpecObject {
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         macro_rules! method {
             ($name:expr; ($($arg:ident; $ty:ty),*); $drct:expr) => {
-                methods.add_method_mut($name, |lua, this, arg: ($($ty),*)| {
+                #[allow(unused_parens)]
+                methods.add_method_mut($name, |_, this, arg: ($($ty),*)| {
                     let ($($arg),*) = arg;
                     this.spec.directives.push($drct);
                     Ok(())
@@ -292,7 +293,7 @@ impl UserData for SpecObject {
             let (fun, quiet) = arg;
 
             let name = Uuid::new_v4().to_string();
-            lua.set_named_registry_value(&name, fun);
+            lua.set_named_registry_value(&name, fun)?;
 
             let drct = Directive::Hook(Hook::Fun(FunHook { name, quiet }));
             this.spec.directives.push(drct);
