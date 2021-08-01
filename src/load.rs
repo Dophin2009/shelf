@@ -230,67 +230,71 @@ impl UserData for SpecObject {
         methods.add_method_mut("dep", |_, this, paths: Variadic<String>| {
             this.spec
                 .deps
-                .extend(paths.into_iter().map(|p| Dep { path: p.into() }));
+                .extend(paths.into_iter().map(|p| Dep { path: ccpath(p) }));
             Ok(())
         });
 
-        method!("file"; (src; String, dest; Option<String>, link_type; Option<LinkType>);
+        method!("file"; (src; String, dest; Option<String>, link_type; Option<LinkType>, optional; Option<bool>);
         File; File::Regular(RegularFile {
-            src: src.into(),
-            dest: dest.map(Into::into),
-            link_type: link_type.unwrap_or(LinkType::Link)
+            src: ccpath(p),
+            dest: dest.map(ccpath),
+            link_type: link_type.unwrap_or(LinkType::Link),
+            optional: optional.unwrap_or(false)
         }));
 
-        method!("tree"; (src; String, dest; Option<String>, link_type; Option<LinkType>, ignore; IgnorePatterns);
+        method!("tree"; (src; String, dest; Option<String>, link_type; Option<LinkType>, ignore; IgnorePatterns, optional; Option<bool>);
         File; File::Tree(TreeFile {
-            src: src.into(),
-            dest: dest.map(Into::into),
+            src: ccpath(src),
+            dest: dest.map(ccpath),
             link_type: link_type.unwrap_or(LinkType::Link),
             ignore,
+            optional: optional.unwrap_or(false)
         }));
 
-        method!("hbs"; (src; String, dest; String, vars; Option<Tree>, partials; HashMap<String, String>);
+        method!("hbs"; (src; String, dest; String, vars; Option<Tree>, partials; HashMap<String, String>, optional; Option<bool>);
         File; {
-            let partials = partials.into_iter().map(|(k, v)| (k, v.into())).collect();
+            let partials = partials.into_iter().map(|(k, v)| (k, ccpath(v))).collect();
             File::Templated(TemplatedFile {
-                src: src.into(),
-                dest: dest.into(),
+                src: ccpath(src),
+                dest: ccpath(dest),
                 vars,
                 typ: TemplatedFileType::Handlebars(HandlebarsTemplatedFile { partials }),
+                optional: optional.unwrap_or(false)
             })
         });
 
-        method!("liquid"; (src; String, dest; String, vars; Option<Tree>);
+        method!("liquid"; (src; String, dest; String, vars; Option<Tree>, optional; Option<bool>);
         File; File::Templated(TemplatedFile {
-            src: src.into(),
-            dest: dest.into(),
+            src: ccpath(src),
+            dest: ccpath(dest),
             vars,
             typ: TemplatedFileType::Liquid(LiquidTemplatedFile {}),
+            optional: optional.unwrap_or(false)
         }));
 
         method!("empty"; (dest; String);
         Gen; GeneratedFile {
-            dest: dest.into(), typ: GeneratedFileTyp::Empty(EmptyGeneratedFile)
+            dest: ccpath(dest), typ: GeneratedFileTyp::Empty(EmptyGeneratedFile)
         });
         method!("str"; (dest; String, contents; String);
         Gen; GeneratedFile {
-            dest: dest.into(), typ: GeneratedFileTyp::String(StringGeneratedFile { contents })
+            dest: ccpath(dest), typ: GeneratedFileTyp::String(StringGeneratedFile { contents })
         });
         method!("yaml"; (dest; String, values; Tree, header; Option<String>);
         Gen; GeneratedFile {
-            dest: dest.into(), typ: GeneratedFileTyp::Yaml(YamlGeneratedFile { values, header })
+            dest: ccpath(dest), typ: GeneratedFileTyp::Yaml(YamlGeneratedFile { values, header })
         });
         method!("toml"; (dest; String, values; Tree, header; Option<String>);
         Gen; GeneratedFile {
-            dest: dest.into(), typ: GeneratedFileTyp::Toml(TomlGeneratedFile { values, header })
+            dest: ccpath(dest), typ: GeneratedFileTyp::Toml(TomlGeneratedFile { values, header })
         });
         method!("json"; (dest; String, values; Tree);
         Gen; GeneratedFile {
-            dest: dest.into(), typ: GeneratedFileTyp::Json(JsonGeneratedFile { values })
+            dest: ccpath(dest), typ: GeneratedFileTyp::Json(JsonGeneratedFile { values })
         });
 
         method!("cmd"; (command; String, quiet; Option<bool>, start; Option<String>, shell; Option<String>);
-        Hook; Hook::Cmd(CmdHook { command, quiet, start: start.map(Into::into), shell })
+        Hook; Hook::Cmd(CmdHook { command, quiet, start: start.map(ccpath), shell })
         );
 
         methods.add_method_mut("fn", |lua, this, arg: (Function, Option<bool>)| {
@@ -304,4 +308,9 @@ impl UserData for SpecObject {
             Ok(())
         });
     }
+}
+
+#[inline]
+fn ccpath(path: String) -> PathBuf {
+    PathBuf::from(path).clean()
 }

@@ -40,6 +40,7 @@ pub struct RegularFile {
 
     /// Files can be symlinked or copied to the destination.
     pub link_type: LinkType,
+    pub optional: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +50,7 @@ pub struct TreeFile {
 
     pub link_type: LinkType,
     pub ignore: IgnorePatterns,
+    pub optional: bool,
 }
 
 pub type IgnorePatterns = Vec<IgnorePattern>;
@@ -70,6 +72,8 @@ pub struct TemplatedFile {
     pub vars: Option<Tree>,
 
     pub typ: TemplatedFileType,
+
+    pub optional: bool,
 }
 
 // FIXME more template engine options

@@ -15,21 +15,24 @@ end
 -- file {'c.txt', 'd.txt'}
 -- file {'e.txt', 'f.txt', type = 'Copy'}
 -- file {'g.txt', type = 'Copy'}
+-- file {'h.txt', optional = true}
 function file(arg)
-    local src, dest, link_type
+    local src, dest, link_type, optional
     if type(arg) == "string" then
         src = arg
         dest = nil
         link_type = nil
+        optional = nil
     elseif type(arg) == "table" then
         src = arg[1] or error('file src path was not provided')
         dest = arg[2]
         link_type = arg.type
+        optional = arg.optional
     else
         error('invalid file directive')
     end
 
-    pkg:file(src, dest, link_type)
+    pkg:file(src, dest, link_type, optional)
 end
 
 -- tree 'tree'
@@ -40,31 +43,33 @@ end
 -- tree {'tree', '.config', type = 'Copy'}
 -- tree {'tree', '.config', ignore = '**/*.log'}
 -- tree {'tree', '.config', type = 'Copy', ignore = '**/*.log'}
+-- tree {'tree', optional = true}
 function tree(arg)
-    local src, dest, link_type, ignore
+    local src, dest, link_type, ignore, optional
     if type(arg) == "string" then
         src = arg
         dest = nil
         link_type = nil
         ignore = {}
+        optional = nil
     elseif type(arg) == "table" then
         src = arg[1] or error('tree src path was not provided')
         dest = arg[2]
         link_type = arg.type
         ignore = arg.ignore or {}
-        
-        if type(ignore) == "string" then
-            ignore = {ignore}
-        end
+        optional = arg.optional
+
+        if type(ignore) == "string" then ignore = {ignore} end
     else
         error('tree arg must be a string or table')
     end
 
-    pkg:tree(src, dest, link_type, ignore)
+    pkg:tree(src, dest, link_type, ignore, optional)
 end
 
 -- template {'d.hbs', 'j.txt', engine = 'handlebars', vars = {}}
 -- template {'d.tmpl', 'k.txt', engine = 'liquid', vars = {}}
+-- template {'d.hbs', 'j.txt', engine = 'hbs', vars = {}, optional = true}
 function template(arg)
     if type(arg) == "table" then
         local engine = arg.engine or error('template engine was not provided')
@@ -81,22 +86,26 @@ function template(arg)
 end
 
 -- hbs {'b.hbs', 'h.txt', vars = {}}
+-- hbs {'b.hbs', 'h.txt', vars = {}, optional = true}
 function hbs(arg)
     src = arg[1] or error('template src was not provided')
     dest = arg[2] or error('template dest was not provided')
     vars = arg.vars
     partials = arg.partials or {}
+    optional = arg.optional
 
-    pkg:hbs(src, dest, vars, partials)
+    pkg:hbs(src, dest, vars, partials, optional)
 end
 
 -- liquid {'b.tmpl', 'i.txt', vars = {}}
+-- liquid {'b.tmpl', 'i.txt', vars = {}, optional = true}
 function liquid(arg)
     src = arg[1] or error('template src was not provided')
     dest = arg[2] or error('template dest was not provided')
     vars = arg.vars
+    optional = arg.optional
 
-    pkg:liquid(src, dest, vars)
+    pkg:liquid(src, dest, vars, optional)
 end
 
 -- empty 'l.txt'
