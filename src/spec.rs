@@ -6,13 +6,13 @@ use crate::tree::Tree;
 #[derive(Debug, Clone)]
 pub struct Spec {
     pub name: String,
+    pub deps: Vec<Dep>,
     /// List of file link directives; order matters.
     pub directives: Vec<Directive>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Directive {
-    Dep(Dep),
     File(File),
     Hook(Hook),
 }

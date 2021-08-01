@@ -91,28 +91,23 @@ impl LoaderState {
     fn insert(&mut self, package: PackageState) -> Result<()> {
         // If already added, stop.
         let path = &package.path;
-        let directives = package.data.directives.clone();
+        let deps = package.data.deps.clone();
         let id = hash_path(path);
         if self.graph.map.insert(id, package).is_some() {
             return Ok(());
         }
         self.graph.graph.add_node(id);
 
-        for drct in directives {
-            if let Directive::Dep(dep_drct) = drct {
-                let dpath = self.normalize_path(&dep_drct.path)?;
-                let dep = self.load_data(&dpath).with_context(|| {
-                    format!(
-                        "Couldn't load dependency: {}",
-                        dep_drct.path.to_string_lossy()
-                    )
-                })?;
+        for dep in deps {
+            let dpath = self.normalize_path(&dep.path)?;
+            let dep = self.load_data(&dpath).with_context(|| {
+                format!("Couldn't load dependency: {}", dep.path.to_string_lossy())
+            })?;
 
-                let dep_id = hash_path(&dpath);
-                self.graph.graph.add_edge(id, dep_id, ());
+            let dep_id = hash_path(&dpath);
+            self.graph.graph.add_edge(id, dep_id, ());
 
-                self.insert(dep)?;
-            }
+            self.insert(dep)?;
         }
 
         Ok(())
@@ -194,7 +189,8 @@ impl SpecObject {
         Self {
             spec: Spec {
                 name: String::new(),
-                directives: vec![],
+                deps: Vec::new(),
+                directives: Vec::new(),
             },
         }
     }
@@ -232,9 +228,9 @@ impl UserData for SpecObject {
         });
 
         methods.add_method_mut("dep", |_, this, paths: Variadic<String>| {
-            for path in paths.into_iter().map(Into::into) {
-                this.spec.directives.push(Directive::Dep(Dep { path }));
-            }
+            this.spec
+                .deps
+                .extend(paths.into_iter().map(|p| Dep { path: p.into() }));
             Ok(())
         });
 
