@@ -3,7 +3,7 @@ use std::env;
 use anyhow::{Context, Result};
 use clap::Clap;
 use stderrlog::ColorChoice;
-use tidy::Loader;
+use tidy::{Linker, Loader, Verbosity};
 
 #[derive(Clap, Debug)]
 #[clap(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
@@ -14,6 +14,10 @@ struct Options {
     quiet: bool,
     #[clap(short, long, about = "Pretend to process")]
     noop: bool,
+
+    #[clap(short, long, about = "Linking destination (defaults to $HOME)")]
+    home: Option<String>,
+
     packages: Vec<String>,
 }
 
@@ -32,20 +36,34 @@ fn main() -> Result<()> {
     cli(&opts)
 }
 
+static HOME_VAR: &str = "HOME";
+
 fn cli(opts: &Options) -> Result<()> {
+    let verbosity = if opts.quiet {
+        Verbosity::Quiet
+    } else if opts.verbosity > 0 {
+        Verbosity::Verbose
+    } else {
+        Verbosity::Info
+    };
+
+    let home = match opts.home {
+        Some(p) => p,
+        None => env::var(HOME_VAR)?,
+    }
+    .into();
+
     let loader = Loader::new();
     let graph = loader
         .load_multi(&opts.packages)
         .with_context(|| "Couldn't resolve packages")?;
 
-    println!(
-        "{:#?}",
-        graph
-            .data()
-            .into_iter()
-            .map(|(_, ps)| ps.data.clone())
-            .collect::<Vec<_>>()
-    );
+    let linker = Linker::new(home, verbosity, opts.noop);
+    let actions = linker.link(&graph)?;
+
+    for action in actions {
+        action?.resolve()?;
+    }
 
     Ok(())
 }
