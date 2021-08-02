@@ -1,4 +1,5 @@
 use std::env;
+use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use clap::Clap;
@@ -33,12 +34,12 @@ fn main() -> Result<()> {
         .init()
         .unwrap();
 
-    cli(&opts)
+    cli(opts)
 }
 
 static HOME_VAR: &str = "HOME";
 
-fn cli(opts: &Options) -> Result<()> {
+fn cli(opts: Options) -> Result<()> {
     let verbosity = if opts.quiet {
         Verbosity::Quiet
     } else if opts.verbosity > 0 {
@@ -47,7 +48,7 @@ fn cli(opts: &Options) -> Result<()> {
         Verbosity::Info
     };
 
-    let home = match opts.home {
+    let home: PathBuf = match opts.home {
         Some(p) => p,
         None => env::var(HOME_VAR)?,
     }
@@ -58,11 +59,11 @@ fn cli(opts: &Options) -> Result<()> {
         .load_multi(&opts.packages)
         .with_context(|| "Couldn't resolve packages")?;
 
-    let linker = Linker::new(home, verbosity, opts.noop);
+    let linker = Linker::new(home);
     let actions = linker.link(&graph)?;
 
     for action in actions {
-        action?.resolve()?;
+        action.resolve()?;
     }
 
     Ok(())

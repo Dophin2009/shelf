@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use mlua::Lua;
+use mlua::Function;
 
 pub enum Action<'lua> {
     LinkFile(LinkFileAction),
@@ -10,7 +10,7 @@ pub enum Action<'lua> {
     RunFunction(RunFunctionAction<'lua>),
 }
 
-impl<'p> Action<'p> {
+impl<'lua> Action<'lua> {
     #[inline]
     pub fn resolve(&self) -> Result<()> {
         Ok(())
@@ -39,5 +39,5 @@ pub struct RunCommandAction {
 
 pub struct RunFunctionAction<'lua> {
     pub name: String,
-    pub lua: &'lua Lua,
+    pub lua: Function<'lua>,
 }
