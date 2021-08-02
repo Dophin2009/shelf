@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use clap::Clap;
 use stderrlog::ColorChoice;
-use tidy::{Linker, Loader, Verbosity};
+use tidy::{Linker, Loader};
 
 #[derive(Clap, Debug)]
 #[clap(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
@@ -28,7 +28,7 @@ fn main() -> Result<()> {
     stderrlog::new()
         .show_level(false)
         .quiet(opts.quiet)
-        .verbosity(opts.verbosity)
+        .verbosity(opts.verbosity + 2)
         .color(ColorChoice::Never)
         .module(module_path!())
         .init()
@@ -40,14 +40,6 @@ fn main() -> Result<()> {
 static HOME_VAR: &str = "HOME";
 
 fn cli(opts: Options) -> Result<()> {
-    let verbosity = if opts.quiet {
-        Verbosity::Quiet
-    } else if opts.verbosity > 0 {
-        Verbosity::Verbose
-    } else {
-        Verbosity::Info
-    };
-
     let home: PathBuf = match opts.home {
         Some(p) => p,
         None => env::var(HOME_VAR)?,
@@ -63,7 +55,7 @@ fn cli(opts: Options) -> Result<()> {
     let actions = linker.link(&graph)?;
 
     for action in actions {
-        action.resolve()?;
+        action?.resolve()?;
     }
 
     Ok(())

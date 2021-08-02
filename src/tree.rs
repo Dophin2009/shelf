@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(transparent)]
 pub struct Tree(pub HashMap<String, Value>);
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
