@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::iter;
 
+use console::{style, StyledObject};
 use log::{debug, error, info, trace, warn};
 use once_cell::sync::OnceCell;
 
@@ -27,11 +28,11 @@ where
     prefix: D,
 }
 
-impl Toplevel<&'static str> {
+impl Toplevel<StyledObject<&'static str>> {
     #[inline]
     pub fn default() -> &'static Self {
-        static INSTANCE: OnceCell<Toplevel<&'static str>> = OnceCell::new();
-        INSTANCE.get_or_init(|| Self::new("=>"))
+        static INSTANCE: OnceCell<Toplevel<StyledObject<&'static str>>> = OnceCell::new();
+        INSTANCE.get_or_init(|| Self::new(style("=>").bright()))
     }
 }
 
@@ -62,11 +63,11 @@ where
     prefix: D,
 }
 
-impl Sublevel<&'static str> {
+impl Sublevel<StyledObject<&'static str>> {
     #[inline]
     pub fn default() -> &'static Self {
-        static INSTANCE: OnceCell<Sublevel<&'static str>> = OnceCell::new();
-        INSTANCE.get_or_init(|| Self::new(">"))
+        static INSTANCE: OnceCell<Sublevel<StyledObject<&'static str>>> = OnceCell::new();
+        INSTANCE.get_or_init(|| Self::new(style(">").bold().dim()))
     }
 }
 
@@ -121,7 +122,8 @@ impl Indexed {
             .take(self.max_padding - self.c.to_string().len())
             .collect::<String>();
 
-        format!("[{}{}/{}] {}", padding, self.c, self.n, message)
+        let idx = format!("[{}{}/{}]", padding, self.c, self.n);
+        format!("{} {}", style(idx).dim(), style(message))
     }
 
     leveled!();

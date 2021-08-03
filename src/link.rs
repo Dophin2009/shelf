@@ -3,6 +3,7 @@ use std::iter;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
+use console::style;
 use log::debug;
 use mlua::Lua;
 use path_clean::PathClean;
@@ -127,12 +128,14 @@ impl<'p> PackageIter<'p> {
         } = rf;
 
         self.log_processing(&format!(
-            "file ({} {} -> {})",
+            "{} ({} {} {} {})",
+            style("file").bold().cyan(),
             match &link_type {
-                LinkType::Link => "link",
-                LinkType::Copy => "copy",
+                LinkType::Link => style("link").green(),
+                LinkType::Copy => style("copy").yellow(),
             },
             src.display(),
+            style("->").dim(),
             dest.as_ref().unwrap_or(&src).display()
         ));
 
@@ -175,8 +178,11 @@ impl<'p> PackageIter<'p> {
         } = tf;
 
         self.log_processing(&format!(
-            "template (hbs {} -> {})",
+            "{} ({} {} {} {})",
+            style("template").bold().yellow(),
+            style("hbs").red(),
             src.display(),
+            style("->").dim(),
             dest.display()
         ));
 
@@ -260,12 +266,11 @@ impl<'p> PackageIter<'p> {
 
     #[inline]
     fn log_processing(&self, step: &str) {
-        self.logger
-            .debug(&format!("Processing directive: {}", step));
+        self.logger.debug(&format!("Processing: {}", step));
     }
 
     #[inline]
     fn log_skipping(&self, reason: &str) {
-        Sublevel::default().debug(&format!("Skipping {}", reason));
+        Sublevel::default().debug(&format!("{} {}", style("Skipping:").bold(), reason));
     }
 }
