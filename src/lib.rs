@@ -2,6 +2,7 @@ pub mod spec;
 pub mod tree;
 
 mod action;
+mod format;
 mod graph;
 mod link;
 mod load;

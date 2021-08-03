@@ -8,12 +8,13 @@ use mlua::Lua;
 use path_clean::PathClean;
 
 use crate::action::{Action, LinkFileAction, WriteFileAction};
+use crate::format::Indexed;
 use crate::graph::PackageGraph;
 use crate::spec::{
-    Directive, File, GeneratedFile, GeneratedFileTyp, LinkType, Spec, TemplatedFile,
+    Directive, File, GeneratedFile, GeneratedFileTyp, LinkType, RegularFile, Spec, TemplatedFile,
     TemplatedFileType, TreeFile,
 };
-use crate::{templating, RegularFile};
+use crate::templating;
 
 #[derive(Debug, Clone)]
 pub struct Linker {
@@ -56,6 +57,7 @@ impl Linker {
             lua,
             directives: spec.directives.iter().collect(),
             next: Box::new(iter::empty()),
+            logger: Indexed::new(spec.directives.len()),
         }
     }
 }
@@ -67,6 +69,8 @@ pub struct PackageIter<'p> {
 
     directives: VecDeque<&'p Directive>,
     next: Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>,
+
+    logger: Indexed,
 }
 
 impl<'p> Iterator for PackageIter<'p> {
@@ -84,6 +88,8 @@ impl<'p> Iterator for PackageIter<'p> {
         let drct = self.directives.pop_front()?;
         let it = self.convert(drct);
         self.next = Box::new(it);
+
+        self.logger.incr();
 
         self.next()
     }
@@ -254,6 +260,10 @@ impl<'p> PackageIter<'p> {
 
     #[inline]
     fn log_processing(&self, message: &str) {
-        debug!("Processing directive: {}", message);
+        debug!(
+            "{}",
+            self.logger
+                .format(&format!("Processing directive: {}", message))
+        );
     }
 }
