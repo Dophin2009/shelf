@@ -1,25 +1,93 @@
+use std::fmt::Display;
 use std::iter;
 
 use log::{debug, error, info, trace, warn};
+use once_cell::sync::OnceCell;
 
-pub trait Logger {
-    fn format(&self, message: &str) -> String;
+macro_rules! leveled {
+    () => {
+        leveled!(error);
+        leveled!(warn);
+        leveled!(info);
+        leveled!(debug);
+        leveled!(trace);
+    };
+    ($level:ident) => {
+        #[inline]
+        pub fn $level(&self, message: &str) {
+            $level!("{}", &self.format(message));
+        }
+    };
 }
 
-pub struct Toplevel;
+pub struct Toplevel<D>
+where
+    D: Display,
+{
+    prefix: D,
+}
 
-impl Toplevel {
+impl Toplevel<&'static str> {
     #[inline]
-    pub fn format(&self, message: &str) -> String {
-        format!("=> {}", message)
+    pub fn default() -> &'static Self {
+        static INSTANCE: OnceCell<Toplevel<&'static str>> = OnceCell::new();
+        INSTANCE.get_or_init(|| Self::new("=>"))
     }
 }
 
-impl Logger for Toplevel {
+impl<D> Toplevel<D>
+where
+    D: Display,
+{
     #[inline]
-    fn format(&self, message: &str) -> String {
-        self.format(message)
+    pub fn new(prefix: D) -> Self {
+        Self { prefix }
     }
+
+    #[inline]
+    pub fn format<M>(&self, message: M) -> String
+    where
+        M: Display,
+    {
+        format!("{} {}", self.prefix, message)
+    }
+
+    leveled!();
+}
+
+pub struct Sublevel<D>
+where
+    D: Display,
+{
+    prefix: D,
+}
+
+impl Sublevel<&'static str> {
+    #[inline]
+    pub fn default() -> &'static Self {
+        static INSTANCE: OnceCell<Sublevel<&'static str>> = OnceCell::new();
+        INSTANCE.get_or_init(|| Self::new(">"))
+    }
+}
+
+impl<D> Sublevel<D>
+where
+    D: Display,
+{
+    #[inline]
+    pub fn new(prefix: D) -> Self {
+        Self { prefix }
+    }
+
+    #[inline]
+    pub fn format<M>(&self, message: M) -> String
+    where
+        M: Display,
+    {
+        format!("  {} {}", self.prefix, message)
+    }
+
+    leveled!();
 }
 
 #[derive(Debug, Clone)]
@@ -45,18 +113,16 @@ impl Indexed {
     }
 
     #[inline]
-    pub fn format(&self, message: &str) -> String {
+    pub fn format<M>(&self, message: M) -> String
+    where
+        M: Display,
+    {
         let padding = iter::repeat(' ')
             .take(self.max_padding - self.c.to_string().len())
             .collect::<String>();
 
         format!("[{}{}/{}] {}", padding, self.c, self.n, message)
     }
-}
 
-impl Logger for Indexed {
-    #[inline]
-    fn format(&self, message: &str) -> String {
-        self.format(message)
-    }
+    leveled!();
 }

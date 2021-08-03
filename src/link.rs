@@ -8,7 +8,7 @@ use mlua::Lua;
 use path_clean::PathClean;
 
 use crate::action::{Action, LinkFileAction, WriteFileAction};
-use crate::format::Indexed;
+use crate::format::{Indexed, Sublevel};
 use crate::graph::PackageGraph;
 use crate::spec::{
     Directive, File, GeneratedFile, GeneratedFileTyp, LinkType, RegularFile, Spec, TemplatedFile,
@@ -140,7 +140,7 @@ impl<'p> PackageIter<'p> {
         let src_full = self.join_package(src);
         // If optional flag enabled, and src doesn't exist, skip.
         if *optional && !src_full.exists() {
-            debug!("Skipping because {} does not exist...", src.display());
+            self.log_skipping(&format!("{} does not exist...", src.display()));
             return Box::new(iter::empty());
         }
 
@@ -185,7 +185,7 @@ impl<'p> PackageIter<'p> {
 
         // If optional flag enabled, and file does not exist, skip.
         if *optional && !src_full.exists() {
-            debug!("Skipping because {} does not exist...", src.display());
+            self.log_skipping(&format!("{} does not exist...", src.display()));
             return Box::new(iter::empty());
         }
 
@@ -259,11 +259,13 @@ impl<'p> PackageIter<'p> {
     }
 
     #[inline]
-    fn log_processing(&self, message: &str) {
-        debug!(
-            "{}",
-            self.logger
-                .format(&format!("Processing directive: {}", message))
-        );
+    fn log_processing(&self, step: &str) {
+        self.logger
+            .debug(&format!("Processing directive: {}", step));
+    }
+
+    #[inline]
+    fn log_skipping(&self, reason: &str) {
+        Sublevel::default().debug(&format!("Skipping {}", reason));
     }
 }

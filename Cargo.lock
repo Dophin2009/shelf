@@ -604,6 +604,7 @@ dependencies = [
  "handlebars",
  "log",
  "mlua",
+ "once_cell",
  "path-clean",
  "petgraph",
  "serde",
