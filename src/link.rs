@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 use std::iter;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use console::style;
 use log::debug;
 use mlua::Lua;
@@ -234,16 +234,58 @@ impl<'p> PackageIter<'p> {
         &self,
         gf: &GeneratedFile,
     ) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
-        let dest = self.dest.join(&gf.dest);
-        let contents = match &gf.typ {
-            GeneratedFileTyp::Empty(_) => "".to_string(),
-            GeneratedFileTyp::String(s) => s.contents.clone(),
-            GeneratedFileTyp::Yaml(_) => todo!(),
-            GeneratedFileTyp::Toml(_) => todo!(),
-            GeneratedFileTyp::Json(_) => todo!(),
+        let GeneratedFile { dest, typ } = gf;
+
+        self.log_processing(&format!(
+            "{} ({} {})",
+            style("generate").bold().magenta(),
+            match &typ {
+                GeneratedFileTyp::Empty(_) => style("empty").white(),
+                GeneratedFileTyp::String(_) => style("string").blue(),
+                GeneratedFileTyp::Yaml(_) => style("yaml").green(),
+                GeneratedFileTyp::Toml(_) => style("toml").yellow(),
+                GeneratedFileTyp::Json(_) => style("json").red(),
+            },
+            dest.display()
+        ));
+
+        // Normalize dest.
+        let dest_full = self.dest.join(&dest);
+
+        // Generate file contents.
+        let (header, mut contents) = match &typ {
+            GeneratedFileTyp::Empty(_) => (None, Ok("".to_string())),
+            GeneratedFileTyp::String(s) => (None, Ok(s.contents.clone())),
+            // FIXME error context
+            GeneratedFileTyp::Yaml(y) => {
+                let contents = serde_yaml::to_string(&y.values)
+                    .with_context(|| "Couldn't serialize values to yaml");
+                (y.header.as_ref(), contents)
+            }
+            GeneratedFileTyp::Toml(t) => {
+                let contents = toml::to_string_pretty(&t.values)
+                    .with_context(|| "Couldn't serialize values to toml");
+                (t.header.as_ref(), contents)
+            }
+            GeneratedFileTyp::Json(j) => (
+                None,
+                serde_json::to_string(&j.values)
+                    .with_context(|| "Couldn't serialize values to json"),
+            ),
         };
 
-        let it = iter::once(Ok(Action::WriteFile(WriteFileAction { dest, contents })));
+        // Prepend the header if there is one.
+        contents = match header {
+            Some(header) => contents.map(|contents| format!("{}\n{}", header, contents)),
+            None => contents,
+        };
+
+        let it = iter::once_with(|| {
+            Ok(Action::WriteFile(WriteFileAction {
+                dest: dest_full,
+                contents: contents?,
+            }))
+        });
         Box::new(it)
     }
 
