@@ -180,7 +180,10 @@ impl<'p> PackageIter<'p> {
         self.log_processing(&format!(
             "{} ({} {} {} {})",
             style("template").bold().yellow(),
-            style("hbs").red(),
+            match typ {
+                TemplatedFileType::Handlebars(_) => style("hbs").red(),
+                TemplatedFileType::Liquid(_) => style("liquid").blue(),
+            },
             src.display(),
             style("->").dim(),
             dest.display()
@@ -203,7 +206,7 @@ impl<'p> PackageIter<'p> {
             TemplatedFileType::Handlebars(hbs) => {
                 templating::hbs::render(&src_full, &vars, &hbs.partials)
             }
-            TemplatedFileType::Liquid(_) => Ok("".to_string()),
+            TemplatedFileType::Liquid(lq) => templating::liquid::render(&src_full, &vars),
         };
 
         let it = iter::once_with(|| {
