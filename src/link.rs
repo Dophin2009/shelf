@@ -5,17 +5,17 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use console::style;
 use log::debug;
-use mlua::Lua;
+use mlua::{Function, Lua};
 use path_clean::PathClean;
 
-use crate::action::{Action, LinkFileAction, WriteFileAction};
+use crate::action::{Action, LinkFileAction, RunCommandAction, RunFunctionAction, WriteFileAction};
 use crate::format::{Indexed, Sublevel};
 use crate::graph::PackageGraph;
 use crate::spec::{
-    Directive, File, GeneratedFile, GeneratedFileTyp, Hook, LinkType, RegularFile, Spec,
-    TemplatedFile, TemplatedFileType, TreeFile,
+    CmdHook, Directive, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
+    RegularFile, Spec, TemplatedFile, TemplatedFileType, TreeFile,
 };
-use crate::{templating, CmdHook, RunCommandAction};
+use crate::templating;
 
 #[derive(Debug, Clone)]
 pub struct Linker {
@@ -194,7 +194,7 @@ impl<'p> PackageIter<'p> {
 
         // If optional flag enabled, and file does not exist, skip.
         if *optional && !src_full.exists() {
-            self.log_skipping(&format!("{} does not exist...", src.display()));
+            self.log_skipping(&format!("{} does not exist", src.display()));
             return Box::new(iter::empty());
         }
 
@@ -293,7 +293,7 @@ impl<'p> PackageIter<'p> {
     fn convert_hook(&self, h: &Hook) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
         match h {
             Hook::Cmd(cmd) => self.convert_hook_cmd(cmd),
-            Hook::Fun(_) => todo!(),
+            Hook::Fun(fun) => self.convert_hook_fun(fun),
         }
     }
 
@@ -327,6 +327,25 @@ impl<'p> PackageIter<'p> {
             start: start_full,
             shell: shell.to_string(),
         });
+        let it = iter::once(Ok(action));
+        Box::new(it)
+    }
+
+    #[inline]
+    fn convert_hook_fun(&self, fun: &FunHook) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+        let FunHook { name, quiet } = fun;
+
+        self.log_processing(&format!(
+            "{} ({} {})",
+            style("hook").bold().blue(),
+            style("fn").bright(),
+            style("<function>").italic().dim()
+        ));
+
+        // Load function from Lua registry.
+        let function: Function = self.lua.named_registry_value(&fun.name).unwrap();
+
+        let action = Action::RunFunction(RunFunctionAction { function });
         let it = iter::once(Ok(action));
         Box::new(it)
     }

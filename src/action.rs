@@ -38,6 +38,5 @@ pub struct RunCommandAction {
 }
 
 pub struct RunFunctionAction<'lua> {
-    pub name: String,
-    pub lua: Function<'lua>,
+    pub function: Function<'lua>,
 }
