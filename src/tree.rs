@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 #[serde(transparent)]
 pub struct Tree(pub HashMap<String, Value>);
 
+// FIXME Custom serialization/deserialization to handle Nil?
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Value {

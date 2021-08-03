@@ -90,6 +90,7 @@ pub struct HandlebarsTemplatedFile {
 
 pub type HandlebarsPartials = HashMap<String, PathBuf>;
 
+// FIXME partials & filters support
 #[derive(Debug, Clone)]
 pub struct LiquidTemplatedFile {}
 

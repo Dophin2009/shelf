@@ -55,6 +55,7 @@ fn cli(opts: Options) -> Result<()> {
     let actions = linker.link(&graph)?;
 
     for action in actions {
+        // FIXME support for choosing fail-fast/skip/etc. on error
         action?.resolve()?;
     }
 
