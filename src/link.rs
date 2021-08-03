@@ -12,10 +12,10 @@ use crate::action::{Action, LinkFileAction, WriteFileAction};
 use crate::format::{Indexed, Sublevel};
 use crate::graph::PackageGraph;
 use crate::spec::{
-    Directive, File, GeneratedFile, GeneratedFileTyp, LinkType, RegularFile, Spec, TemplatedFile,
-    TemplatedFileType, TreeFile,
+    Directive, File, GeneratedFile, GeneratedFileTyp, Hook, LinkType, RegularFile, Spec,
+    TemplatedFile, TemplatedFileType, TreeFile,
 };
-use crate::templating;
+use crate::{templating, CmdHook, RunCommandAction};
 
 #[derive(Debug, Clone)]
 pub struct Linker {
@@ -101,7 +101,7 @@ impl<'p> PackageIter<'p> {
     fn convert(&self, drct: &Directive) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
         match drct {
             Directive::File(f) => self.convert_file(f),
-            Directive::Hook(_) => todo!(),
+            Directive::Hook(h) => self.convert_hook(h),
         }
     }
 
@@ -143,7 +143,7 @@ impl<'p> PackageIter<'p> {
         let src_full = self.join_package(src);
         // If optional flag enabled, and src doesn't exist, skip.
         if *optional && !src_full.exists() {
-            self.log_skipping(&format!("{} does not exist...", src.display()));
+            self.log_skipping(&format!("{} does not exist", src.display()));
             return Box::new(iter::empty());
         }
 
@@ -290,6 +290,48 @@ impl<'p> PackageIter<'p> {
     }
 
     #[inline]
+    fn convert_hook(&self, h: &Hook) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+        match h {
+            Hook::Cmd(cmd) => self.convert_hook_cmd(cmd),
+            Hook::Fun(_) => todo!(),
+        }
+    }
+
+    #[inline]
+    fn convert_hook_cmd(&self, cmd: &CmdHook) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+        let CmdHook {
+            command,
+            quiet,
+            start,
+            shell,
+        } = cmd;
+
+        // Use sh as default shell.
+        let shell = shell.as_ref().map(String::as_str).unwrap_or("sh");
+        self.log_processing(&format!(
+            "{} ({} '{}')",
+            style("hook").bold().blue(),
+            style(shell).bright(),
+            style(command).dim(),
+        ));
+
+        // Normalize start path.
+        let start_full = start
+            .as_ref()
+            .map(|start| self.join_package(start))
+            .unwrap_or(self.path.clone());
+
+        let action = Action::RunCommand(RunCommandAction {
+            command: command.clone(),
+            quiet: quiet.unwrap_or(false),
+            start: start_full,
+            shell: shell.to_string(),
+        });
+        let it = iter::once(Ok(action));
+        Box::new(it)
+    }
+
+    #[inline]
     fn join_package(&self, path: impl AsRef<Path>) -> PathBuf {
         self.normalize_path(path, &self.path)
     }
@@ -316,6 +358,6 @@ impl<'p> PackageIter<'p> {
 
     #[inline]
     fn log_skipping(&self, reason: &str) {
-        Sublevel::default().debug(&format!("{} {}", style("Skipping:").bold(), reason));
+        Sublevel::default().debug(&format!("{} {}", style("Skipping...").bold(), reason));
     }
 }
