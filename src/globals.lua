@@ -45,18 +45,20 @@ end
 -- tree {'tree', '.config', type = 'Copy', ignore = '**/*.log'}
 -- tree {'tree', optional = true}
 function tree(arg)
-    local src, dest, link_type, ignore, optional
+    local src, dest, link_type, globs, ignore, optional
     if type(arg) == "string" then
         src = arg
         dest = nil
         link_type = nil
-        ignore = {}
+        globs = nil
+        ignore = nil
         optional = nil
     elseif type(arg) == "table" then
         src = arg[1] or error('tree src path was not provided')
         dest = arg[2]
         link_type = arg.type
-        ignore = arg.ignore or {}
+        globs = arg.globs
+        ignore = arg.ignore
         optional = arg.optional
 
         if type(ignore) == "string" then ignore = {ignore} end
@@ -64,7 +66,7 @@ function tree(arg)
         error('tree arg must be a string or table')
     end
 
-    pkg:tree(src, dest, link_type, ignore, optional)
+    pkg:tree(src, dest, link_type, globs, ignore, optional)
 end
 
 -- template {'d.hbs', 'j.txt', engine = 'handlebars', vars = {}}

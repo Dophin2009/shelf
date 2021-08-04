@@ -14,6 +14,7 @@ macro_rules! leveled {
         leveled!(trace);
     };
     ($level:ident) => {
+        #[allow(dead_code)]
         #[inline]
         pub fn $level(&self, message: &str) {
             $level!("{}", &self.format(message));

@@ -48,13 +48,15 @@ pub struct TreeFile {
     pub src: PathBuf,
     pub dest: Option<PathBuf>,
 
+    pub globs: Option<Patterns>,
+    pub ignore: Option<Patterns>,
+
     pub link_type: LinkType,
-    pub ignore: IgnorePatterns,
     pub optional: bool,
 }
 
-pub type IgnorePatterns = Vec<IgnorePattern>;
-pub type IgnorePattern = String;
+pub type Patterns = Vec<Pattern>;
+pub type Pattern = String;
 
 #[derive(Debug, Clone)]
 pub enum LinkType {

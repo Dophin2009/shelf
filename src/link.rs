@@ -1,8 +1,9 @@
-use std::collections::VecDeque;
+use std::borrow::Cow;
+use std::collections::{HashSet, VecDeque};
 use std::iter;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use console::style;
 use log::debug;
 use mlua::{Function, Lua};
@@ -87,8 +88,11 @@ impl<'p> Iterator for PackageIter<'p> {
         }
 
         let drct = self.directives.pop_front()?;
-        let it = self.convert(drct);
-        self.next = Box::new(it);
+        let it = match self.convert(drct) {
+            Ok(it) => it,
+            Err(err) => return Some(Err(err)),
+        };
+        self.next = it;
 
         self.logger.incr();
 
@@ -98,7 +102,10 @@ impl<'p> Iterator for PackageIter<'p> {
 
 impl<'p> PackageIter<'p> {
     #[inline]
-    fn convert(&self, drct: &Directive) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+    fn convert(
+        &self,
+        drct: &Directive,
+    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
         match drct {
             Directive::File(f) => self.convert_file(f),
             Directive::Hook(h) => self.convert_hook(h),
@@ -106,12 +113,12 @@ impl<'p> PackageIter<'p> {
     }
 
     #[inline]
-    fn convert_file(&self, f: &File) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+    fn convert_file(&self, f: &File) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
         match f {
             File::Regular(rf) => self.convert_regular(rf),
-            File::Templated(tf) => Box::new(self.convert_template(tf)),
-            File::Tree(tf) => Box::new(self.convert_tree(tf)),
-            File::Generated(gf) => Box::new(self.convert_generated(gf)),
+            File::Templated(tf) => self.convert_template(tf),
+            File::Tree(tf) => self.convert_tree(tf),
+            File::Generated(gf) => self.convert_generated(gf),
         }
     }
 
@@ -119,7 +126,7 @@ impl<'p> PackageIter<'p> {
     fn convert_regular(
         &self,
         rf: &RegularFile,
-    ) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
         let RegularFile {
             src,
             dest,
@@ -143,8 +150,11 @@ impl<'p> PackageIter<'p> {
         let src_full = self.join_package(src);
         // If optional flag enabled, and src doesn't exist, skip.
         if *optional && !src_full.exists() {
-            self.log_skipping(&format!("{} does not exist", src.display()));
-            return Box::new(iter::empty());
+            self.log_skipping(&format!(
+                "{} does not exist",
+                style(src.display()).underlined()
+            ));
+            return Ok(Box::new(iter::empty()));
         }
 
         // Normalize dest (or use src if absent).
@@ -161,14 +171,14 @@ impl<'p> PackageIter<'p> {
             dest: dest_full,
             copy,
         })));
-        Box::new(it)
+        Ok(Box::new(it))
     }
 
     #[inline]
     fn convert_template(
         &self,
         tf: &TemplatedFile,
-    ) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
         let TemplatedFile {
             src,
             dest,
@@ -194,8 +204,11 @@ impl<'p> PackageIter<'p> {
 
         // If optional flag enabled, and file does not exist, skip.
         if *optional && !src_full.exists() {
-            self.log_skipping(&format!("{} does not exist", src.display()));
-            return Box::new(iter::empty());
+            self.log_skipping(&format!(
+                "{} does not exist",
+                style(src.display()).underlined()
+            ));
+            return Ok(Box::new(iter::empty()));
         }
 
         // Normalize dest.
@@ -215,25 +228,104 @@ impl<'p> PackageIter<'p> {
                 contents: contents?,
             }))
         });
-        Box::new(it)
+        Ok(Box::new(it))
     }
 
     #[inline]
-    fn convert_tree(&self, tf: &TreeFile) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
-        let dest = tf
-            .dest
+    fn convert_tree(
+        &self,
+        tf: &TreeFile,
+    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+        let TreeFile {
+            src,
+            dest,
+            globs,
+            ignore,
+            link_type,
+            optional,
+        } = tf;
+
+        self.log_processing(&format!(
+            "{} ({} {} {} {})",
+            style("tree").bold().green(),
+            match link_type {
+                LinkType::Link => style("link").green(),
+                LinkType::Copy => style("copy").yellow(),
+            },
+            src.display(),
+            style("->").dim(),
+            dest.as_ref().unwrap_or(src).display(),
+        ));
+
+        // Normalize src.
+        let src_full = self.join_package(src);
+
+        // If optional flag enabled, and src does not exist, skip.
+        if !src_full.exists() {
+            if *optional {
+                self.log_skipping(&format!(
+                    "{} does not exist",
+                    style(src.display()).underlined()
+                ));
+                return Ok(Box::new(iter::empty()));
+            } else {
+                return Err(anyhow!("Tree path not found: {}", src.display()));
+            }
+        }
+
+        // Normalize dest.
+        let dest_full = dest
             .as_ref()
             .map(|dest| self.join_dest(dest))
             .unwrap_or_else(|| self.dest.clone());
 
-        Box::new(iter::empty())
+        #[inline]
+        fn glob_tree(src: impl AsRef<Path>, pats: &Vec<String>) -> Result<HashSet<PathBuf>> {
+            let pats: Vec<_> = pats
+                .iter()
+                .map(|glob| format!("{}/{}", src.as_ref().display(), glob))
+                .collect();
+            let matches: Vec<glob::Paths> = pats
+                .iter()
+                .map(|pat| {
+                    glob::glob(pat).with_context(|| format!("Couldn't glob with pattern: {}", pat))
+                })
+                .collect::<Result<_>>()?;
+            matches
+                .into_iter()
+                .flatten()
+                .map(|r| r.with_context(|| "Couldn't read path"))
+                .collect::<Result<_>>()
+        }
+
+        // Glob to get file paths.
+        // FIXME handle absolute path globs
+        let globs = globs
+            .as_ref()
+            .map(Cow::Borrowed)
+            .unwrap_or(Cow::Owned(vec!["**/*".to_string()]));
+        let mut paths = glob_tree(&src_full, &globs)?;
+
+        let ignore = ignore
+            .as_ref()
+            .map(Cow::Borrowed)
+            .unwrap_or(Cow::Owned(vec![]));
+        let ignore_paths = glob_tree(&src_full, &ignore)?;
+
+        for path in ignore_paths {
+            paths.remove(&path);
+        }
+
+        todo!()
+
+        Ok(Box::new(iter::empty()))
     }
 
     #[inline]
     fn convert_generated(
         &self,
         gf: &GeneratedFile,
-    ) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
         let GeneratedFile { dest, typ } = gf;
 
         self.log_processing(&format!(
@@ -250,7 +342,7 @@ impl<'p> PackageIter<'p> {
         ));
 
         // Normalize dest.
-        let dest_full = self.dest.join(&dest);
+        let dest_full = self.join_dest(&dest);
 
         // Generate file contents.
         let (header, mut contents) = match &typ {
@@ -286,11 +378,11 @@ impl<'p> PackageIter<'p> {
                 contents: contents?,
             }))
         });
-        Box::new(it)
+        Ok(Box::new(it))
     }
 
     #[inline]
-    fn convert_hook(&self, h: &Hook) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+    fn convert_hook(&self, h: &Hook) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
         match h {
             Hook::Cmd(cmd) => self.convert_hook_cmd(cmd),
             Hook::Fun(fun) => self.convert_hook_fun(fun),
@@ -298,7 +390,10 @@ impl<'p> PackageIter<'p> {
     }
 
     #[inline]
-    fn convert_hook_cmd(&self, cmd: &CmdHook) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+    fn convert_hook_cmd(
+        &self,
+        cmd: &CmdHook,
+    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
         let CmdHook {
             command,
             quiet,
@@ -328,11 +423,14 @@ impl<'p> PackageIter<'p> {
             shell: shell.to_string(),
         });
         let it = iter::once(Ok(action));
-        Box::new(it)
+        Ok(Box::new(it))
     }
 
     #[inline]
-    fn convert_hook_fun(&self, fun: &FunHook) -> Box<dyn Iterator<Item = Result<Action<'p>>> + 'p> {
+    fn convert_hook_fun(
+        &self,
+        fun: &FunHook,
+    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
         let FunHook { name, quiet } = fun;
 
         self.log_processing(&format!(
@@ -347,7 +445,7 @@ impl<'p> PackageIter<'p> {
 
         let action = Action::RunFunction(RunFunctionAction { function });
         let it = iter::once(Ok(action));
-        Box::new(it)
+        Ok(Box::new(it))
     }
 
     #[inline]

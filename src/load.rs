@@ -13,9 +13,9 @@ use uuid::Uuid;
 use crate::graph::{PackageGraph, PackageState};
 use crate::spec::{
     CmdHook, Dep, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile, GeneratedFileTyp,
-    HandlebarsTemplatedFile, Hook, IgnorePatterns, JsonGeneratedFile, LinkType,
-    LiquidTemplatedFile, RegularFile, Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType,
-    TomlGeneratedFile, TreeFile, YamlGeneratedFile,
+    HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType, LiquidTemplatedFile, Patterns,
+    RegularFile, Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType, TomlGeneratedFile,
+    TreeFile, YamlGeneratedFile,
 };
 use crate::tree::Tree;
 
@@ -243,12 +243,14 @@ impl UserData for SpecObject {
             optional: optional.unwrap_or(false)
         }));
 
-        method!("tree"; (src; String, dest; Option<String>, link_type; Option<LinkType>, ignore; IgnorePatterns, optional; Option<bool>);
+        method!("tree"; (src; String, dest; Option<String>, link_type; Option<LinkType>,
+                         globs; Option<Patterns>, ignore; Option<Patterns>, optional; Option<bool>);
         File; File::Tree(TreeFile {
             src: src.into(),
             dest: dest.map(Into::into),
-            link_type: link_type.unwrap_or(LinkType::Link),
+            globs,
             ignore,
+            link_type: link_type.unwrap_or(LinkType::Link),
             optional: optional.unwrap_or(false)
         }));
 
