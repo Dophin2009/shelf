@@ -254,7 +254,7 @@ impl UserData for SpecObject {
             optional: optional.unwrap_or(false)
         }));
 
-        method!("hbs"; (src; String, dest; String, vars; Option<Tree>, partials; HashMap<String, String>, optional; Option<bool>);
+        method!("hbs"; (src; String, dest; String, vars; Tree, partials; HashMap<String, String>, optional; Option<bool>);
         File; {
             let partials = partials.into_iter().map(|(k, v)| (k, v.into())).collect();
             File::Templated(TemplatedFile {
@@ -266,7 +266,7 @@ impl UserData for SpecObject {
             })
         });
 
-        method!("liquid"; (src; String, dest; String, vars; Option<Tree>, optional; Option<bool>);
+        method!("liquid"; (src; String, dest; String, vars; Tree, optional; Option<bool>);
         File; File::Templated(TemplatedFile {
             src: src.into(),
             dest: dest.into(),

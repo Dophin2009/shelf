@@ -39,4 +39,5 @@ pub struct RunCommandAction {
 
 pub struct RunFunctionAction<'lua> {
     pub function: Function<'lua>,
+    pub quiet: bool,
 }

@@ -69,9 +69,7 @@ pub struct TemplatedFile {
     pub src: PathBuf,
     pub dest: PathBuf,
 
-    /// Optional set of variables to use for this template; globals will not be used if this is
-    /// set.
-    pub vars: Option<Tree>,
+    pub vars: Tree,
 
     pub typ: TemplatedFileType,
 

@@ -61,6 +61,7 @@ function tree(arg)
         ignore = arg.ignore
         optional = arg.optional
 
+        if type(globs) == "string" then globs = {globs} end
         if type(ignore) == "string" then ignore = {ignore} end
     else
         error('tree arg must be a string or table')
@@ -92,7 +93,7 @@ end
 function hbs(arg)
     src = arg[1] or error('template src was not provided')
     dest = arg[2] or error('template dest was not provided')
-    vars = arg.vars
+    vars = arg.vars or error('template vars was not provided')
     partials = arg.partials or {}
     optional = arg.optional
 
@@ -104,7 +105,7 @@ end
 function liquid(arg)
     src = arg[1] or error('template src was not provided')
     dest = arg[2] or error('template dest was not provided')
-    vars = arg.vars
+    vars = arg.vars or error('template vars was not provided')
     optional = arg.optional
 
     pkg:liquid(src, dest, vars, optional)
