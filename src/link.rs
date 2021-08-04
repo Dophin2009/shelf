@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Context, Result};
 use console::style;
-use log::debug;
 use mlua::{Function, Lua};
 use path_clean::PathClean;
 
@@ -219,7 +218,7 @@ impl<'p> PackageIter<'p> {
             TemplatedFileType::Handlebars(hbs) => {
                 templating::hbs::render(&src_full, &vars, &hbs.partials)
             }
-            TemplatedFileType::Liquid(lq) => templating::liquid::render(&src_full, &vars),
+            TemplatedFileType::Liquid(_lq) => templating::liquid::render(&src_full, &vars),
         };
 
         let it = iter::once_with(|| {
@@ -254,14 +253,17 @@ impl<'p> PackageIter<'p> {
             },
             src.display(),
             style("->").dim(),
-            dest.as_ref().unwrap_or(src).display(),
+            dest.as_ref()
+                .map(|dest| dest.display().to_string())
+                .unwrap_or(".".to_string()),
         ));
 
         // Normalize src.
         let src_full = self.join_package(src);
 
-        // If optional flag enabled, and src does not exist, skip.
         if !src_full.exists() {
+            // If src does not exist, and optional flag enabled, skip.
+            // If optional flag disabled, return error.
             if *optional {
                 self.log_skipping(&format!(
                     "{} does not exist",
@@ -271,6 +273,17 @@ impl<'p> PackageIter<'p> {
             } else {
                 return Err(anyhow!("Tree path not found: {}", src.display()));
             }
+        } else if !src_full.is_dir() {
+            // If src isn't a directory, and optional flag enabled, skip it.
+            // If optional flag disabled, return error.
+            if *optional {
+                self.log_skipping(&format!(
+                    "{} is not a directory",
+                    style(src.display()).underlined()
+                ))
+            } else {
+                return Err(anyhow!("Tree path isn't a directory: {}", src.display()));
+            }
         }
 
         // Normalize dest.
@@ -279,6 +292,7 @@ impl<'p> PackageIter<'p> {
             .map(|dest| self.join_dest(dest))
             .unwrap_or_else(|| self.dest.clone());
 
+        // FIXME handle absolute path globs
         #[inline]
         fn glob_tree(src: impl AsRef<Path>, pats: &Vec<String>) -> Result<HashSet<PathBuf>> {
             let pats: Vec<_> = pats
@@ -295,30 +309,61 @@ impl<'p> PackageIter<'p> {
                 .into_iter()
                 .flatten()
                 .map(|r| r.with_context(|| "Couldn't read path"))
+                .filter(|r| {
+                    if let Ok(path) = r {
+                        path.is_file()
+                    } else {
+                        false
+                    }
+                })
                 .collect::<Result<_>>()
         }
 
         // Glob to get file paths.
-        // FIXME handle absolute path globs
         let globs = globs
             .as_ref()
             .map(Cow::Borrowed)
             .unwrap_or(Cow::Owned(vec!["**/*".to_string()]));
         let mut paths = glob_tree(&src_full, &globs)?;
 
+        // Glob to get ignored paths.
         let ignore = ignore
             .as_ref()
             .map(Cow::Borrowed)
             .unwrap_or(Cow::Owned(vec![]));
         let ignore_paths = glob_tree(&src_full, &ignore)?;
 
+        // Remove all the ignored paths from the globbed paths.
         for path in ignore_paths {
             paths.remove(&path);
         }
 
-        todo!()
+        // FIXME better way to do this (e.g. chdir before globbing?)
+        let rel_paths: Vec<_> = paths
+            .iter()
+            .map(|path| path.strip_prefix(&src_full))
+            .collect::<std::result::Result<_, _>>()
+            .unwrap();
+        let dest_paths: Vec<_> = rel_paths.iter().map(|path| dest_full.join(path)).collect();
 
-        Ok(Box::new(iter::empty()))
+        // Determine copy flag.
+        let copy = match link_type {
+            LinkType::Link => false,
+            LinkType::Copy => true,
+        };
+
+        // Map paths and dest paths into linking actions.
+        let it = paths
+            .into_iter()
+            .zip(dest_paths.into_iter())
+            .map(move |(fsrc, fdest)| {
+                Ok(Action::LinkFile(LinkFileAction {
+                    src: fsrc,
+                    dest: fdest,
+                    copy,
+                }))
+            });
+        Ok(Box::new(it))
     }
 
     #[inline]
@@ -441,9 +486,12 @@ impl<'p> PackageIter<'p> {
         ));
 
         // Load function from Lua registry.
-        let function: Function = self.lua.named_registry_value(&fun.name).unwrap();
+        let function: Function = self.lua.named_registry_value(name).unwrap();
 
-        let action = Action::RunFunction(RunFunctionAction { function });
+        let action = Action::RunFunction(RunFunctionAction {
+            function,
+            quiet: *quiet.as_ref().unwrap_or(&false),
+        });
         let it = iter::once(Ok(action));
         Ok(Box::new(it))
     }
