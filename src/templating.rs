@@ -15,7 +15,6 @@ fn read_template<P: AsRef<Path>>(path: P) -> Result<String> {
 
 pub mod hbs {
     use std::collections::HashMap;
-    use std::fs;
     use std::path::{Path, PathBuf};
 
     use anyhow::{Context, Result};
@@ -45,7 +44,6 @@ pub mod hbs {
 }
 
 pub mod liquid {
-    use std::fs;
     use std::path::Path;
 
     use anyhow::{Context, Result};
