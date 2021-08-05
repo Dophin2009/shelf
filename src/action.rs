@@ -6,7 +6,7 @@ use console::style;
 use glob::{GlobError, PatternError};
 use mlua::Function;
 
-use crate::format::{Indexed, Sublevel};
+use crate::format::Sublevel;
 use crate::spec::{HandlebarsPartials, Patterns};
 use crate::templating;
 use crate::tree::Tree;
@@ -419,11 +419,6 @@ impl<'a> Resolvable for FunctionAction<'a> {
         // FIXME implement
         Ok(Resolution::Done)
     }
-}
-
-#[inline]
-fn log_processing(idxl: &Indexed, step: &str) {
-    idxl.debug(&format!("Processing: {}", step));
 }
 
 #[inline]
