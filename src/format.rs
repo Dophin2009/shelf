@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 use std::fmt::Display;
-use std::iter;
+use std::path::Path;
+use std::{iter, path};
 
 use console::{style, StyledObject};
 use log::{debug, error, info, trace, warn};
@@ -21,6 +22,11 @@ macro_rules! leveled {
             $level!("{}", &self.format(message));
         }
     };
+}
+
+#[inline]
+pub fn filepath(path: &Path) -> StyledObject<path::Display<'_>> {
+    style(path.display()).underlined().dim()
 }
 
 pub struct Toplevel<D>

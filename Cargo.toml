@@ -8,6 +8,7 @@ license = "GPL-3.0-or-later"
 name = "tidy"
 repository = "https://github.com/Dophin2009/tidy.git"
 version = "0.3.0"
+
 [[bin]]
 name = "tidy"
 path = "src/main.rs"
@@ -49,7 +50,3 @@ lua53 = ["mlua/lua53"]
 lua54 = ["mlua/lua54"]
 luajit = ["mlua/luajit"]
 unsafe = []
-
-[lib]
-name = "tidy"
-path = "src/lib.rs"

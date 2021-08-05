@@ -6,7 +6,7 @@ use console::style;
 use glob::{GlobError, PatternError};
 use mlua::Function;
 
-use crate::format::Sublevel;
+use crate::format::{self, Sublevel};
 use crate::spec::{HandlebarsPartials, Patterns};
 use crate::templating;
 use crate::tree::Tree;
@@ -97,10 +97,7 @@ impl Resolvable for LinkAction {
 
         // If optional flag enabled, and file does not exist, skip.
         if optional && !src.exists() {
-            log_skipping(&format!(
-                "{} does not exist",
-                style(src.display()).underlined()
-            ));
+            log_skipping(&format!("{} does not exist", format::filepath(&src)));
             return Ok(Resolution::Skipped);
         }
 
@@ -150,10 +147,7 @@ impl Resolvable for TreeAction {
             // If src does not exist, and optional flag enabled, skip.
             // If optional flag disabled, return error.
             if optional {
-                log_skipping(&format!(
-                    "{} does not exist",
-                    style(src.display()).underlined()
-                ));
+                log_skipping(&format!("{} does not exist", format::filepath(&src)));
                 return Ok(Resolution::Skipped);
             } else {
                 Err(io::Error::new(
@@ -165,10 +159,7 @@ impl Resolvable for TreeAction {
             // If src isn't a directory, and optional flag enabled, skip it.
             // If optional flag disabled, return error.
             if optional {
-                log_skipping(&format!(
-                    "{} is not a directory",
-                    style(src.display()).underlined()
-                ));
+                log_skipping(&format!("{} is not a directory", format::filepath(&src)));
                 return Ok(Resolution::Skipped);
             } else {
                 Err(io::Error::new(
@@ -269,10 +260,7 @@ impl Resolvable for HandlebarsAction {
 
         // If optional flag enabled, and file does not exist, skip.
         if optional && !src.exists() {
-            log_skipping(&format!(
-                "{} does not exist",
-                style(src.display()).underlined()
-            ));
+            log_skipping(&format!("{} does not exist", format::filepath(&src)));
             return Ok(Resolution::Skipped);
         }
 
@@ -304,10 +292,7 @@ impl Resolvable for LiquidAction {
 
         // If optional flag enabled, and file does not exist, skip.
         if optional && !src.exists() {
-            log_skipping(&format!(
-                "{} does not exist",
-                style(src.display()).underlined()
-            ));
+            log_skipping(&format!("{} does not exist", format::filepath(&src)));
             return Ok(Resolution::Skipped);
         }
 
@@ -423,5 +408,9 @@ impl<'a> Resolvable for FunctionAction<'a> {
 
 #[inline]
 fn log_skipping(reason: &str) {
-    Sublevel::default().debug(&format!("{} {}", style("Skipping...").bold(), reason));
+    Sublevel::default().debug(&format!(
+        "{} {}",
+        style("Skipping...").bold().yellow(),
+        reason
+    ));
 }
