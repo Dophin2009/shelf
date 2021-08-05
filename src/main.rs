@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Clap;
 use stderrlog::ColorChoice;
-use tidy::{link, Loader, Resolvable, ResolveOpts};
+use tidy::{link, load, Resolvable, ResolveOpts};
 
 #[derive(Clap, Debug)]
 #[clap(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
@@ -43,8 +43,7 @@ fn cli(opts: Options) {
     let dest = get_dest(opts.home).unwrap();
 
     // FIXME error handling
-    let loader = Loader::new();
-    let graph = loader.load_multi(&opts.packages).unwrap();
+    let graph = load::load_multi(&opts.packages).unwrap();
 
     // FIXME error handling
     let packages = link::link(dest, &graph).unwrap();

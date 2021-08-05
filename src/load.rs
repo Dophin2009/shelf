@@ -21,35 +21,24 @@ use crate::tree::Tree;
 
 static CONFIG_FILE: &str = "package.lua";
 
-#[derive(Debug, Clone)]
-pub struct Loader {}
+/// Loaded paths are not cleaned, and may be relative or absolute.
+#[inline]
+pub fn load(path: impl AsRef<Path>) -> Result<PackageGraph> {
+    load_multi(&[path])
+}
 
-impl Loader {
-    #[inline]
-    pub fn new() -> Self {
-        Self {}
-    }
+#[inline]
+pub fn load_multi(paths: &[impl AsRef<Path>]) -> Result<PackageGraph> {
+    let mut s = LoaderState::new();
+    paths
+        .iter()
+        .map(|p| {
+            s.load(p)
+                .with_context(|| format!("Couldn't load package: {}", p.as_ref().to_string_lossy()))
+        })
+        .collect::<Result<_>>()?;
 
-    /// Loaded paths are not cleaned, and may be relative or absolute.
-    #[inline]
-    pub fn load(&self, path: impl AsRef<Path>) -> Result<PackageGraph> {
-        self.load_multi(&[path])
-    }
-
-    #[inline]
-    pub fn load_multi(&self, paths: &[impl AsRef<Path>]) -> Result<PackageGraph> {
-        let mut s = LoaderState::new();
-        paths
-            .iter()
-            .map(|p| {
-                s.load(p).with_context(|| {
-                    format!("Couldn't load package: {}", p.as_ref().to_string_lossy())
-                })
-            })
-            .collect::<Result<_>>()?;
-
-        Ok(s.graph)
-    }
+    Ok(s.graph)
 }
 
 struct LoaderState {
