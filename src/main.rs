@@ -1,10 +1,9 @@
 use std::env;
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
 use clap::Clap;
 use stderrlog::ColorChoice;
-use tidy::{Linker, Loader};
+use tidy::{link, Loader, Resolvable, ResolveOpts};
 
 #[derive(Clap, Debug)]
 #[clap(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
@@ -22,7 +21,7 @@ struct Options {
     packages: Vec<String>,
 }
 
-fn main() -> Result<()> {
+fn main() {
     let opts = Options::parse();
 
     stderrlog::new()
@@ -34,30 +33,36 @@ fn main() -> Result<()> {
         .init()
         .unwrap();
 
-    cli(opts)
+    cli(opts);
 }
 
 static HOME_VAR: &str = "HOME";
 
-fn cli(opts: Options) -> Result<()> {
-    let home: PathBuf = match opts.home {
+fn cli(opts: Options) {
+    // FIXME error handling
+    let dest = get_dest(opts.home).unwrap();
+
+    // FIXME error handling
+    let loader = Loader::new();
+    let graph = loader.load_multi(&opts.packages).unwrap();
+
+    // FIXME error handling
+    let packages = link::link(dest, &graph).unwrap();
+    for actions in packages {
+        for action in actions {
+            // FIXME support for choosing fail-fast/skip/etc. on error
+            action.resolve(&ResolveOpts {}).unwrap();
+        }
+    }
+}
+
+#[inline]
+fn get_dest(home: Option<String>) -> Result<PathBuf, env::VarError> {
+    let ret = match home {
         Some(p) => p,
         None => env::var(HOME_VAR)?,
     }
     .into();
 
-    let loader = Loader::new();
-    let graph = loader
-        .load_multi(&opts.packages)
-        .with_context(|| "Couldn't resolve packages")?;
-
-    let linker = Linker::new(home);
-    let actions = linker.link(&graph)?;
-
-    for action in actions {
-        // FIXME support for choosing fail-fast/skip/etc. on error
-        action?.resolve()?;
-    }
-
-    Ok(())
+    Ok(ret)
 }

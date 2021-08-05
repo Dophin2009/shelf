@@ -1,65 +1,53 @@
-use std::borrow::Cow;
-use std::collections::{HashSet, VecDeque};
-use std::iter;
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::Result;
 use console::style;
 use mlua::{Function, Lua};
 use path_clean::PathClean;
 
-use crate::action::{Action, LinkFileAction, RunCommandAction, RunFunctionAction, WriteFileAction};
-use crate::format::{Indexed, Sublevel};
-use crate::graph::PackageGraph;
+use crate::action::{
+    Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
+    TomlAction, TreeAction, WriteAction, YamlAction,
+};
+use crate::format::Indexed;
+use crate::graph::{OrderError, PackageGraph};
 use crate::spec::{
     CmdHook, Directive, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
     RegularFile, Spec, TemplatedFile, TemplatedFileType, TreeFile,
 };
-use crate::templating;
 
-#[derive(Debug, Clone)]
-pub struct Linker {
-    dest: PathBuf,
+#[inline]
+pub fn link<'p>(
+    dest: impl AsRef<Path>,
+    graph: &'p PackageGraph,
+) -> Result<impl Iterator<Item = PackageIter<'p>>, OrderError> {
+    let order = graph.order()?;
+    let it = order.into_iter().map(move |package| {
+        link_one(
+            dest.as_ref().to_path_buf(),
+            &package.lua,
+            &package.path,
+            &package.data,
+        )
+    });
+
+    Ok(it)
 }
 
-impl Linker {
-    #[inline]
-    pub fn new(dest: impl AsRef<Path>) -> Self {
-        Self {
-            dest: dest.as_ref().to_path_buf().clean(),
-        }
-    }
-
-    #[inline]
-    pub fn link<'p>(
-        &self,
-        graph: &'p PackageGraph,
-    ) -> Result<impl Iterator<Item = Result<Action<'p>>>> {
-        // Link in dependency order.
-        let order = graph.order()?;
-        let dest = self.dest.clone();
-        let actions = order.flat_map(move |package| {
-            Self::link_one(dest.clone(), &package.lua, &package.path, &package.data)
-        });
-
-        Ok(actions)
-    }
-
-    #[inline]
-    fn link_one<'p>(
-        dest: PathBuf,
-        lua: &'p Lua,
-        path: &'p PathBuf,
-        spec: &'p Spec,
-    ) -> PackageIter<'p> {
-        PackageIter {
-            path,
-            dest,
-            lua,
-            directives: spec.directives.iter().collect(),
-            next: Box::new(iter::empty()),
-            logger: Indexed::new(spec.directives.len()),
-        }
+#[inline]
+pub fn link_one<'p>(
+    dest: PathBuf,
+    lua: &'p Lua,
+    path: &'p PathBuf,
+    spec: &'p Spec,
+) -> PackageIter<'p> {
+    PackageIter {
+        path,
+        dest,
+        lua,
+        directives: spec.directives.iter().collect(),
+        idxl: Indexed::new(spec.directives.len()),
     }
 }
 
@@ -69,42 +57,26 @@ pub struct PackageIter<'p> {
     lua: &'p Lua,
 
     directives: VecDeque<&'p Directive>,
-    next: Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>,
 
-    logger: Indexed,
+    idxl: Indexed,
 }
 
 impl<'p> Iterator for PackageIter<'p> {
-    type Item = Result<Action<'p>>;
+    type Item = Action<'p>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        match self.next.next() {
-            item @ Some(_) => {
-                return item;
-            }
-            None => {}
-        }
-
         let drct = self.directives.pop_front()?;
-        let it = match self.convert(drct) {
-            Ok(it) => it,
-            Err(err) => return Some(Err(err)),
-        };
-        self.next = it;
+        let action = self.convert(drct);
+        self.idxl.incr();
 
-        self.logger.incr();
-
-        self.next()
+        Some(action)
     }
 }
 
 impl<'p> PackageIter<'p> {
     #[inline]
-    fn convert(
-        &self,
-        drct: &Directive,
-    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+    fn convert(&self, drct: &Directive) -> Action<'p> {
         match drct {
             Directive::File(f) => self.convert_file(f),
             Directive::Hook(h) => self.convert_hook(h),
@@ -112,7 +84,7 @@ impl<'p> PackageIter<'p> {
     }
 
     #[inline]
-    fn convert_file(&self, f: &File) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+    fn convert_file(&self, f: &File) -> Action<'p> {
         match f {
             File::Regular(rf) => self.convert_regular(rf),
             File::Templated(tf) => self.convert_template(tf),
@@ -122,10 +94,7 @@ impl<'p> PackageIter<'p> {
     }
 
     #[inline]
-    fn convert_regular(
-        &self,
-        rf: &RegularFile,
-    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+    fn convert_regular(&self, rf: &RegularFile) -> Action<'p> {
         let RegularFile {
             src,
             dest,
@@ -147,15 +116,6 @@ impl<'p> PackageIter<'p> {
 
         // Normalize src.
         let src_full = self.join_package(src);
-        // If optional flag enabled, and src doesn't exist, skip.
-        if *optional && !src_full.exists() {
-            self.log_skipping(&format!(
-                "{} does not exist",
-                style(src.display()).underlined()
-            ));
-            return Ok(Box::new(iter::empty()));
-        }
-
         // Normalize dest (or use src if absent).
         let dest_full = self.join_dest(dest.as_ref().unwrap_or(src));
 
@@ -165,19 +125,16 @@ impl<'p> PackageIter<'p> {
             LinkType::Copy => true,
         };
 
-        let it = iter::once(Ok(Action::LinkFile(LinkFileAction {
+        Action::Link(LinkAction {
             src: src_full,
             dest: dest_full,
             copy,
-        })));
-        Ok(Box::new(it))
+            optional: *optional,
+        })
     }
 
     #[inline]
-    fn convert_template(
-        &self,
-        tf: &TemplatedFile,
-    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+    fn convert_template(&self, tf: &TemplatedFile) -> Action<'p> {
         let TemplatedFile {
             src,
             dest,
@@ -200,41 +157,28 @@ impl<'p> PackageIter<'p> {
 
         // Normalize src.
         let src_full = self.join_package(&src);
-
-        // If optional flag enabled, and file does not exist, skip.
-        if *optional && !src_full.exists() {
-            self.log_skipping(&format!(
-                "{} does not exist",
-                style(src.display()).underlined()
-            ));
-            return Ok(Box::new(iter::empty()));
-        }
-
         // Normalize dest.
         let dest_full = self.join_dest(dest.clone());
 
-        // Generate template contents.
-        let contents = match &typ {
-            TemplatedFileType::Handlebars(hbs) => {
-                templating::hbs::render(&src_full, &vars, &hbs.partials)
-            }
-            TemplatedFileType::Liquid(_lq) => templating::liquid::render(&src_full, &vars),
-        };
-
-        let it = iter::once_with(|| {
-            Ok(Action::WriteFile(WriteFileAction {
+        match typ {
+            TemplatedFileType::Handlebars(hbs) => Action::Handlebars(HandlebarsAction {
+                src: src_full,
                 dest: dest_full,
-                contents: contents?,
-            }))
-        });
-        Ok(Box::new(it))
+                vars: vars.clone(),
+                optional: *optional,
+                partials: hbs.partials.clone(),
+            }),
+            TemplatedFileType::Liquid(_) => Action::Liquid(LiquidAction {
+                src: src_full,
+                dest: dest_full,
+                vars: vars.clone(),
+                optional: *optional,
+            }),
+        }
     }
 
     #[inline]
-    fn convert_tree(
-        &self,
-        tf: &TreeFile,
-    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+    fn convert_tree(&self, tf: &TreeFile) -> Action<'p> {
         let TreeFile {
             src,
             dest,
@@ -260,91 +204,15 @@ impl<'p> PackageIter<'p> {
 
         // Normalize src.
         let src_full = self.join_package(src);
-
-        if !src_full.exists() {
-            // If src does not exist, and optional flag enabled, skip.
-            // If optional flag disabled, return error.
-            if *optional {
-                self.log_skipping(&format!(
-                    "{} does not exist",
-                    style(src.display()).underlined()
-                ));
-                return Ok(Box::new(iter::empty()));
-            } else {
-                return Err(anyhow!("Tree path not found: {}", src.display()));
-            }
-        } else if !src_full.is_dir() {
-            // If src isn't a directory, and optional flag enabled, skip it.
-            // If optional flag disabled, return error.
-            if *optional {
-                self.log_skipping(&format!(
-                    "{} is not a directory",
-                    style(src.display()).underlined()
-                ))
-            } else {
-                return Err(anyhow!("Tree path isn't a directory: {}", src.display()));
-            }
-        }
-
         // Normalize dest.
         let dest_full = dest
             .as_ref()
             .map(|dest| self.join_dest(dest))
             .unwrap_or_else(|| self.dest.clone());
 
-        // FIXME handle absolute path globs
-        #[inline]
-        fn glob_tree(src: impl AsRef<Path>, pats: &Vec<String>) -> Result<HashSet<PathBuf>> {
-            let pats: Vec<_> = pats
-                .iter()
-                .map(|glob| format!("{}/{}", src.as_ref().display(), glob))
-                .collect();
-            let matches: Vec<glob::Paths> = pats
-                .iter()
-                .map(|pat| {
-                    glob::glob(pat).with_context(|| format!("Couldn't glob with pattern: {}", pat))
-                })
-                .collect::<Result<_>>()?;
-            matches
-                .into_iter()
-                .flatten()
-                .map(|r| r.with_context(|| "Couldn't read path"))
-                .filter(|r| {
-                    if let Ok(path) = r {
-                        path.is_file()
-                    } else {
-                        false
-                    }
-                })
-                .collect::<Result<_>>()
-        }
-
-        // Glob to get file paths.
-        let globs = globs
-            .as_ref()
-            .map(Cow::Borrowed)
-            .unwrap_or(Cow::Owned(vec!["**/*".to_string()]));
-        let mut paths = glob_tree(&src_full, &globs)?;
-
-        // Glob to get ignored paths.
-        let ignore = ignore
-            .as_ref()
-            .map(Cow::Borrowed)
-            .unwrap_or(Cow::Owned(vec![]));
-        let ignore_paths = glob_tree(&src_full, &ignore)?;
-
-        // Remove all the ignored paths from the globbed paths.
-        for path in ignore_paths {
-            paths.remove(&path);
-        }
-
-        // FIXME better way to do this (e.g. chdir before globbing?)
-        let rel_paths: Vec<_> = paths
-            .iter()
-            .map(|path| path.strip_prefix(&src_full))
-            .collect::<std::result::Result<_, _>>()
-            .unwrap();
-        let dest_paths: Vec<_> = rel_paths.iter().map(|path| dest_full.join(path)).collect();
+        // FIXME no clone
+        let globs = globs.clone().unwrap_or(vec!["**/*".to_string()]);
+        let ignore = ignore.clone().unwrap_or(vec![]);
 
         // Determine copy flag.
         let copy = match link_type {
@@ -352,25 +220,18 @@ impl<'p> PackageIter<'p> {
             LinkType::Copy => true,
         };
 
-        // Map paths and dest paths into linking actions.
-        let it = paths
-            .into_iter()
-            .zip(dest_paths.into_iter())
-            .map(move |(fsrc, fdest)| {
-                Ok(Action::LinkFile(LinkFileAction {
-                    src: fsrc,
-                    dest: fdest,
-                    copy,
-                }))
-            });
-        Ok(Box::new(it))
+        Action::Tree(TreeAction {
+            src: src_full,
+            dest: dest_full,
+            globs,
+            ignore,
+            copy,
+            optional: *optional,
+        })
     }
 
     #[inline]
-    fn convert_generated(
-        &self,
-        gf: &GeneratedFile,
-    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+    fn convert_generated(&self, gf: &GeneratedFile) -> Action<'p> {
         let GeneratedFile { dest, typ } = gf;
 
         self.log_processing(&format!(
@@ -389,45 +250,35 @@ impl<'p> PackageIter<'p> {
         // Normalize dest.
         let dest_full = self.join_dest(&dest);
 
-        // Generate file contents.
-        let (header, mut contents) = match &typ {
-            GeneratedFileTyp::Empty(_) => (None, Ok("".to_string())),
-            GeneratedFileTyp::String(s) => (None, Ok(s.contents.clone())),
-            // FIXME error context
-            GeneratedFileTyp::Yaml(y) => {
-                let contents = serde_yaml::to_string(&y.values)
-                    .with_context(|| "Couldn't serialize values to yaml");
-                (y.header.as_ref(), contents)
-            }
-            GeneratedFileTyp::Toml(t) => {
-                let contents = toml::to_string_pretty(&t.values)
-                    .with_context(|| "Couldn't serialize values to toml");
-                (t.header.as_ref(), contents)
-            }
-            GeneratedFileTyp::Json(j) => (
-                None,
-                serde_json::to_string(&j.values)
-                    .with_context(|| "Couldn't serialize values to json"),
-            ),
-        };
-
-        // Prepend the header if there is one.
-        contents = match header {
-            Some(header) => contents.map(|contents| format!("{}\n{}", header, contents)),
-            None => contents,
-        };
-
-        let it = iter::once_with(|| {
-            Ok(Action::WriteFile(WriteFileAction {
+        match typ {
+            GeneratedFileTyp::Empty(_) => Action::Write(WriteAction {
                 dest: dest_full,
-                contents: contents?,
-            }))
-        });
-        Ok(Box::new(it))
+                contents: "".to_string(),
+            }),
+            GeneratedFileTyp::String(s) => Action::Write(WriteAction {
+                dest: dest_full,
+                contents: s.contents.clone(),
+            }),
+            // FIXME error context
+            GeneratedFileTyp::Yaml(y) => Action::Yaml(YamlAction {
+                dest: dest_full,
+                values: y.values.clone(),
+                header: y.header.clone(),
+            }),
+            GeneratedFileTyp::Toml(t) => Action::Toml(TomlAction {
+                dest: dest_full,
+                values: t.values.clone(),
+                header: t.header.clone(),
+            }),
+            GeneratedFileTyp::Json(j) => Action::Json(JsonAction {
+                dest: dest_full,
+                values: j.values.clone(),
+            }),
+        }
     }
 
     #[inline]
-    fn convert_hook(&self, h: &Hook) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+    fn convert_hook(&self, h: &Hook) -> Action<'p> {
         match h {
             Hook::Cmd(cmd) => self.convert_hook_cmd(cmd),
             Hook::Fun(fun) => self.convert_hook_fun(fun),
@@ -435,10 +286,7 @@ impl<'p> PackageIter<'p> {
     }
 
     #[inline]
-    fn convert_hook_cmd(
-        &self,
-        cmd: &CmdHook,
-    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+    fn convert_hook_cmd(&self, cmd: &CmdHook) -> Action<'p> {
         let CmdHook {
             command,
             quiet,
@@ -461,21 +309,16 @@ impl<'p> PackageIter<'p> {
             .map(|start| self.join_package(start))
             .unwrap_or(self.path.clone());
 
-        let action = Action::RunCommand(RunCommandAction {
+        Action::Command(CommandAction {
             command: command.clone(),
             quiet: quiet.unwrap_or(false),
             start: start_full,
             shell: shell.to_string(),
-        });
-        let it = iter::once(Ok(action));
-        Ok(Box::new(it))
+        })
     }
 
     #[inline]
-    fn convert_hook_fun(
-        &self,
-        fun: &FunHook,
-    ) -> Result<Box<dyn Iterator<Item = Result<Action<'p>>> + 'p>> {
+    fn convert_hook_fun(&self, fun: &FunHook) -> Action<'p> {
         let FunHook { name, quiet } = fun;
 
         self.log_processing(&format!(
@@ -488,12 +331,10 @@ impl<'p> PackageIter<'p> {
         // Load function from Lua registry.
         let function: Function = self.lua.named_registry_value(name).unwrap();
 
-        let action = Action::RunFunction(RunFunctionAction {
+        Action::Function(FunctionAction {
             function,
             quiet: *quiet.as_ref().unwrap_or(&false),
-        });
-        let it = iter::once(Ok(action));
-        Ok(Box::new(it))
+        })
     }
 
     #[inline]
@@ -518,11 +359,6 @@ impl<'p> PackageIter<'p> {
 
     #[inline]
     fn log_processing(&self, step: &str) {
-        self.logger.debug(&format!("Processing: {}", step));
-    }
-
-    #[inline]
-    fn log_skipping(&self, reason: &str) {
-        Sublevel::default().debug(&format!("{} {}", style("Skipping...").bold(), reason));
+        self.idxl.debug(&format!("Processing: {}", step));
     }
 }

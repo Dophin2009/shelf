@@ -1,64 +1,73 @@
 use std::fs;
+use std::io;
 use std::path::Path;
 
-use anyhow::{Context, Result};
-use serde::Serialize;
-
-pub trait TemplateEngine {
-    fn render<S: Serialize>(&self, value: &S) -> Result<String>;
-}
-
 #[inline]
-fn read_template<P: AsRef<Path>>(path: P) -> Result<String> {
-    fs::read_to_string(path).with_context(|| "Couldn't read template source")
+fn read_template<P: AsRef<Path>>(path: P) -> io::Result<String> {
+    fs::read_to_string(path)
 }
 
 pub mod hbs {
     use std::collections::HashMap;
+    use std::io;
     use std::path::{Path, PathBuf};
 
-    use anyhow::{Context, Result};
     use handlebars::Handlebars;
     use serde::Serialize;
+
+    #[derive(Debug, thiserror::Error)]
+    pub enum Error {
+        #[error("i/o error")]
+        Io(#[from] io::Error),
+        #[error("couldn't parse a handlebars template")]
+        Template(#[from] handlebars::TemplateError),
+        #[error("couldn't render a handlebars template")]
+        Render(#[from] handlebars::RenderError),
+    }
 
     #[inline]
     pub fn render<P: AsRef<Path>, S: Serialize>(
         template: P,
         ctx: &S,
         partials: &HashMap<String, PathBuf>,
-    ) -> Result<String> {
+    ) -> Result<String, Error> {
         let template_str = super::read_template(template)?;
 
         let mut reg = Handlebars::new();
         partials
             .iter()
-            .map(|(name, path)| {
-                reg.register_template_file(name, &path)
-                    .with_context(|| "Couldn't register partial template")
-            })
-            .collect::<Result<Vec<_>>>()?;
+            .map(|(name, path)| reg.register_template_file(name, &path))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        reg.render_template(&template_str, ctx)
-            .with_context(|| "Couldn't render a handlebars template")
+        let res = reg.render_template(&template_str, ctx)?;
+        Ok(res)
     }
 }
 
 pub mod liquid {
+    use std::io;
     use std::path::Path;
 
-    use anyhow::{Context, Result};
     use liquid::ParserBuilder;
     use serde::Serialize;
 
+    #[derive(Debug, thiserror::Error)]
+    pub enum Error {
+        #[error("i/o error")]
+        Io(#[from] io::Error),
+        #[error("liquid error")]
+        Liquid(#[from] liquid::Error),
+    }
+
     #[inline]
-    pub fn render<P: AsRef<Path>, S: Serialize>(template: P, ctx: &S) -> Result<String> {
+    pub fn render<P: AsRef<Path>, S: Serialize>(template: P, ctx: &S) -> Result<String, Error> {
         let template_str = super::read_template(template)?;
+
         // FIXME error context
         let parser = ParserBuilder::with_stdlib().build()?.parse(&template_str)?;
         let object = liquid::to_object(ctx)?;
 
-        parser
-            .render(&object)
-            .with_context(|| "Couldn't render a liquid template")
+        let res = parser.render(&object)?;
+        Ok(res)
     }
 }
