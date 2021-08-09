@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use clap::Clap;
 
 use crate::action::{Resolvable, ResolveOpts};
+use crate::error::EmptyError;
 use crate::link;
 use crate::load;
 
@@ -23,21 +24,21 @@ pub struct Options {
     pub packages: Vec<String>,
 }
 
-pub fn cli(opts: Options) {
-    // FIXME error handling
-    let dest = get_dest(opts.home).unwrap();
+pub fn cli(opts: Options) -> Result<(), EmptyError> {
+    // FIXME error printing
+    let dest = fail!(get_dest(opts.home));
 
-    // FIXME error handling
-    let graph = load::load_multi(&opts.packages).unwrap();
+    let graph = fail!(load::load_multi(&opts.packages));
+    let packages = fail!(link::link(dest, &graph));
 
-    // FIXME error handling
-    let packages = link::link(dest, &graph).unwrap();
     for actions in packages {
         for action in actions {
             // FIXME support for choosing fail-fast/skip/etc. on error
             action.resolve(&ResolveOpts {}).unwrap();
         }
     }
+
+    Ok(())
 }
 
 #[inline]

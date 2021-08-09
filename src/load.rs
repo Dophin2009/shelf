@@ -1,3 +1,4 @@
+use core::fmt;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::env;
@@ -10,6 +11,8 @@ use mlua::{FromLua, Function, Lua, UserData, UserDataMethods, Variadic};
 use path_clean::PathClean;
 use uuid::Uuid;
 
+use crate::error::EmptyError;
+use crate::format::{self, errored, style, sublevel, toplevel};
 use crate::graph::{PackageGraph, PackageState};
 use crate::spec::{
     CmdHook, Dep, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile, GeneratedFileTyp,
@@ -21,30 +24,41 @@ use crate::tree::Tree;
 
 static CONFIG_FILE: &str = "package.lua";
 
+macro_rules! lfail {
+    ($res:expr) => {
+        fail!($res, err => { render_err(err.into()) })
+    };
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
     #[error("couldn't read a file")]
-    Read(io::Error),
+    Read(PathBuf, io::Error),
     #[error("couldn't determine the current working directory")]
     Cwd(io::Error),
     #[error("couldn't change the current working directory")]
-    Chdir(io::Error),
-    #[error("lua error")]
+    Chdir(PathBuf, io::Error),
+    #[error("Lua {}", .0)]
     Lua(#[from] mlua::Error),
 }
 
 /// Loaded paths are not cleaned, and may be relative or absolute.
 #[inline]
-pub fn load(path: impl AsRef<Path>) -> Result<PackageGraph, LoadError> {
+pub fn load(path: impl AsRef<Path>) -> Result<PackageGraph, EmptyError> {
     load_multi(&[path])
 }
 
 #[inline]
-pub fn load_multi(paths: &[impl AsRef<Path>]) -> Result<PackageGraph, LoadError> {
+pub fn load_multi(paths: &[impl AsRef<Path>]) -> Result<PackageGraph, EmptyError> {
     let mut s = LoaderState::new();
-    paths.iter().map(|p| s.load(p)).collect::<Result<_, _>>()?;
 
-    Ok(s.graph)
+    // FIXME option to fail-fast
+    let load_it = paths.iter().map(|p| s.load(p));
+    if load_it.filter_map(|r| r.err()).count() != 0 {
+        Err(EmptyError)
+    } else {
+        Ok(s.graph)
+    }
 }
 
 struct LoaderState {
@@ -59,67 +73,79 @@ impl LoaderState {
         }
     }
 
+    // FIXME needs lots of cleanup
     #[inline]
-    pub fn load(&mut self, path: impl AsRef<Path>) -> Result<(), LoadError> {
+    pub fn load(&mut self, path: impl AsRef<Path>) -> Result<(), EmptyError> {
+        toplevel::info(&format!(
+            "Loading package at {}",
+            format::filepath(path.as_ref().display())
+        ));
+
         // If given a relative path, make it absolute.
-        let path = self.normalize_path(path)?;
+        let path = lfail!(self.normalize_path(path));
+
+        // Check if this path has already been loaded.
+        let id = hash_path(&path);
+        if self.graph.map.get(&id).is_some() {
+            return Ok(());
+        }
 
         // Save current cwd.
-        let cwd = env::current_dir().map_err(LoadError::Cwd)?;
+        let cwd = lfail!(env::current_dir().map_err(LoadError::Cwd));
         // Work relative to the package root.
-        env::set_current_dir(&path).map_err(LoadError::Chdir)?;
+        lfail!(env::set_current_dir(&path).map_err(|err| LoadError::Chdir(path.clone(), err)));
 
         // Load package data.
         let package = self.load_data(&path)?;
-        self.insert(package)?;
+
+        // Insert the data into the graph.
+        self.insert(id, package)?;
 
         // Reload cwd.
-        env::set_current_dir(cwd).map_err(LoadError::Chdir)?;
+        lfail!(env::set_current_dir(&cwd).map_err(|err| LoadError::Chdir(cwd, err)));
 
         Ok(())
     }
 
     #[inline]
-    fn insert(&mut self, package: PackageState) -> Result<(), LoadError> {
-        // If already added, stop.
-        let path = &package.path;
+    fn insert(&mut self, id: u64, package: PackageState) -> Result<(), EmptyError> {
+        // Insert package data into map.
         let deps = package.data.deps.clone();
-        let id = hash_path(path);
-        if self.graph.map.insert(id, package).is_some() {
-            return Ok(());
-        }
+        self.graph.map.insert(id, package);
+
+        // Add graph node.
         self.graph.graph.add_node(id);
 
-        for dep in deps {
-            let dpath = self.normalize_path(&dep.path)?;
-            // FIXME more error context
-            let dep = self.load_data(&dpath)?;
-
-            let dep_id = hash_path(&dpath);
-            self.graph.graph.add_edge(id, dep_id, ());
-
-            self.insert(dep)?;
-        }
+        // Add nodes and edges for dependencies.
+        sublevel::debug("Resolving dependencies");
+        deps.iter()
+            .map(|dep| self.load(&dep.path))
+            .collect::<Result<Vec<_>, EmptyError>>()?;
 
         Ok(())
     }
 
     #[inline]
-    pub fn load_data(&mut self, path: impl AsRef<Path>) -> Result<PackageState, LoadError> {
+    pub fn load_data(&mut self, path: impl AsRef<Path>) -> Result<PackageState, EmptyError> {
+        sublevel::debug("Trying to load package data");
         let path = path.as_ref().to_path_buf();
 
         // Read the configuration contents.
         let config_path = path.join(CONFIG_FILE);
-        let config_contents = fs::read_to_string(&config_path).map_err(LoadError::Read)?;
+        let config_contents = lfail!(
+            fs::read_to_string(&config_path).map_err(|err| LoadError::Read(config_path, err))
+        );
 
         // Load and evaluate Lua code.
-        let lua = self.lua_instance()?;
+        sublevel::debug("Evalulating Lua code");
+        let lua = lfail!(self.lua_instance());
         let chunk = lua.load(&config_contents);
-        chunk.exec()?;
+        lfail!(chunk.exec());
 
         // FIXME better error context
-        let pkg_data = lua.globals().get("pkg")?;
-        let package: SpecObject = FromLua::from_lua(pkg_data, &lua)?;
+        sublevel::debug("Retrieving package configuration object");
+        let pkg_data = lfail!(lua.globals().get("pkg").into());
+        let package: SpecObject = lfail!(FromLua::from_lua(pkg_data, &lua));
 
         Ok(PackageState {
             path,
@@ -129,7 +155,7 @@ impl LoaderState {
     }
 
     #[inline]
-    pub fn lua_instance(&self) -> Result<Lua, LoadError> {
+    fn lua_instance(&self) -> Result<Lua, mlua::Error> {
         #[cfg(not(feature = "unsafe"))]
         let lua = Lua::new();
         #[cfg(feature = "unsafe")]
@@ -292,4 +318,32 @@ impl UserData for SpecObject {
             Ok(())
         });
     }
+}
+
+#[inline]
+fn render_err(err: LoadError) {
+    fn render<E>(msg: impl fmt::Display, extra: impl fmt::Display, err: E) -> String
+    where
+        E: std::error::Error,
+    {
+        format!(
+            "{} {}\n      {}",
+            style(format!("{}:", msg)).bold().red(),
+            style(extra).red(),
+            err
+        )
+    }
+
+    let rendered = match err {
+        LoadError::Read(path, err) => {
+            render("Couldn't read the package config", path.display(), err)
+        }
+        LoadError::Cwd(err) => render("Couldn't determine the current directory", "", err),
+        LoadError::Chdir(path, err) => {
+            render("Couldn't change current directory", path.display(), err)
+        }
+        LoadError::Lua(err) => render("Couldn't evaluate Lua", "", err),
+    };
+
+    errored::error(&rendered);
 }

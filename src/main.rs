@@ -1,3 +1,6 @@
+#[macro_use]
+pub mod error;
+
 pub mod action;
 pub mod cli;
 pub mod format;
@@ -7,6 +10,8 @@ pub mod load;
 pub mod spec;
 pub mod templating;
 pub mod tree;
+
+use std::process;
 
 use clap::Clap;
 use stderrlog::ColorChoice;
@@ -25,5 +30,7 @@ fn main() {
         .init()
         .unwrap();
 
-    cli::cli(opts);
+    if cli::cli(opts).is_err() {
+        process::exit(1);
+    }
 }

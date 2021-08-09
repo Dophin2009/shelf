@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use console::style;
 use mlua::{Function, Lua};
 use path_clean::PathClean;
 
@@ -10,7 +9,7 @@ use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
     TomlAction, TreeAction, WriteAction, YamlAction,
 };
-use crate::format::Indexed;
+use crate::format::{indexed::Indexed, style};
 use crate::graph::{OrderError, PackageGraph};
 use crate::spec::{
     CmdHook, Directive, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
