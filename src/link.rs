@@ -9,8 +9,9 @@ use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
     TomlAction, TreeAction, WriteAction, YamlAction,
 };
-use crate::format::{indexed::Indexed, style};
-use crate::graph::{OrderError, PackageGraph};
+use crate::error::EmptyError;
+use crate::format::{self, errored, indexed::Indexed, style, toplevel};
+use crate::graph::{CircularDependencyError, PackageGraph};
 use crate::spec::{
     CmdHook, Directive, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
     RegularFile, Spec, TemplatedFile, TemplatedFileType, TreeFile,
@@ -20,8 +21,15 @@ use crate::spec::{
 pub fn link<'p>(
     dest: impl AsRef<Path>,
     graph: &'p PackageGraph,
-) -> Result<impl Iterator<Item = PackageIter<'p>>, OrderError> {
-    let order = graph.order()?;
+) -> Result<impl Iterator<Item = PackageIter<'p>>, EmptyError> {
+    toplevel::info("Sorting packages");
+    let order = fail!(graph.order(), err => {
+        let msg = format!("{} {}",
+                          style("Circular dependency found for package:").bold().red(),
+                          format::filepath(err.0.display()));
+        errored::error(msg);
+    });
+
     let it = order.into_iter().map(move |package| {
         link_one(
             dest.as_ref().to_path_buf(),

@@ -1,10 +1,11 @@
-use core::fmt;
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
 
 use mlua::Lua;
 use petgraph::{algo, graphmap::DiGraphMap};
 
+use crate::format;
 use crate::spec::Spec;
 
 pub struct PackageState {
@@ -43,13 +44,13 @@ impl PackageGraph {
     }
 
     #[inline]
-    pub fn order<'g>(&'g self) -> Result<Vec<&'g PackageState>, OrderError> {
+    pub fn order<'g>(&'g self) -> Result<Vec<&'g PackageState>, CircularDependencyError> {
         let mut sorted = match algo::toposort(&self.graph, None) {
             Ok(v) => v,
             Err(cycle) => {
                 let node_id = cycle.node_id();
                 let ps = self.map.get(&node_id).unwrap();
-                return Err(CircularDependencyError(ps.data.name.clone()).into());
+                return Err(CircularDependencyError(ps.path.clone()).into());
             }
         };
         sorted.reverse();
@@ -62,19 +63,17 @@ impl PackageGraph {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum OrderError {
-    #[error("circular dependency detected")]
-    CircularDependency(#[from] CircularDependencyError),
-}
-
 #[derive(Debug, Clone)]
-pub struct CircularDependencyError(String);
+pub struct CircularDependencyError(pub PathBuf);
 
 impl fmt::Display for CircularDependencyError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "circular dependency found for package: {}", self.0)
+        write!(
+            f,
+            "Circular dependency found for package: {}",
+            self.0.display()
+        )
     }
 }
 

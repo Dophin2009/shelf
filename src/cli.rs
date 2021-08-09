@@ -5,6 +5,10 @@ use clap::Clap;
 
 use crate::action::{Resolvable, ResolveOpts};
 use crate::error::EmptyError;
+use crate::format::{
+    style,
+    toplevel::{self, Toplevel},
+};
 use crate::link;
 use crate::load;
 
@@ -25,6 +29,20 @@ pub struct Options {
 }
 
 pub fn cli(opts: Options) -> Result<(), EmptyError> {
+    match run(opts) {
+        Ok(_) => Ok(()),
+        Err(err) => {
+            Toplevel::new(style("==>").bold().red()).error(
+                style("Fatal errors were encountered! See above.")
+                    .bold()
+                    .red(),
+            );
+            Err(err)
+        }
+    }
+}
+
+fn run(opts: Options) -> Result<(), EmptyError> {
     // FIXME error printing
     let dest = fail!(get_dest(opts.home));
 

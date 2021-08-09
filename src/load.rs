@@ -76,35 +76,38 @@ impl LoaderState {
     // FIXME needs lots of cleanup
     #[inline]
     pub fn load(&mut self, path: impl AsRef<Path>) -> Result<(), EmptyError> {
+        let _ = self.load_id(path)?;
+        Ok(())
+    }
+
+    #[inline]
+    fn load_id(&mut self, path: impl AsRef<Path>) -> Result<u64, EmptyError> {
+        let path = path.as_ref().to_path_buf();
+
         toplevel::info(&format!(
             "Loading package at {}",
-            format::filepath(path.as_ref().display())
+            format::filepath(path.display())
         ));
-
-        // If given a relative path, make it absolute.
-        let path = lfail!(self.normalize_path(path));
 
         // Check if this path has already been loaded.
         let id = hash_path(&path);
-        if self.graph.map.get(&id).is_some() {
-            return Ok(());
+        if self.graph.map.get(&id).is_none() {
+            // Save current cwd.
+            let cwd = lfail!(env::current_dir().map_err(LoadError::Cwd));
+            // Work relative to the package root.
+            lfail!(env::set_current_dir(&path).map_err(|err| LoadError::Chdir(path.clone(), err)));
+
+            // Load package data.
+            let package = self.load_data(&path)?;
+
+            // Insert the data into the graph.
+            self.insert(id, package)?;
+
+            // Reload cwd.
+            lfail!(env::set_current_dir(&cwd).map_err(|err| LoadError::Chdir(cwd, err)));
         }
 
-        // Save current cwd.
-        let cwd = lfail!(env::current_dir().map_err(LoadError::Cwd));
-        // Work relative to the package root.
-        lfail!(env::set_current_dir(&path).map_err(|err| LoadError::Chdir(path.clone(), err)));
-
-        // Load package data.
-        let package = self.load_data(&path)?;
-
-        // Insert the data into the graph.
-        self.insert(id, package)?;
-
-        // Reload cwd.
-        lfail!(env::set_current_dir(&cwd).map_err(|err| LoadError::Chdir(cwd, err)));
-
-        Ok(())
+        return Ok(id);
     }
 
     #[inline]
@@ -118,11 +121,24 @@ impl LoaderState {
 
         // Add nodes and edges for dependencies.
         sublevel::debug("Resolving dependencies");
-        deps.iter()
-            .map(|dep| self.load(&dep.path))
-            .collect::<Result<Vec<_>, EmptyError>>()?;
+        let dep_it = deps
+            .iter()
+            .map(|dep| {
+                // If given a relative path, make it absolute.
+                let path = lfail!(self.normalize_path(&dep.path));
 
-        Ok(())
+                let dep_id = self.load_id(path)?;
+                self.graph.graph.add_edge(id, dep_id, ());
+
+                Ok(())
+            })
+            .filter_map(Result::err);
+
+        if dep_it.count() == 0 {
+            Ok(())
+        } else {
+            Err(EmptyError)
+        }
     }
 
     #[inline]
