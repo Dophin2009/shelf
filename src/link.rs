@@ -13,8 +13,8 @@ use crate::error::EmptyError;
 use crate::format::{self, errored, indexed::Indexed, style, toplevel};
 use crate::graph::{CircularDependencyError, PackageGraph};
 use crate::spec::{
-    CmdHook, Directive, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
-    RegularFile, Spec, TemplatedFile, TemplatedFileType, TreeFile,
+    CmdHook, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
+    NonZeroExitBehavior, RegularFile, Spec, TemplatedFile, TemplatedFileType, TreeFile,
 };
 
 #[inline]
@@ -22,7 +22,6 @@ pub fn link<'p>(
     dest: impl AsRef<Path>,
     graph: &'p PackageGraph,
 ) -> Result<impl Iterator<Item = PackageIter<'p>>, EmptyError> {
-    toplevel::info("Sorting packages");
     let order = fail!(graph.order(), err => {
         let msg = format!("{} {}",
                           style("Circular dependency found for package:").bold().red(),
@@ -32,6 +31,7 @@ pub fn link<'p>(
 
     let it = order.into_iter().map(move |package| {
         link_one(
+            package.data.name.clone(),
             dest.as_ref().to_path_buf(),
             &package.lua,
             &package.path,
@@ -43,13 +43,15 @@ pub fn link<'p>(
 }
 
 #[inline]
-pub fn link_one<'p>(
+fn link_one<'p>(
+    name: String,
     dest: PathBuf,
     lua: &'p Lua,
     path: &'p PathBuf,
     spec: &'p Spec,
 ) -> PackageIter<'p> {
     PackageIter {
+        name,
         path,
         dest,
         lua,
@@ -59,6 +61,8 @@ pub fn link_one<'p>(
 }
 
 pub struct PackageIter<'p> {
+    pub name: String,
+
     dest: PathBuf,
     path: &'p PathBuf,
     lua: &'p Lua,
@@ -296,9 +300,13 @@ impl<'p> PackageIter<'p> {
     fn convert_hook_cmd(&self, cmd: &CmdHook) -> Action<'p> {
         let CmdHook {
             command,
-            quiet,
             start,
             shell,
+            stdout,
+            stderr,
+            clean_env,
+            env,
+            nonzero_exit,
         } = cmd;
 
         // Use sh as default shell.
@@ -318,9 +326,13 @@ impl<'p> PackageIter<'p> {
 
         Action::Command(CommandAction {
             command: command.clone(),
-            quiet: quiet.unwrap_or(false),
             start: start_full,
             shell: shell.to_string(),
+            stdout: *stdout.as_ref().unwrap_or(&true),
+            stderr: *stderr.as_ref().unwrap_or(&true),
+            clean_env: *clean_env.as_ref().unwrap_or(&false),
+            env: env.clone().unwrap_or_else(|| EnvMap::new()),
+            nonzero_exit: nonzero_exit.clone().unwrap_or(NonZeroExitBehavior::Ignore),
         })
     }
 

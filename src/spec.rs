@@ -140,13 +140,30 @@ pub enum Hook {
     Fun(FunHook),
 }
 
+// FIXME optional env variables?
 #[derive(Debug, Clone)]
 pub struct CmdHook {
     pub command: String,
 
-    pub quiet: Option<bool>,
     pub start: Option<PathBuf>,
     pub shell: Option<String>,
+
+    pub stdout: Option<bool>,
+    pub stderr: Option<bool>,
+
+    pub clean_env: Option<bool>,
+    pub env: Option<EnvMap>,
+
+    pub nonzero_exit: Option<NonZeroExitBehavior>,
+}
+
+pub type EnvMap = HashMap<String, String>;
+
+#[derive(Debug, Clone)]
+pub enum NonZeroExitBehavior {
+    Error,
+    Warn,
+    Ignore,
 }
 
 #[derive(Debug, Clone)]
@@ -159,22 +176,45 @@ pub struct FunHook {
 mod lua {
     use mlua::{Error as LuaError, FromLua, Value as LuaValue};
 
-    use super::LinkType;
+    use super::{LinkType, NonZeroExitBehavior};
 
     impl<'lua> FromLua<'lua> for LinkType {
         #[inline]
         fn from_lua(lua_value: LuaValue<'lua>, _lua: &'lua mlua::Lua) -> mlua::Result<Self> {
             match lua_value {
                 LuaValue::String(s) => match s.to_str()? {
-                    "Link" => Ok(Self::Link),
-                    "Copy" => Ok(Self::Copy),
+                    "link" => Ok(Self::Link),
+                    "copy" => Ok(Self::Copy),
                     _ => conv_err(
                         LuaValue::String(s),
                         "LinkType",
-                        r#"string ("Link" or "Copy")"#,
+                        r#"string ("link" or "copy")"#,
                     ),
                 },
-                _ => conv_err(lua_value, "LinkType", r#"string ("Link" or "Copy")"#),
+                _ => conv_err(lua_value, "LinkType", r#"string ("link" or "copy")"#),
+            }
+        }
+    }
+
+    impl<'lua> FromLua<'lua> for NonZeroExitBehavior {
+        #[inline]
+        fn from_lua(lua_value: LuaValue<'lua>, _lua: &'lua mlua::Lua) -> mlua::Result<Self> {
+            match lua_value {
+                LuaValue::String(s) => match s.to_str()? {
+                    "error" => Ok(Self::Error),
+                    "warn" => Ok(Self::Warn),
+                    "ignore" => Ok(Self::Ignore),
+                    _ => conv_err(
+                        LuaValue::String(s),
+                        "NonZeroExitBehavior",
+                        r#"string ("error", "warn", or "ignore")"#,
+                    ),
+                },
+                _ => conv_err(
+                    lua_value,
+                    "NonZeroExitBehavior",
+                    r#"string ("error", "warn", or "ignore")"#,
+                ),
             }
         }
     }

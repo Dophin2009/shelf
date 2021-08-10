@@ -1,12 +1,16 @@
 use std::collections::HashSet;
+use std::fmt;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::process::Stdio;
 
 use glob::{GlobError, PatternError};
 use mlua::Function;
 
-use crate::format::{self, style, sublevel};
-use crate::spec::{HandlebarsPartials, Patterns};
+use crate::error::EmptyError;
+use crate::format::{self, errored, style, sublevel};
+use crate::spec::{EnvMap, HandlebarsPartials, NonZeroExitBehavior, Patterns};
 use crate::templating;
 use crate::tree::Tree;
 
@@ -14,7 +18,7 @@ use crate::tree::Tree;
 pub struct ResolveOpts {}
 
 pub trait Resolvable {
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError>;
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError>;
 }
 
 pub enum Resolution {
@@ -60,7 +64,7 @@ pub enum Action<'lua> {
 
 impl<'a> Resolvable for Action<'a> {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         match self {
             Self::Link(a) => a.resolve(opts),
             Self::Write(a) => a.resolve(opts),
@@ -86,7 +90,7 @@ pub struct LinkAction {
 
 impl Resolvable for LinkAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
             src,
             dest,
@@ -94,13 +98,19 @@ impl Resolvable for LinkAction {
             optional,
         } = self;
 
-        // If optional flag enabled, and file does not exist, skip.
-        if optional && !src.exists() {
-            log_skipping(&format!(
-                "{} does not exist",
-                format::filepath(src.display())
-            ));
-            return Ok(Resolution::Skipped);
+        // If file does not exist and optional flag enabled, skip.
+        // If optional flag disabled, error.
+        if !src.exists() {
+            if optional {
+                log_skipping(format!(
+                    "{} does not exist",
+                    format::filepath(src.display())
+                ));
+                return Ok(Resolution::Skipped);
+            } else {
+                log_missing(&src);
+                return Err(EmptyError);
+            }
         }
 
         // FIXME implement
@@ -116,7 +126,7 @@ pub struct WriteAction {
 
 impl Resolvable for WriteAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         // FIXME implement
 
         Ok(Resolution::Done)
@@ -135,7 +145,7 @@ pub struct TreeAction {
 
 impl Resolvable for TreeAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
             src,
             dest,
@@ -145,35 +155,20 @@ impl Resolvable for TreeAction {
             optional,
         } = self;
 
-        if !src.exists() {
-            // If src does not exist, and optional flag enabled, skip.
-            // If optional flag disabled, return error.
+        // If src does not exist, and optional flag enabled, skip.
+        // If optional flag disabled, error.
+        // If src exists but isn't a directory, and optional flag enabled, skip it.
+        // If optional flag disabled, return error.
+        if !src.exists() || !src.is_dir() {
             if optional {
-                log_skipping(&format!(
+                log_skipping(format!(
                     "{} does not exist",
                     format::filepath(src.display())
                 ));
                 return Ok(Resolution::Skipped);
             } else {
-                Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("{} was not found", src.display()),
-                ))?;
-            }
-        } else if !src.is_dir() {
-            // If src isn't a directory, and optional flag enabled, skip it.
-            // If optional flag disabled, return error.
-            if optional {
-                log_skipping(&format!(
-                    "{} is not a directory",
-                    format::filepath(src.display())
-                ));
-                return Ok(Resolution::Skipped);
-            } else {
-                Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("{} was not found", src.display()),
-                ))?;
+                log_missing(&src);
+                return Err(EmptyError);
             }
         }
 
@@ -182,7 +177,7 @@ impl Resolvable for TreeAction {
         fn glob_tree(
             src: impl AsRef<Path>,
             pats: &Vec<String>,
-        ) -> Result<HashSet<PathBuf>, ResolveError> {
+        ) -> Result<HashSet<PathBuf>, EmptyError> {
             let pats: Vec<_> = pats
                 .iter()
                 .map(|glob| format!("{}/{}", src.as_ref().display(), glob))
@@ -190,16 +185,31 @@ impl Resolvable for TreeAction {
             let matches: Vec<glob::Paths> = pats
                 .iter()
                 .map(|pat| glob::glob(pat))
+                .map(|r| {
+                    r.map_err(|err| {
+                        errored::error(format!(
+                            "{} {}",
+                            style("Couldn't glob a pattern:").red(),
+                            err
+                        ));
+                        EmptyError
+                    })
+                })
                 .collect::<Result<_, _>>()?;
 
             let res = matches
                 .into_iter()
                 .flatten()
-                .filter(|r| {
-                    if let Ok(path) = r {
-                        path.is_file()
-                    } else {
-                        false
+                .filter_map(|r| match r {
+                    Ok(path) if path.is_file() => Some(Ok(path)),
+                    Ok(path) => None,
+                    Err(err) => {
+                        errored::error(format!(
+                            "{} {}",
+                            style("Couldn't read path while globbing:").red(),
+                            err
+                        ));
+                        Some(Err(EmptyError))
                     }
                 })
                 .collect::<Result<_, _>>()?;
@@ -257,7 +267,7 @@ pub struct HandlebarsAction {
 
 impl Resolvable for HandlebarsAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
             src,
             dest,
@@ -266,18 +276,25 @@ impl Resolvable for HandlebarsAction {
             partials,
         } = self;
 
-        // If optional flag enabled, and file does not exist, skip.
-        if optional && !src.exists() {
-            log_skipping(&format!(
-                "{} does not exist",
-                format::filepath(src.display())
-            ));
-            return Ok(Resolution::Skipped);
+        // If file does not exist, and optional flag enabled, skip.
+        // If optional flag disabled, error.
+        if !src.exists() {
+            if optional {
+                log_skipping(&format!(
+                    "{} does not exist",
+                    format::filepath(src.display())
+                ));
+                return Ok(Resolution::Skipped);
+            } else {
+                log_missing(&src);
+                return Err(EmptyError);
+            }
         }
 
         // Render contents.
-        let contents = templating::hbs::render(&src, &vars, &partials)?;
-
+        let contents = fail!(templating::hbs::render(&src, &vars, &partials), err => {
+            errored::error(format!("{} {}", style("Couldn't render Handlebars template:").red(), err));
+        });
         let wa = WriteAction { dest, contents };
         wa.resolve(opts)
     }
@@ -293,7 +310,7 @@ pub struct LiquidAction {
 
 impl Resolvable for LiquidAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
             src,
             dest,
@@ -301,17 +318,25 @@ impl Resolvable for LiquidAction {
             optional,
         } = self;
 
-        // If optional flag enabled, and file does not exist, skip.
-        if optional && !src.exists() {
-            log_skipping(&format!(
-                "{} does not exist",
-                format::filepath(src.display())
-            ));
-            return Ok(Resolution::Skipped);
+        // If file does not exist, and optional flag enabled, skip.
+        // If optional flag disabled, error.
+        if !src.exists() {
+            if optional {
+                log_skipping(format!(
+                    "{} does not exist",
+                    format::filepath(src.display())
+                ));
+                return Ok(Resolution::Skipped);
+            } else {
+                log_missing(&src);
+                return Err(EmptyError);
+            }
         }
 
-        let contents = templating::liquid::render(&src, &vars)?;
-
+        // Render resulting file contents.
+        let contents = fail!(templating::liquid::render(&src, &vars), err => {
+            errored::error(format!("{} {}", style("Couldn't render Liquid template:").red(), err));
+        });
         let wa = WriteAction { dest, contents };
         wa.resolve(opts)
     }
@@ -326,14 +351,16 @@ pub struct YamlAction {
 
 impl Resolvable for YamlAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
             dest,
             values,
             header,
         } = self;
 
-        let mut contents = serde_yaml::to_string(&values)?;
+        let mut contents = fail!(serde_yaml::to_string(&values), err => {
+            errored::error(format!("{} {}", style("Couldn't convert value map into yaml:").red(), err))
+        });
         contents = match header {
             Some(header) => format!("{}\n{}", header, contents),
             None => contents,
@@ -353,14 +380,16 @@ pub struct TomlAction {
 
 impl Resolvable for TomlAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
             dest,
             values,
             header,
         } = self;
 
-        let mut contents = toml::to_string_pretty(&values)?;
+        let mut contents = fail!(toml::to_string_pretty(&values), err => {
+            errored::error(format!("{} {}", style("Couldn't convert value map into toml:").red(), err))
+        });
         contents = match header {
             Some(header) => format!("{}\n{}", header, contents),
             None => contents,
@@ -378,10 +407,12 @@ pub struct JsonAction {
 
 impl Resolvable for JsonAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self { dest, values } = self;
 
-        let contents = serde_json::to_string(&values)?;
+        let contents = fail!(serde_json::to_string(&values), err => {
+            errored::error(format!("{} {}", style("Couldn't convert value map into json:").red(), err))
+        });
 
         let wa = WriteAction {
             dest: dest.clone(),
@@ -394,15 +425,93 @@ impl Resolvable for JsonAction {
 pub struct CommandAction {
     pub command: String,
 
-    pub quiet: bool,
     pub start: PathBuf,
     pub shell: String,
+
+    pub stdout: bool,
+    pub stderr: bool,
+
+    pub clean_env: bool,
+    pub env: EnvMap,
+
+    pub nonzero_exit: NonZeroExitBehavior,
 }
 
 impl Resolvable for CommandAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
-        // FIXME implement
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+        let Self {
+            command,
+            start,
+            shell,
+            stdout,
+            stderr,
+            clean_env,
+            env,
+            nonzero_exit,
+        } = self;
+
+        sublevel::debug("Building command...");
+
+        let mut cmd = Command::new(shell);
+        cmd.args(&["-c", &command]).current_dir(&start);
+
+        if !stdout {
+            sublevel::debug("Capturing stdout...");
+            cmd.stdout(Stdio::null());
+        }
+        if !stderr {
+            sublevel::debug("Capturing stderr...");
+            cmd.stderr(Stdio::null());
+        }
+
+        if clean_env {
+            sublevel::debug("Clearing environment variables...");
+            cmd.env_clear();
+        }
+
+        if !env.is_empty() {
+            sublevel::debug("Populating environment variables...");
+            for (k, v) in env {
+                cmd.env(k, v);
+            }
+        }
+
+        sublevel::debug("Spawning...");
+        let mut child = fail!(cmd.spawn(), err => {
+            errored::error(format!("{} {}", style("Couldn't spawn command:").red(), err));
+        });
+
+        let res = fail!(child.wait(), err => {
+            errored::error(format!("{} {}", style("Couldn't finish command:").red(), err));
+        });
+
+        if let Some(code) = res.code() {
+            sublevel::debug(format!("Done... exit {}", style(code).green()));
+        }
+
+        // Check for non zero exit status.
+        if !res.success() {
+            match nonzero_exit {
+                NonZeroExitBehavior::Error => {
+                    errored::error(format!(
+                        "{} '{}' {}",
+                        style("Hook").red(),
+                        style(command).dim(),
+                        style("exited with a non-zero status").red()
+                    ));
+                    return Err(EmptyError);
+                }
+                NonZeroExitBehavior::Warn => sublevel::warn(format!(
+                    "{} '{}' {}",
+                    style("Hook").yellow(),
+                    style(command).dim(),
+                    style("exited with a non-zero status").yellow()
+                )),
+                NonZeroExitBehavior::Ignore => {}
+            }
+        }
+
         Ok(Resolution::Done)
     }
 }
@@ -414,17 +523,25 @@ pub struct FunctionAction<'lua> {
 
 impl<'a> Resolvable for FunctionAction<'a> {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolveError> {
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         // FIXME implement
         Ok(Resolution::Done)
     }
 }
 
 #[inline]
-fn log_skipping(reason: &str) {
-    sublevel::debug(&format!(
-        "{} {}",
-        style("Skipping...").bold().yellow(),
-        reason
+fn log_missing(path: impl AsRef<Path>) {
+    errored::error(format!(
+        "{} {} does not exist",
+        style("Failed!").red(),
+        format::filepath(path.as_ref().display())
     ));
+}
+
+#[inline]
+fn log_skipping<M>(reason: M)
+where
+    M: fmt::Display,
+{
+    sublevel::debug(format!("{} {}", style("Skipping...").yellow(), reason));
 }

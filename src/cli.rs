@@ -46,10 +46,15 @@ fn run(opts: Options) -> Result<(), EmptyError> {
     // FIXME error printing
     let dest = fail!(get_dest(opts.home));
 
+    toplevel::info("Loading packages...");
     let graph = fail!(load::load_multi(&opts.packages));
+
+    toplevel::info("Sorting packages...");
     let packages = fail!(link::link(dest, &graph));
 
+    toplevel::info("Starting package linking...");
     for actions in packages {
+        toplevel::info(format!("Linking {}...", style(&actions.name).bold().blue()));
         for action in actions {
             // FIXME support for choosing fail-fast/skip/etc. on error
             action.resolve(&ResolveOpts {}).unwrap();

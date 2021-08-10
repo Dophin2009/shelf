@@ -13,8 +13,8 @@ end
 -- file 'a.txt'
 -- file {'b.txt'}
 -- file {'c.txt', 'd.txt'}
--- file {'e.txt', 'f.txt', type = 'Copy'}
--- file {'g.txt', type = 'Copy'}
+-- file {'e.txt', 'f.txt', type = 'copy'}
+-- file {'g.txt', type = 'copy'}
 -- file {'h.txt', optional = true}
 function file(arg)
     local src, dest, link_type, optional
@@ -38,11 +38,11 @@ end
 -- tree 'tree'
 -- tree {'tree'}
 -- tree {'tree', '.config'}
--- tree {'tree', type = 'Copy'}
+-- tree {'tree', type = 'copy'}
 -- tree {'tree', ignore = '**/*.log'}
--- tree {'tree', '.config', type = 'Copy'}
+-- tree {'tree', '.config', type = 'copy'}
 -- tree {'tree', '.config', ignore = '**/*.log'}
--- tree {'tree', '.config', type = 'Copy', ignore = '**/*.log'}
+-- tree {'tree', '.config', type = 'copy', ignore = '**/*.log'}
 -- tree {'tree', optional = true}
 function tree(arg)
     local src, dest, link_type, globs, ignore, optional
@@ -182,22 +182,30 @@ end
 -- cmd {[[echo "a"]], start = "tree", shell = "zsh"}
 -- cmd {[[echo "a"]], quiet = true, start = "tree", shell = "zsh"}
 function cmd(arg)
-    local command, quiet, start, shell
+    local command, start, shell, stdout, stderr, clean_env, env, nonzero_exit
     if type(arg) == "string" then
         command = arg;
-        quiet = nil
         start = nil
         shell = nil
+        stdout = nil
+        stderr = nil
+        clean_env = nil
+        env = nil
+        nonzero_exit = nil
     elseif type(arg) == "table" then
         command = arg[1] or error('cmd command was not provided')
-        quiet = arg.quiet
         start = arg.start
         shell = arg.shell
+        stdout = arg.stdout
+        stderr = arg.stderr
+        clean_env = arg.clean_env
+        env = arg.env
+        nonzero_exit = arg.nonzero_exit
     else
         error('cmd arg must be a string or table')
     end
 
-    pkg:cmd(command, quiet, start, shell)
+    pkg:cmd(command, start, shell, stdout, stdin, clean_env, env, nonzero_exit)
 end
 
 -- fn(function() print("a") end)

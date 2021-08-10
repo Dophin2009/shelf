@@ -16,9 +16,9 @@ use crate::format::{self, errored, style, sublevel, toplevel};
 use crate::graph::{PackageGraph, PackageState};
 use crate::spec::{
     CmdHook, Dep, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile, GeneratedFileTyp,
-    HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType, LiquidTemplatedFile, Patterns,
-    RegularFile, Spec, StringGeneratedFile, TemplatedFile, TemplatedFileType, TomlGeneratedFile,
-    TreeFile, YamlGeneratedFile,
+    HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType, LiquidTemplatedFile,
+    NonZeroExitBehavior, Patterns, RegularFile, Spec, StringGeneratedFile, TemplatedFile,
+    TemplatedFileType, TomlGeneratedFile, TreeFile, YamlGeneratedFile,
 };
 use crate::tree::Tree;
 
@@ -120,7 +120,7 @@ impl LoaderState {
         self.graph.graph.add_node(id);
 
         // Add nodes and edges for dependencies.
-        sublevel::debug("Resolving dependencies");
+        sublevel::debug("Resolving dependencies...");
         let dep_it = deps
             .iter()
             .map(|dep| {
@@ -143,7 +143,7 @@ impl LoaderState {
 
     #[inline]
     pub fn load_data(&mut self, path: impl AsRef<Path>) -> Result<PackageState, EmptyError> {
-        sublevel::debug("Trying to load package data");
+        sublevel::debug("Trying to load package data...");
         let path = path.as_ref().to_path_buf();
 
         // Read the configuration contents.
@@ -153,13 +153,13 @@ impl LoaderState {
         );
 
         // Load and evaluate Lua code.
-        sublevel::debug("Evalulating Lua code");
+        sublevel::debug("Evalulating Lua code...");
         let lua = lfail!(self.lua_instance());
         let chunk = lua.load(&config_contents);
         lfail!(chunk.exec());
 
         // FIXME better error context
-        sublevel::debug("Retrieving package configuration object");
+        sublevel::debug("Retrieving package configuration object...");
         let pkg_data = lfail!(lua.globals().get("pkg").into());
         let package: SpecObject = lfail!(FromLua::from_lua(pkg_data, &lua));
 
@@ -319,8 +319,20 @@ impl UserData for SpecObject {
             dest: dest.into(), typ: GeneratedFileTyp::Json(JsonGeneratedFile { values })
         });
 
-        method!("cmd"; (command; String, quiet; Option<bool>, start; Option<String>, shell; Option<String>);
-        Hook; Hook::Cmd(CmdHook { command, quiet, start: start.map(Into::into), shell })
+        method!("cmd"; (command; String, start; Option<String>, shell; Option<String>,
+                        stdout; Option<bool>, stderr; Option<bool>,
+                        clean_env; Option<bool>, env; Option<HashMap<String, String>>,
+                        nonzero_exit; Option<NonZeroExitBehavior>);
+        Hook; Hook::Cmd(CmdHook {
+            command,
+            start: start.map(Into::into),
+            shell,
+            stdout,
+            stderr,
+            clean_env,
+            env,
+            nonzero_exit
+        })
         );
 
         methods.add_method_mut("fn", |lua, this, arg: (Function, Option<bool>)| {
