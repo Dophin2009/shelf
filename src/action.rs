@@ -17,7 +17,7 @@ use crate::tree::Tree;
 #[derive(Debug, Clone)]
 pub struct ResolveOpts {}
 
-pub trait Resolvable {
+pub trait Resolve {
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError>;
 }
 
@@ -62,7 +62,7 @@ pub enum Action<'lua> {
     Function(FunctionAction<'lua>),
 }
 
-impl<'a> Resolvable for Action<'a> {
+impl<'a> Resolve for Action<'a> {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         match self {
@@ -88,7 +88,7 @@ pub struct LinkAction {
     pub optional: bool,
 }
 
-impl Resolvable for LinkAction {
+impl Resolve for LinkAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
@@ -124,7 +124,7 @@ pub struct WriteAction {
     pub contents: String,
 }
 
-impl Resolvable for WriteAction {
+impl Resolve for WriteAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         // FIXME implement
@@ -143,7 +143,7 @@ pub struct TreeAction {
     pub optional: bool,
 }
 
-impl Resolvable for TreeAction {
+impl Resolve for TreeAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
@@ -265,7 +265,7 @@ pub struct HandlebarsAction {
     pub partials: HandlebarsPartials,
 }
 
-impl Resolvable for HandlebarsAction {
+impl Resolve for HandlebarsAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
@@ -308,7 +308,7 @@ pub struct LiquidAction {
     pub optional: bool,
 }
 
-impl Resolvable for LiquidAction {
+impl Resolve for LiquidAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
@@ -349,7 +349,7 @@ pub struct YamlAction {
     pub header: Option<String>,
 }
 
-impl Resolvable for YamlAction {
+impl Resolve for YamlAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
@@ -378,7 +378,7 @@ pub struct TomlAction {
     pub header: Option<String>,
 }
 
-impl Resolvable for TomlAction {
+impl Resolve for TomlAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
@@ -405,7 +405,7 @@ pub struct JsonAction {
     pub values: Tree,
 }
 
-impl Resolvable for JsonAction {
+impl Resolve for JsonAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self { dest, values } = self;
@@ -437,7 +437,7 @@ pub struct CommandAction {
     pub nonzero_exit: NonZeroExitBehavior,
 }
 
-impl Resolvable for CommandAction {
+impl Resolve for CommandAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
@@ -521,7 +521,7 @@ pub struct FunctionAction<'lua> {
     pub quiet: bool,
 }
 
-impl<'a> Resolvable for FunctionAction<'a> {
+impl<'a> Resolve for FunctionAction<'a> {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         // FIXME implement

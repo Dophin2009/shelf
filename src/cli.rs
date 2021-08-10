@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use clap::Clap;
 
-use crate::action::{Resolvable, ResolveOpts};
+use crate::action::{Resolve, ResolveOpts};
 use crate::error::EmptyError;
 use crate::format::{
     style,
