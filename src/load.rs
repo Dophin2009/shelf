@@ -332,19 +332,21 @@ impl UserData for SpecObject {
             clean_env,
             env,
             nonzero_exit
-        })
+        }));
+
+        methods.add_method_mut(
+            "fn",
+            |lua, this, arg: (Function, Option<NonZeroExitBehavior>)| {
+                let (fun, error_exit) = arg;
+
+                let name = Uuid::new_v4().to_string();
+                lua.set_named_registry_value(&name, fun)?;
+
+                let drct = Directive::Hook(Hook::Fun(FunHook { name, error_exit }));
+                this.spec.directives.push(drct);
+                Ok(())
+            },
         );
-
-        methods.add_method_mut("fn", |lua, this, arg: (Function, Option<bool>)| {
-            let (fun, quiet) = arg;
-
-            let name = Uuid::new_v4().to_string();
-            lua.set_named_registry_value(&name, fun)?;
-
-            let drct = Directive::Hook(Hook::Fun(FunHook { name, quiet }));
-            this.spec.directives.push(drct);
-            Ok(())
-        });
     }
 }
 

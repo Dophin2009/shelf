@@ -210,18 +210,18 @@ end
 
 -- fn(function() print("a") end)
 -- fn {function() print("a") end}
--- fn {function() print("a") end, quiet = true}
+-- fn {function() print("a") end, error_exit = "error"}
 function fn(arg)
-    local fun, quiet
+    local fun, error_exit
     if type(arg) == "function" then
         fun = arg
-        quiet = nil
+        error_exit = nil
     elseif type(arg) == "table" then
         fun = arg[1] or error('fn function was not provided')
-        quiet = arg.quiet
+        error_exit = arg.error_exit
     else
         error('fn arg must be a function or table')
     end
 
-    pkg:fn(fun, quiet)
+    pkg:fn(fun, error_exit)
 end

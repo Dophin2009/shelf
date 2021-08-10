@@ -170,7 +170,7 @@ pub enum NonZeroExitBehavior {
 pub struct FunHook {
     pub name: String,
 
-    pub quiet: Option<bool>,
+    pub error_exit: Option<NonZeroExitBehavior>,
 }
 
 mod lua {

@@ -338,7 +338,7 @@ impl<'p> PackageIter<'p> {
 
     #[inline]
     fn convert_hook_fun(&self, fun: &FunHook) -> Action<'p> {
-        let FunHook { name, quiet } = fun;
+        let FunHook { name, error_exit } = fun;
 
         self.log_processing(&format!(
             "{} ({} {})",
@@ -352,7 +352,7 @@ impl<'p> PackageIter<'p> {
 
         Action::Function(FunctionAction {
             function,
-            quiet: *quiet.as_ref().unwrap_or(&false),
+            error_exit: error_exit.clone().unwrap_or(NonZeroExitBehavior::Ignore),
         })
     }
 

@@ -518,13 +518,45 @@ impl Resolve for CommandAction {
 
 pub struct FunctionAction<'lua> {
     pub function: Function<'lua>,
-    pub quiet: bool,
+
+    pub error_exit: NonZeroExitBehavior,
 }
 
 impl<'a> Resolve for FunctionAction<'a> {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
-        // FIXME implement
+        let Self {
+            function,
+            error_exit,
+        } = self;
+
+        sublevel::debug("Calling function...");
+        let ret: mlua::Value = fail!(function.call(()), err => {
+            errored::error(format!("{} {}", style("Couldn't finish executing function hook:").red(), err));
+        });
+
+        match ret {
+            mlua::Value::Nil => {}
+            v => match error_exit {
+                NonZeroExitBehavior::Error => {
+                    errored::error(format!(
+                        "{} {:?}",
+                        style("Function returned with an error:").red(),
+                        v
+                    ));
+                    return Err(EmptyError);
+                }
+                NonZeroExitBehavior::Warn => sublevel::warn(format!(
+                    "Done... {} {:?}",
+                    style("non-nil exit:").yellow(),
+                    v
+                )),
+                NonZeroExitBehavior::Ignore => {
+                    sublevel::debug(format!("Done... exit {}", style("nil").blue()));
+                }
+            },
+        }
+
         Ok(Resolution::Done)
     }
 }
