@@ -117,11 +117,11 @@ impl Resolve for LinkAction {
             mkdir_parents(&dest)?;
 
             sl_debug!(
-                "{} file: {[green]}",
+                "{} file: {[green]} to {[green]}",
                 if copy { "Copying" } else { "Linking" },
-                src.reld()
+                src.reld(),
+                dest.reld()
             );
-            sl_debug!("Destination: {[green]}", dest.reld());
 
             if copy {
                 fail!(fs::copy(&src.abs(), &dest.abs()), err => {
@@ -601,7 +601,7 @@ impl<'a> Resolve for FunctionAction<'a> {
 
 #[inline]
 fn log_miss(path: &PathWrapper) {
-    sl_error!("{$red}Failed!{/$} {} does not exist", path.absd());
+    sl_error!("{$red}Failed!{/$} Missing file: {[green]}", path.absd());
 }
 
 #[inline]

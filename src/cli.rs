@@ -29,7 +29,7 @@ pub fn cli(opts: Options) -> Result<(), EmptyError> {
     match run(opts) {
         Ok(_) => Ok(()),
         Err(err) => {
-            tl_error!("Fatal errors were encountered! See above.");
+            tl_error!("{$red+bold}Fatal errors were encountered! See above.{/$}");
             Err(err)
         }
     }
@@ -50,7 +50,7 @@ fn run(opts: Options) -> Result<(), EmptyError> {
         tl_info!("Linking {$blue}{}{/$}...", actions.name());
         for action in actions {
             // FIXME support for choosing fail-fast/skip/etc. on error
-            action.resolve(&ResolveOpts {}).unwrap();
+            fail!(action.resolve(&ResolveOpts {}));
         }
     }
 

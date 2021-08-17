@@ -52,6 +52,8 @@ fn link_one<'d, 'p>(
         dest,
         lua,
         directives: spec.directives.iter().collect(),
+        i: 0,
+        n: spec.directives.len(),
     }
 }
 
@@ -63,6 +65,9 @@ pub struct PackageIter<'d, 'p> {
     lua: &'p Lua,
 
     directives: VecDeque<&'p Directive>,
+
+    i: usize,
+    n: usize,
 }
 
 impl<'d, 'p> Iterator for PackageIter<'d, 'p> {
@@ -72,6 +77,8 @@ impl<'d, 'p> Iterator for PackageIter<'d, 'p> {
     fn next(&mut self) -> Option<Self::Item> {
         let drct = self.directives.pop_front()?;
         let action = self.convert(drct);
+
+        self.i += 1;
 
         Some(action)
     }
@@ -110,17 +117,19 @@ impl<'d, 'p> PackageIter<'d, 'p> {
             optional,
         } = rf;
 
-        // self.log_processing(&format!(
-        // "{} ({} {} {} {})",
-        // "file".bold().cyan(),
-        // match &link_type {
-        // LinkType::Link => "link".green(),
-        // LinkType::Copy => "copy".yellow(),
-        // },
-        // src.display(),
-        // "->".dim(),
-        // dest.as_ref().unwrap_or(&src).display()
-        // ));
+        let (link_s, copy_s) = match link_type {
+            LinkType::Link => ("link", ""),
+            LinkType::Copy => ("", "copy"),
+        };
+        idx_debug!(
+            self.i,
+            self.n,
+            "{$cyan+bold}file{/$} ({[green]}{[yellow]} {[green]} {$dimmed}->{/$} {[green]})",
+            link_s,
+            copy_s,
+            src.display(),
+            dest.as_ref().unwrap_or(&src).display()
+        );
 
         // Normalize src.
         let src_w = self.join_package(src);
@@ -151,17 +160,19 @@ impl<'d, 'p> PackageIter<'d, 'p> {
             optional,
         } = tf;
 
-        // self.log_processing(&format!(
-        // "{} ({} {} {} {})",
-        // "template".bold().yellow(),
-        // match typ {
-        // TemplatedFileType::Handlebars(_) => "hbs".red(),
-        // TemplatedFileType::Liquid(_) => "liquid".blue(),
-        // },
-        // src.display(),
-        // "->".dim(),
-        // dest.display()
-        // ));
+        let (hbs_s, liquid_s) = match typ {
+            TemplatedFileType::Handlebars(_) => ("hbs", ""),
+            TemplatedFileType::Liquid(_) => ("", "liquid"),
+        };
+        idx_debug!(
+            self.i,
+            self.n,
+            "{$yellow+bold}template{/$} ({[red]}{[blue]} {[green]} {$dimmed}->{/$} {[green]})",
+            hbs_s,
+            liquid_s,
+            src.display(),
+            dest.display()
+        );
 
         // Normalize src.
         let src_w = self.join_package(src);
@@ -196,19 +207,21 @@ impl<'d, 'p> PackageIter<'d, 'p> {
             optional,
         } = tf;
 
-        // self.log_processing(&format!(
-        // "{} ({} {} {} {})",
-        // "tree".bold().green(),
-        // match link_type {
-        // LinkType::Link => "link".green(),
-        // LinkType::Copy => "copy".yellow(),
-        // },
-        // src.display(),
-        // "->".dim(),
-        // dest.as_ref()
-        // .map(|dest| dest.display().to_string())
-        // .unwrap_or(".".to_string()),
-        // ));
+        let (link_s, copy_s) = match link_type {
+            LinkType::Link => ("link", ""),
+            LinkType::Copy => ("", "copy"),
+        };
+        idx_debug!(
+            self.i,
+            self.n,
+            "{$yellow+bold}template{/$} ({[green]}{[yellow]} {[green]} {$dimmed}->{/$} {[green]})",
+            link_s,
+            copy_s,
+            src.display(),
+            dest.as_ref()
+                .map(|dest| dest.display().to_string())
+                .unwrap_or(".".to_string())
+        );
 
         // Normalize src.
         let src_w = self.join_package(src);
@@ -242,18 +255,25 @@ impl<'d, 'p> PackageIter<'d, 'p> {
     fn convert_generated(&self, gf: &GeneratedFile) -> Action<'p> {
         let GeneratedFile { dest, typ } = gf;
 
-        // self.log_processing(&format!(
-        // "{} ({} {})",
-        // "generate".bold().magenta(),
-        // match &typ {
-        // GeneratedFileTyp::Empty(_) => "empty".white(),
-        // GeneratedFileTyp::String(_) => "string".blue(),
-        // GeneratedFileTyp::Yaml(_) => "yaml".green(),
-        // GeneratedFileTyp::Toml(_) => "toml".yellow(),
-        // GeneratedFileTyp::Json(_) => "json".red(),
-        // },
-        // dest.display()
-        // ));
+        // FIXME this is terrible
+        let (empty_s, string_s, yaml_s, toml_s, json_s) = match &typ {
+            GeneratedFileTyp::Empty(_) => ("empty", "", "", "", ""),
+            GeneratedFileTyp::String(_) => ("", "toml", "", "", ""),
+            GeneratedFileTyp::Yaml(_) => ("", "", "yaml", "", ""),
+            GeneratedFileTyp::Toml(_) => ("", "", "", "toml", ""),
+            GeneratedFileTyp::Json(_) => ("", "", "", "", "json"),
+        };
+        idx_debug!(
+            self.i,
+            self.n,
+            "{$magenta+bold}generate{/$} ({[white]}{[blue]}{[green]}{[yellow]}{[red]} {[green]})",
+            empty_s,
+            string_s,
+            yaml_s,
+            toml_s,
+            json_s,
+            dest.display()
+        );
 
         // Normalize dest.
         let dest_w = self.join_dest(dest);
@@ -308,12 +328,12 @@ impl<'d, 'p> PackageIter<'d, 'p> {
 
         // Use sh as default shell.
         let shell = shell.as_ref().map(String::as_str).unwrap_or("sh");
-        // self.log_processing(&format!(
-        // "{} ({} '{}')",
-        // "hook".bold().blue(),
-        // shell.bright(),
-        // command.dim(),
-        // ));
+        idx_debug!(
+            self.i,
+            self.n,
+            "{$blue+bold}hook{/$} ({$white}shell{/$} '{[dimmed]})",
+            command
+        );
 
         // Normalize start path.
         let start_w = start
@@ -349,12 +369,11 @@ impl<'d, 'p> PackageIter<'d, 'p> {
             error_exit,
         } = fun;
 
-        // self.log_processing(&format!(
-        // "{} ({} {})",
-        // "hook".bold().blue(),
-        // "fn".bright(),
-        // "<function>".italic().dim()
-        // ));
+        idx_debug!(
+            self.i,
+            self.n,
+            "{$blue+bold}hook{/$} ({$white}fn{/$} '{$dimmed+italic}<function>{/$})"
+        );
 
         // Load function from Lua registry.
         let function: Function = self.lua.named_registry_value(name).unwrap();
@@ -396,7 +415,5 @@ impl<'d, 'p> PackageIter<'d, 'p> {
     }
 
     #[inline]
-    fn log_processing(&self, step: &str) {
-        // self.idxl.debug(&format!("Processing: {}", step));
-    }
+    fn log_processing(&self, step: &str) {}
 }

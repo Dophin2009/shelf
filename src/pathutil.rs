@@ -80,7 +80,7 @@ impl PathWrapper {
 
     #[inline]
     pub fn reld(&self) -> std::path::Display<'_> {
-        self.rel.as_ref().unwrap_or_else(|| &self.abs).display()
+        self.rel().display()
     }
 
     #[inline]
