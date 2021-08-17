@@ -16,22 +16,22 @@ pub mod tree;
 
 use std::process;
 
+use bunt_logger::{ColorChoice, Level};
 use clap::Clap;
-use stderrlog::ColorChoice;
 
 use crate::cli::Options;
 
 fn main() {
     let opts = Options::parse();
 
-    stderrlog::new()
-        .show_level(false)
+    bunt_logger::with()
         .quiet(opts.quiet)
-        .verbosity(opts.verbosity + 2)
-        .color(ColorChoice::Never)
-        .module(module_path!())
-        .init()
-        .unwrap();
+        .level(match opts.verbosity {
+            0 => Level::Info,
+            1 => Level::Debug,
+            _ => Level::Trace,
+        })
+        .stderr(ColorChoice::Auto);
 
     if cli::cli(opts).is_err() {
         process::exit(1);
