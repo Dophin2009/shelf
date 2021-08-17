@@ -1,16 +1,15 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::path::PathBuf;
 
 use mlua::Lua;
 use petgraph::{algo, graphmap::DiGraphMap};
 
-use crate::format;
+use crate::pathutil::PathWrapper;
 use crate::spec::Spec;
 
 pub struct PackageState {
     /// Absolute path of the package.
-    pub path: PathBuf,
+    pub path: PathWrapper,
     /// Package specification.
     pub data: Spec,
     /// Saved Lua state.
@@ -64,7 +63,7 @@ impl PackageGraph {
 }
 
 #[derive(Debug, Clone)]
-pub struct CircularDependencyError(pub PathBuf);
+pub struct CircularDependencyError(pub PathWrapper);
 
 impl fmt::Display for CircularDependencyError {
     #[inline]
@@ -72,7 +71,7 @@ impl fmt::Display for CircularDependencyError {
         write!(
             f,
             "Circular dependency found for package: {}",
-            self.0.display()
+            self.0.absd()
         )
     }
 }

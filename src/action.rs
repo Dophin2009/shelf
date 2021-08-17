@@ -1,7 +1,9 @@
 use std::collections::HashSet;
+use std::env;
 use std::fmt;
+use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 
@@ -9,7 +11,7 @@ use glob::{GlobError, PatternError};
 use mlua::Function;
 
 use crate::error::EmptyError;
-use crate::format::{self, errored, style, sublevel};
+use crate::pathutil::PathWrapper;
 use crate::spec::{EnvMap, HandlebarsPartials, NonZeroExitBehavior, Patterns};
 use crate::templating;
 use crate::tree::Tree;
@@ -81,8 +83,8 @@ impl<'a> Resolve for Action<'a> {
 }
 
 pub struct LinkAction {
-    pub src: PathBuf,
-    pub dest: PathBuf,
+    pub src: PathWrapper,
+    pub dest: PathWrapper,
 
     pub copy: bool,
     pub optional: bool,
@@ -102,40 +104,101 @@ impl Resolve for LinkAction {
         // If optional flag disabled, error.
         if !src.exists() {
             if optional {
-                log_skipping(format!(
-                    "{} does not exist",
-                    format::filepath(src.display())
-                ));
+                // log_skip("{[green]} does not exist", src.display());
                 return Ok(Resolution::Skipped);
             } else {
-                log_missing(&src);
+                log_miss(&src);
                 return Err(EmptyError);
             }
         }
 
-        // FIXME implement
+        // If dest does not exist, just mkdir and symlink/copy.
+        if !dest.exists() {
+            mkdir_parents(&dest)?;
+
+            sl_debug!(
+                "{} file: {[green]}",
+                if copy { "Copying" } else { "Linking" },
+                src.reld()
+            );
+            sl_debug!("Destination: {[green]}", dest.reld());
+
+            if copy {
+                fail!(fs::copy(&src.abs(), &dest.abs()), err => {
+                    sl_error!("{$red}Couldn't copy{/$} {[green]} {$red}to{/$} {[green]}{$red}:{/$} {}",
+                       src.absd(),
+                       dest.absd(),
+                       err
+                    );
+                });
+            }
+
+            // FIXME cache this action
+        }
 
         Ok(Resolution::Done)
     }
 }
 
 pub struct WriteAction {
-    pub dest: PathBuf,
+    pub dest: PathWrapper,
     pub contents: String,
 }
 
 impl Resolve for WriteAction {
     #[inline]
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
-        // FIXME implement
+        let Self { dest, contents } = self;
 
-        Ok(Resolution::Done)
+        // If the destination doesn't exist yet, create the directories and write the file.
+        if !dest.exists() {
+            mkdir_parents(&dest)?;
+
+            sl_debug!("Writing file: {[green]}", dest.reld());
+            fail!(fs::write(&dest.abs(), &contents), err => {
+                sl_error!("{$red}Couldn't write{/$} {[green]} {$red}:{/$} {}", dest.absd(), err);
+            });
+
+            sl_info!("Done... {$green}ok!{/$}");
+
+            // FIXME cache this action
+            Ok(Resolution::Done)
+        } else {
+            todo!();
+
+            // Retrieve information for this location from the cache.
+            // If not found, we should error.
+
+            // If existing is a symlink, replace it.
+
+            // If existing is not a symlink, replace it.
+
+            // Cache the action.
+
+            Ok(Resolution::Done)
+        }
     }
 }
 
+#[inline]
+fn mkdir_parents(path: &PathWrapper) -> Result<(), EmptyError> {
+    // FIXME how to handle this case? (i.e. where path is /)
+    let parent = failopt!(path.parent(), { todo!() });
+
+    if !parent.exists() {
+        sl_debug!("Creating directories: {[green]}", parent.reld());
+
+        fail!(fs::create_dir_all(parent.abs()), err => {
+            sl_error!("{$red}Couldn't create parent directories at{/$} {[green]} {$red}:{/$} {}", parent.absd(), err);
+        });
+    }
+
+    Ok(())
+}
+
 pub struct TreeAction {
-    pub src: PathBuf,
-    pub dest: PathBuf,
+    pub src: PathWrapper,
+    pub dest: PathWrapper,
     pub globs: Patterns,
     pub ignore: Patterns,
 
@@ -161,13 +224,10 @@ impl Resolve for TreeAction {
         // If optional flag disabled, return error.
         if !src.exists() || !src.is_dir() {
             if optional {
-                log_skipping(format!(
-                    "{} does not exist",
-                    format::filepath(src.display())
-                ));
+                // log_skip(format!("{[green]} does not exist", src.reld()));
                 return Ok(Resolution::Skipped);
             } else {
-                log_missing(&src);
+                log_miss(&src);
                 return Err(EmptyError);
             }
         }
@@ -175,23 +235,19 @@ impl Resolve for TreeAction {
         // FIXME handle absolute path globs
         #[inline]
         fn glob_tree(
-            src: impl AsRef<Path>,
+            src: &PathWrapper,
             pats: &Vec<String>,
         ) -> Result<HashSet<PathBuf>, EmptyError> {
-            let pats: Vec<_> = pats
-                .iter()
-                .map(|glob| format!("{}/{}", src.as_ref().display(), glob))
-                .collect();
+            let cwd = env::current_dir().unwrap();
+            env::set_current_dir(src.abs()).unwrap();
+
             let matches: Vec<glob::Paths> = pats
                 .iter()
                 .map(|pat| glob::glob(pat))
                 .map(|r| {
                     r.map_err(|err| {
-                        errored::error(format!(
-                            "{} {}",
-                            style("Couldn't glob a pattern:").red(),
-                            err
-                        ));
+                        // FIXME path in error
+                        sl_error!("{$red}Couldn't glob a pattern:{/$} {}", err);
                         EmptyError
                     })
                 })
@@ -202,17 +258,16 @@ impl Resolve for TreeAction {
                 .flatten()
                 .filter_map(|r| match r {
                     Ok(path) if path.is_file() => Some(Ok(path)),
-                    Ok(path) => None,
+                    Ok(_) => None,
                     Err(err) => {
-                        errored::error(format!(
-                            "{} {}",
-                            style("Couldn't read path while globbing:").red(),
-                            err
-                        ));
+                        // FIXME path in error
+                        sl_error!("{$red}Couldn't read path while globbing:{/$} {}", err);
                         Some(Err(EmptyError))
                     }
                 })
                 .collect::<Result<_, _>>()?;
+
+            env::set_current_dir(&cwd).unwrap();
 
             Ok(res)
         }
@@ -227,26 +282,18 @@ impl Resolve for TreeAction {
             paths.remove(&path);
         }
 
-        // FIXME better way to do this (e.g. chdir before globbing?)
-        let rel_paths: Vec<_> = paths
-            .iter()
-            .map(|path| path.strip_prefix(&src))
-            .collect::<Result<_, _>>()
-            .unwrap();
-        let dest_paths: Vec<_> = rel_paths.iter().map(|path| dest.join(path)).collect();
+        let src_paths = paths.iter().map(|path| src.join(path));
+        let dest_paths = paths.iter().map(|path| dest.join(path));
 
         // Map paths and dest paths into linking actions.
-        let it = paths
-            .into_iter()
-            .zip(dest_paths.into_iter())
-            .map(move |(fsrc, fdest)| {
-                Action::Link(LinkAction {
-                    src: fsrc,
-                    dest: fdest,
-                    copy,
-                    optional: false,
-                })
-            });
+        let it = src_paths.zip(dest_paths).map(move |(fsrc, fdest)| {
+            Action::Link(LinkAction {
+                src: fsrc,
+                dest: fdest,
+                copy,
+                optional: false,
+            })
+        });
 
         // FIXME handle resolutions
         it.map(|action| action.resolve(opts))
@@ -257,8 +304,8 @@ impl Resolve for TreeAction {
 }
 
 pub struct HandlebarsAction {
-    pub src: PathBuf,
-    pub dest: PathBuf,
+    pub src: PathWrapper,
+    pub dest: PathWrapper,
     pub vars: Tree,
 
     pub optional: bool,
@@ -280,20 +327,17 @@ impl Resolve for HandlebarsAction {
         // If optional flag disabled, error.
         if !src.exists() {
             if optional {
-                log_skipping(&format!(
-                    "{} does not exist",
-                    format::filepath(src.display())
-                ));
+                // log_skip(format!("{[green]} does not exist", src.reld()));
                 return Ok(Resolution::Skipped);
             } else {
-                log_missing(&src);
+                log_miss(&src);
                 return Err(EmptyError);
             }
         }
 
         // Render contents.
-        let contents = fail!(templating::hbs::render(&src, &vars, &partials), err => {
-            errored::error(format!("{} {}", style("Couldn't render Handlebars template:").red(), err));
+        let contents = fail!(templating::hbs::render(src.abs(), &vars, &partials), err => {
+            sl_error!("{$red}Couldn't render Handlebars template:{/$} {}", err);
         });
         let wa = WriteAction { dest, contents };
         wa.resolve(opts)
@@ -301,8 +345,8 @@ impl Resolve for HandlebarsAction {
 }
 
 pub struct LiquidAction {
-    pub src: PathBuf,
-    pub dest: PathBuf,
+    pub src: PathWrapper,
+    pub dest: PathWrapper,
     pub vars: Tree,
 
     pub optional: bool,
@@ -322,20 +366,17 @@ impl Resolve for LiquidAction {
         // If optional flag disabled, error.
         if !src.exists() {
             if optional {
-                log_skipping(format!(
-                    "{} does not exist",
-                    format::filepath(src.display())
-                ));
+                // log_skip(format!("{[green]} does not exist", src.reld()));
                 return Ok(Resolution::Skipped);
             } else {
-                log_missing(&src);
+                log_miss(&src);
                 return Err(EmptyError);
             }
         }
 
         // Render resulting file contents.
-        let contents = fail!(templating::liquid::render(&src, &vars), err => {
-            errored::error(format!("{} {}", style("Couldn't render Liquid template:").red(), err));
+        let contents = fail!(templating::liquid::render(src.abs(), &vars), err => {
+            sl_error!("{$red}Couldn't render Liquid template:{/$} {}", err);
         });
         let wa = WriteAction { dest, contents };
         wa.resolve(opts)
@@ -343,7 +384,7 @@ impl Resolve for LiquidAction {
 }
 
 pub struct YamlAction {
-    pub dest: PathBuf,
+    pub dest: PathWrapper,
     pub values: Tree,
 
     pub header: Option<String>,
@@ -359,7 +400,7 @@ impl Resolve for YamlAction {
         } = self;
 
         let mut contents = fail!(serde_yaml::to_string(&values), err => {
-            errored::error(format!("{} {}", style("Couldn't convert value map into yaml:").red(), err))
+            sl_error!("{$red}Couldn't convert value map into yaml:{/$} {}", err);
         });
         contents = match header {
             Some(header) => format!("{}\n{}", header, contents),
@@ -372,7 +413,7 @@ impl Resolve for YamlAction {
 }
 
 pub struct TomlAction {
-    pub dest: PathBuf,
+    pub dest: PathWrapper,
     pub values: Tree,
 
     pub header: Option<String>,
@@ -388,7 +429,7 @@ impl Resolve for TomlAction {
         } = self;
 
         let mut contents = fail!(toml::to_string_pretty(&values), err => {
-            errored::error(format!("{} {}", style("Couldn't convert value map into toml:").red(), err))
+            sl_error!("{$red}Couldn't convert value map into toml:{/$} {}", err);
         });
         contents = match header {
             Some(header) => format!("{}\n{}", header, contents),
@@ -401,7 +442,7 @@ impl Resolve for TomlAction {
 }
 
 pub struct JsonAction {
-    pub dest: PathBuf,
+    pub dest: PathWrapper,
     pub values: Tree,
 }
 
@@ -411,7 +452,7 @@ impl Resolve for JsonAction {
         let Self { dest, values } = self;
 
         let contents = fail!(serde_json::to_string(&values), err => {
-            errored::error(format!("{} {}", style("Couldn't convert value map into json:").red(), err))
+            sl_error!("{$red}Couldn't convert value map into json:{/$} {}", err);
         });
 
         let wa = WriteAction {
@@ -425,7 +466,7 @@ impl Resolve for JsonAction {
 pub struct CommandAction {
     pub command: String,
 
-    pub start: PathBuf,
+    pub start: PathWrapper,
     pub shell: String,
 
     pub stdout: bool,
@@ -451,63 +492,59 @@ impl Resolve for CommandAction {
             nonzero_exit,
         } = self;
 
-        sublevel::debug("Building command...");
+        sl_debug!("Building command...");
 
         let mut cmd = Command::new(shell);
-        cmd.args(&["-c", &command]).current_dir(&start);
+        cmd.args(&["-c", &command]).current_dir(&start.abs());
 
         if !stdout {
-            sublevel::debug("Capturing stdout...");
+            sl_debug!("Capturing stdout...");
             cmd.stdout(Stdio::null());
         }
         if !stderr {
-            sublevel::debug("Capturing stderr...");
+            sl_debug!("Capturing stderr...");
             cmd.stderr(Stdio::null());
         }
 
         if clean_env {
-            sublevel::debug("Clearing environment variables...");
+            sl_debug!("Clearing environment variables...");
             cmd.env_clear();
         }
 
         if !env.is_empty() {
-            sublevel::debug("Populating environment variables...");
+            sl_debug!("Populating environment variables...");
             for (k, v) in env {
                 cmd.env(k, v);
             }
         }
 
-        sublevel::debug("Spawning...");
+        sl_debug!("Spawning...");
         let mut child = fail!(cmd.spawn(), err => {
-            errored::error(format!("{} {}", style("Couldn't spawn command:").red(), err));
+            sl_error!("{$red}Couldn't spawn command:{/$} {}", err);
         });
 
         let res = fail!(child.wait(), err => {
-            errored::error(format!("{} {}", style("Couldn't finish command:").red(), err));
+            sl_error!("{$red}Couldn't finish command:{/$} {}", err);
         });
 
         if let Some(code) = res.code() {
-            sublevel::debug(format!("Done... exit {}", style(code).green()));
+            sl_debug!("Done... exit {[green]}", code);
         }
 
         // Check for non zero exit status.
         if !res.success() {
             match nonzero_exit {
                 NonZeroExitBehavior::Error => {
-                    errored::error(format!(
-                        "{} '{}' {}",
-                        style("Hook").red(),
-                        style(command).dim(),
-                        style("exited with a non-zero status").red()
-                    ));
+                    sl_error!(
+                        "{$red}Hook{/$} '{[dimmed]}' {$red}exited with a non-zero status{/$}",
+                        command
+                    );
                     return Err(EmptyError);
                 }
-                NonZeroExitBehavior::Warn => sublevel::warn(format!(
-                    "{} '{}' {}",
-                    style("Hook").yellow(),
-                    style(command).dim(),
-                    style("exited with a non-zero status").yellow()
-                )),
+                NonZeroExitBehavior::Warn => sl_warn!(
+                    "{$yellow}Hook{/$} '{[dimmed]}' {$yellow}exited with a non-zero status{/$}",
+                    command,
+                ),
                 NonZeroExitBehavior::Ignore => {}
             }
         }
@@ -519,6 +556,7 @@ impl Resolve for CommandAction {
 pub struct FunctionAction<'lua> {
     pub function: Function<'lua>,
 
+    pub start: PathWrapper,
     pub error_exit: NonZeroExitBehavior,
 }
 
@@ -527,53 +565,49 @@ impl<'a> Resolve for FunctionAction<'a> {
     fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
         let Self {
             function,
+            start,
             error_exit,
         } = self;
 
-        sublevel::debug("Calling function...");
+        let cwd = env::current_dir().unwrap();
+        env::set_current_dir(start.abs()).unwrap();
+
+        sl_debug!("Calling function...");
         let ret: mlua::Value = fail!(function.call(()), err => {
-            errored::error(format!("{} {}", style("Couldn't finish executing function hook:").red(), err));
+            sl_error!("{$red}Couldn't finish executing function hook:{/$} {}", err);
         });
 
         match ret {
             mlua::Value::Nil => {}
             v => match error_exit {
                 NonZeroExitBehavior::Error => {
-                    errored::error(format!(
-                        "{} {:?}",
-                        style("Function returned with an error:").red(),
-                        v
-                    ));
+                    sl_error!("{$red}Function returned with an error:{/$} {:?}", v);
                     return Err(EmptyError);
                 }
-                NonZeroExitBehavior::Warn => sublevel::warn(format!(
-                    "Done... {} {:?}",
-                    style("non-nil exit:").yellow(),
-                    v
-                )),
+                NonZeroExitBehavior::Warn => {
+                    sl_warn!("Done... {$yellow}non-nil exit:{/$} {:?}", v)
+                }
                 NonZeroExitBehavior::Ignore => {
-                    sublevel::debug(format!("Done... exit {}", style("nil").blue()));
+                    sl_debug!("Done... exit {$blue}nil{/$}");
                 }
             },
         }
 
+        // FIXME restore cwd regardless of error or not
+        env::set_current_dir(&cwd).unwrap();
         Ok(Resolution::Done)
     }
 }
 
 #[inline]
-fn log_missing(path: impl AsRef<Path>) {
-    errored::error(format!(
-        "{} {} does not exist",
-        style("Failed!").red(),
-        format::filepath(path.as_ref().display())
-    ));
+fn log_miss(path: &PathWrapper) {
+    sl_error!("{$red}Failed!{/$} {} does not exist", path.absd());
 }
 
 #[inline]
-fn log_skipping<M>(reason: M)
+fn log_skip<M>(reason: M)
 where
     M: fmt::Display,
 {
-    sublevel::debug(format!("{} {}", style("Skipping...").yellow(), reason));
+    sl_debug!("{$yellow}Skipping...{/$} {}", reason);
 }

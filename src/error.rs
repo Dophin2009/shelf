@@ -16,6 +16,22 @@ macro_rules! fail {
     };
 }
 
+#[macro_export]
+macro_rules! failopt {
+    ($res:expr) => {
+        failopt!($res, {})
+    };
+    ($res:expr, $block:block) => {
+        match $res {
+            Some(v) => v,
+            None => {
+                $block;
+                return Err(crate::error::EmptyError);
+            }
+        }
+    };
+}
+
 #[derive(Debug)]
 pub struct EmptyError;
 

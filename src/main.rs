@@ -1,12 +1,15 @@
 #[macro_use]
 pub mod error;
 
+#[macro_use]
+pub mod pl;
+
 pub mod action;
 pub mod cli;
-pub mod format;
 pub mod graph;
 pub mod link;
 pub mod load;
+pub mod pathutil;
 pub mod spec;
 pub mod templating;
 pub mod tree;

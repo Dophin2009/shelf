@@ -1,38 +1,34 @@
 use std::collections::VecDeque;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::Result;
 use mlua::{Function, Lua};
-use path_clean::PathClean;
 
 use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
     TomlAction, TreeAction, WriteAction, YamlAction,
 };
 use crate::error::EmptyError;
-use crate::format::{self, errored, indexed::Indexed, style, toplevel};
-use crate::graph::{CircularDependencyError, PackageGraph};
+use crate::graph::PackageGraph;
+use crate::pathutil::PathWrapper;
 use crate::spec::{
     CmdHook, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
     NonZeroExitBehavior, RegularFile, Spec, TemplatedFile, TemplatedFileType, TreeFile,
 };
 
 #[inline]
-pub fn link<'p>(
-    dest: impl AsRef<Path>,
+pub fn link<'d, 'p>(
+    dest: &'d PathWrapper,
     graph: &'p PackageGraph,
-) -> Result<impl Iterator<Item = PackageIter<'p>>, EmptyError> {
+) -> Result<impl Iterator<Item = PackageIter<'d, 'p>>, EmptyError> {
     let order = fail!(graph.order(), err => {
-        let msg = format!("{} {}",
-                          style("Circular dependency found for package:").bold().red(),
-                          format::filepath(err.0.display()));
-        errored::error(msg);
+        sl_error!("{$red}Circular dependency found for package:{/$} {}", err.0.absd());
     });
 
     let it = order.into_iter().map(move |package| {
         link_one(
             package.data.name.clone(),
-            dest.as_ref().to_path_buf(),
+            dest,
             &package.lua,
             &package.path,
             &package.data,
@@ -43,49 +39,50 @@ pub fn link<'p>(
 }
 
 #[inline]
-fn link_one<'p>(
+fn link_one<'d, 'p>(
     name: String,
-    dest: PathBuf,
+    dest: &'d PathWrapper,
     lua: &'p Lua,
-    path: &'p PathBuf,
+    path: &'p PathWrapper,
     spec: &'p Spec,
-) -> PackageIter<'p> {
+) -> PackageIter<'d, 'p> {
     PackageIter {
         name,
         path,
         dest,
         lua,
         directives: spec.directives.iter().collect(),
-        idxl: Indexed::new(spec.directives.len()),
     }
 }
 
-pub struct PackageIter<'p> {
-    pub name: String,
+pub struct PackageIter<'d, 'p> {
+    name: String,
 
-    dest: PathBuf,
-    path: &'p PathBuf,
+    dest: &'d PathWrapper,
+    path: &'p PathWrapper,
     lua: &'p Lua,
 
     directives: VecDeque<&'p Directive>,
-
-    idxl: Indexed,
 }
 
-impl<'p> Iterator for PackageIter<'p> {
+impl<'d, 'p> Iterator for PackageIter<'d, 'p> {
     type Item = Action<'p>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let drct = self.directives.pop_front()?;
         let action = self.convert(drct);
-        self.idxl.incr();
 
         Some(action)
     }
 }
 
-impl<'p> PackageIter<'p> {
+impl<'d, 'p> PackageIter<'d, 'p> {
+    #[inline]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     #[inline]
     fn convert(&self, drct: &Directive) -> Action<'p> {
         match drct {
@@ -113,22 +110,22 @@ impl<'p> PackageIter<'p> {
             optional,
         } = rf;
 
-        self.log_processing(&format!(
-            "{} ({} {} {} {})",
-            style("file").bold().cyan(),
-            match &link_type {
-                LinkType::Link => style("link").green(),
-                LinkType::Copy => style("copy").yellow(),
-            },
-            src.display(),
-            style("->").dim(),
-            dest.as_ref().unwrap_or(&src).display()
-        ));
+        // self.log_processing(&format!(
+        // "{} ({} {} {} {})",
+        // "file".bold().cyan(),
+        // match &link_type {
+        // LinkType::Link => "link".green(),
+        // LinkType::Copy => "copy".yellow(),
+        // },
+        // src.display(),
+        // "->".dim(),
+        // dest.as_ref().unwrap_or(&src).display()
+        // ));
 
         // Normalize src.
-        let src_full = self.join_package(src);
+        let src_w = self.join_package(src);
         // Normalize dest (or use src if absent).
-        let dest_full = self.join_dest(dest.as_ref().unwrap_or(src));
+        let dest_w = self.join_dest(dest.as_ref().unwrap_or(src));
 
         // Determine copy flag.
         let copy = match link_type {
@@ -137,8 +134,8 @@ impl<'p> PackageIter<'p> {
         };
 
         Action::Link(LinkAction {
-            src: src_full,
-            dest: dest_full,
+            src: src_w,
+            dest: dest_w,
             copy,
             optional: *optional,
         })
@@ -154,34 +151,34 @@ impl<'p> PackageIter<'p> {
             optional,
         } = tf;
 
-        self.log_processing(&format!(
-            "{} ({} {} {} {})",
-            style("template").bold().yellow(),
-            match typ {
-                TemplatedFileType::Handlebars(_) => style("hbs").red(),
-                TemplatedFileType::Liquid(_) => style("liquid").blue(),
-            },
-            src.display(),
-            style("->").dim(),
-            dest.display()
-        ));
+        // self.log_processing(&format!(
+        // "{} ({} {} {} {})",
+        // "template".bold().yellow(),
+        // match typ {
+        // TemplatedFileType::Handlebars(_) => "hbs".red(),
+        // TemplatedFileType::Liquid(_) => "liquid".blue(),
+        // },
+        // src.display(),
+        // "->".dim(),
+        // dest.display()
+        // ));
 
         // Normalize src.
-        let src_full = self.join_package(&src);
+        let src_w = self.join_package(src);
         // Normalize dest.
-        let dest_full = self.join_dest(dest.clone());
+        let dest_w = self.join_dest(dest);
 
         match typ {
             TemplatedFileType::Handlebars(hbs) => Action::Handlebars(HandlebarsAction {
-                src: src_full,
-                dest: dest_full,
+                src: src_w,
+                dest: dest_w,
                 vars: vars.clone(),
                 optional: *optional,
                 partials: hbs.partials.clone(),
             }),
             TemplatedFileType::Liquid(_) => Action::Liquid(LiquidAction {
-                src: src_full,
-                dest: dest_full,
+                src: src_w,
+                dest: dest_w,
                 vars: vars.clone(),
                 optional: *optional,
             }),
@@ -199,24 +196,24 @@ impl<'p> PackageIter<'p> {
             optional,
         } = tf;
 
-        self.log_processing(&format!(
-            "{} ({} {} {} {})",
-            style("tree").bold().green(),
-            match link_type {
-                LinkType::Link => style("link").green(),
-                LinkType::Copy => style("copy").yellow(),
-            },
-            src.display(),
-            style("->").dim(),
-            dest.as_ref()
-                .map(|dest| dest.display().to_string())
-                .unwrap_or(".".to_string()),
-        ));
+        // self.log_processing(&format!(
+        // "{} ({} {} {} {})",
+        // "tree".bold().green(),
+        // match link_type {
+        // LinkType::Link => "link".green(),
+        // LinkType::Copy => "copy".yellow(),
+        // },
+        // src.display(),
+        // "->".dim(),
+        // dest.as_ref()
+        // .map(|dest| dest.display().to_string())
+        // .unwrap_or(".".to_string()),
+        // ));
 
         // Normalize src.
-        let src_full = self.join_package(src);
+        let src_w = self.join_package(src);
         // Normalize dest.
-        let dest_full = dest
+        let dest_w = dest
             .as_ref()
             .map(|dest| self.join_dest(dest))
             .unwrap_or_else(|| self.dest.clone());
@@ -232,8 +229,8 @@ impl<'p> PackageIter<'p> {
         };
 
         Action::Tree(TreeAction {
-            src: src_full,
-            dest: dest_full,
+            src: src_w,
+            dest: dest_w,
             globs,
             ignore,
             copy,
@@ -245,44 +242,44 @@ impl<'p> PackageIter<'p> {
     fn convert_generated(&self, gf: &GeneratedFile) -> Action<'p> {
         let GeneratedFile { dest, typ } = gf;
 
-        self.log_processing(&format!(
-            "{} ({} {})",
-            style("generate").bold().magenta(),
-            match &typ {
-                GeneratedFileTyp::Empty(_) => style("empty").white(),
-                GeneratedFileTyp::String(_) => style("string").blue(),
-                GeneratedFileTyp::Yaml(_) => style("yaml").green(),
-                GeneratedFileTyp::Toml(_) => style("toml").yellow(),
-                GeneratedFileTyp::Json(_) => style("json").red(),
-            },
-            dest.display()
-        ));
+        // self.log_processing(&format!(
+        // "{} ({} {})",
+        // "generate".bold().magenta(),
+        // match &typ {
+        // GeneratedFileTyp::Empty(_) => "empty".white(),
+        // GeneratedFileTyp::String(_) => "string".blue(),
+        // GeneratedFileTyp::Yaml(_) => "yaml".green(),
+        // GeneratedFileTyp::Toml(_) => "toml".yellow(),
+        // GeneratedFileTyp::Json(_) => "json".red(),
+        // },
+        // dest.display()
+        // ));
 
         // Normalize dest.
-        let dest_full = self.join_dest(&dest);
+        let dest_w = self.join_dest(dest);
 
         match typ {
             GeneratedFileTyp::Empty(_) => Action::Write(WriteAction {
-                dest: dest_full,
+                dest: dest_w,
                 contents: "".to_string(),
             }),
             GeneratedFileTyp::String(s) => Action::Write(WriteAction {
-                dest: dest_full,
+                dest: dest_w,
                 contents: s.contents.clone(),
             }),
             // FIXME error context
             GeneratedFileTyp::Yaml(y) => Action::Yaml(YamlAction {
-                dest: dest_full,
+                dest: dest_w,
                 values: y.values.clone(),
                 header: y.header.clone(),
             }),
             GeneratedFileTyp::Toml(t) => Action::Toml(TomlAction {
-                dest: dest_full,
+                dest: dest_w,
                 values: t.values.clone(),
                 header: t.header.clone(),
             }),
             GeneratedFileTyp::Json(j) => Action::Json(JsonAction {
-                dest: dest_full,
+                dest: dest_w,
                 values: j.values.clone(),
             }),
         }
@@ -311,73 +308,95 @@ impl<'p> PackageIter<'p> {
 
         // Use sh as default shell.
         let shell = shell.as_ref().map(String::as_str).unwrap_or("sh");
-        self.log_processing(&format!(
-            "{} ({} '{}')",
-            style("hook").bold().blue(),
-            style(shell).bright(),
-            style(command).dim(),
-        ));
+        // self.log_processing(&format!(
+        // "{} ({} '{}')",
+        // "hook".bold().blue(),
+        // shell.bright(),
+        // command.dim(),
+        // ));
 
         // Normalize start path.
-        let start_full = start
+        let start_w = start
             .as_ref()
             .map(|start| self.join_package(start))
             .unwrap_or(self.path.clone());
 
+        let command = command.clone();
+        let shell = shell.to_string();
+        let stdout = *stdout.as_ref().unwrap_or(&true);
+        let stderr = *stderr.as_ref().unwrap_or(&true);
+        let clean_env = *clean_env.as_ref().unwrap_or(&false);
+        let env = env.clone().unwrap_or_else(|| EnvMap::new());
+        let nonzero_exit = nonzero_exit.clone().unwrap_or(NonZeroExitBehavior::Ignore);
+
         Action::Command(CommandAction {
-            command: command.clone(),
-            start: start_full,
-            shell: shell.to_string(),
-            stdout: *stdout.as_ref().unwrap_or(&true),
-            stderr: *stderr.as_ref().unwrap_or(&true),
-            clean_env: *clean_env.as_ref().unwrap_or(&false),
-            env: env.clone().unwrap_or_else(|| EnvMap::new()),
-            nonzero_exit: nonzero_exit.clone().unwrap_or(NonZeroExitBehavior::Ignore),
+            command,
+            start: start_w,
+            shell,
+            stdout,
+            stderr,
+            clean_env,
+            env,
+            nonzero_exit,
         })
     }
 
     #[inline]
     fn convert_hook_fun(&self, fun: &FunHook) -> Action<'p> {
-        let FunHook { name, error_exit } = fun;
+        let FunHook {
+            name,
+            start,
+            error_exit,
+        } = fun;
 
-        self.log_processing(&format!(
-            "{} ({} {})",
-            style("hook").bold().blue(),
-            style("fn").bright(),
-            style("<function>").italic().dim()
-        ));
+        // self.log_processing(&format!(
+        // "{} ({} {})",
+        // "hook".bold().blue(),
+        // "fn".bright(),
+        // "<function>".italic().dim()
+        // ));
 
         // Load function from Lua registry.
         let function: Function = self.lua.named_registry_value(name).unwrap();
+        let start = start
+            .as_ref()
+            .map(|start| self.join_package(start))
+            .unwrap_or_else(|| self.path.clone());
 
         Action::Function(FunctionAction {
             function,
+            start,
             error_exit: error_exit.clone().unwrap_or(NonZeroExitBehavior::Ignore),
         })
     }
 
     #[inline]
-    fn join_package(&self, path: impl AsRef<Path>) -> PathBuf {
-        self.normalize_path(path, &self.path)
+    fn join_package<P>(&self, path: P) -> PathWrapper
+    where
+        P: AsRef<Path>,
+    {
+        self.normalize_path(path, &self.path.abs())
     }
 
     #[inline]
-    fn join_dest(&self, path: impl AsRef<Path>) -> PathBuf {
-        self.normalize_path(path, &self.dest)
+    fn join_dest<P>(&self, path: P) -> PathWrapper
+    where
+        P: AsRef<Path>,
+    {
+        self.normalize_path(path, &self.dest.abs())
     }
 
     #[inline]
-    fn normalize_path(&self, path: impl AsRef<Path>, start: &PathBuf) -> PathBuf {
-        let new_path = if path.as_ref().is_relative() {
-            start.join(path)
-        } else {
-            path.as_ref().to_path_buf()
-        };
-        new_path.clean()
+    fn normalize_path<P, S>(&self, path: P, start: S) -> PathWrapper
+    where
+        P: AsRef<Path>,
+        S: AsRef<Path>,
+    {
+        PathWrapper::from_with_start(path.as_ref().to_path_buf(), start)
     }
 
     #[inline]
     fn log_processing(&self, step: &str) {
-        self.idxl.debug(&format!("Processing: {}", step));
+        // self.idxl.debug(&format!("Processing: {}", step));
     }
 }
