@@ -2,7 +2,7 @@
 pub mod error;
 
 #[macro_use]
-pub mod pl;
+pub mod prettylog;
 
 pub mod action;
 pub mod cli;
