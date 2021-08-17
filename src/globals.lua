@@ -37,6 +37,20 @@ function file(arg)
 	pkg:file(src, dest, link_type, optional)
 end
 
+function link(arg)
+	if type(arg) == "table" then
+		arg.link_type = "link"
+	end
+	file(arg)
+end
+
+function copy(arg)
+	if type(arg) == "table" then
+		arg.link_type = "copy"
+	end
+	file(arg)
+end
+
 -- tree 'tree'
 -- tree {'tree'}
 -- tree {'tree', '.config'}
