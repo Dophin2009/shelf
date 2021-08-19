@@ -413,7 +413,4 @@ impl<'d, 'p> PackageIter<'d, 'p> {
     {
         PathWrapper::from_with_start(path.as_ref().to_path_buf(), start)
     }
-
-    #[inline]
-    fn log_processing(&self, step: &str) {}
 }

@@ -28,29 +28,6 @@ pub enum Resolution {
     Skipped,
 }
 
-// FIXME better grouping
-#[derive(Debug, thiserror::Error)]
-pub enum ResolveError {
-    #[error("couldn't find file")]
-    Io(#[from] io::Error),
-    #[error("couldn't glob with a pattern")]
-    Glob(#[from] GlobError),
-    #[error("couldn't parse a pattern")]
-    Pattern(#[from] PatternError),
-    #[error("handlebars error")]
-    Hbs(#[from] templating::hbs::Error),
-    #[error("liquid error")]
-    Liquid(#[from] templating::liquid::Error),
-    #[error("yaml error")]
-    Yaml(#[from] serde_yaml::Error),
-    #[error("json error")]
-    Json(#[from] serde_json::Error),
-    #[error("toml error")]
-    Toml(#[from] toml::ser::Error),
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
-}
-
 pub enum Action<'lua> {
     Link(LinkAction),
     Write(WriteAction),
@@ -82,6 +59,18 @@ impl<'a> Resolve for Action<'a> {
     }
 }
 
+macro_rules! log_skip {
+    () => {
+        sl_debug!("")
+    };
+    ($format_str:literal $(, $arg:expr)* $(,)?) => {
+        log_skip!([$format_str] $(, $arg )*)
+    };
+    ([$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
+        sl_debug!(["{$yellow}Skipping...{/$} ", $($format_str),+] $(, $arg)*)
+    };
+}
+
 pub struct LinkAction {
     pub src: PathWrapper,
     pub dest: PathWrapper,
@@ -102,42 +91,150 @@ impl Resolve for LinkAction {
 
         // If file does not exist and optional flag enabled, skip.
         // If optional flag disabled, error.
-        if !src.exists() {
-            if optional {
-                // log_skip("{[green]} does not exist", src.display());
+        match (src.exists(), optional) {
+            (false, true) => {
+                log_skip!("{[green]} does not exist", src.reld());
                 return Ok(Resolution::Skipped);
-            } else {
+            }
+            (false, false) => {
                 log_miss(&src);
                 return Err(EmptyError);
             }
+            _ => {}
+        };
+
+        if copy {
+            Self::copy_file(&src, &dest)?;
+        } else {
+            Self::symlink_file(&src, &dest)?;
         }
 
-        // If dest does not exist, just mkdir and symlink/copy.
-        if !dest.exists() {
-            mkdir_parents(&dest)?;
-
-            sl_debug!(
-                "{} file: {[green]} to {[green]}",
-                if copy { "Copying" } else { "Linking" },
-                src.reld(),
-                dest.reld()
-            );
-
-            if copy {
-                fail!(fs::copy(&src.abs(), &dest.abs()), err => {
-                    sl_error!("{$red}Couldn't copy{/$} {[green]} {$red}to{/$} {[green]}{$red}:{/$} {}",
-                       src.absd(),
-                       dest.absd(),
-                       err
-                    );
-                });
-            }
-
-            // FIXME cache this action
-        }
+        // FIXME cache this action
 
         Ok(Resolution::Done)
     }
+}
+
+impl LinkAction {
+    // FIXME implement missing pieces
+    #[inline]
+    fn copy_file(src: &PathWrapper, dest: &PathWrapper) -> Result<(), EmptyError> {
+        // Check the cache for the destination path.
+
+        // If not found and the destination already has a file, emit a warning/error.
+
+        // If the content hash doesn't match the new content, emit a warning/error.
+
+        // If the content has does match the new content, do nothing.
+
+        sl_debug!(
+            "Copying file: {[green]} to {[green]}",
+            src.reld(),
+            dest.reld()
+        );
+
+        // Make the parent directories.
+        mkdir_parents(dest)?;
+
+        // Actually copy.
+        let res = fs::copy(&src.abs(), &dest.abs());
+        fail!(res, err => {
+            sl_error!("{$red}Couldn't copy {[green]} to {[green]}:{/$} {}",
+               src.absd(),
+               dest.absd(),
+               err
+            );
+        });
+
+        Ok(())
+    }
+
+    #[inline]
+    fn symlink_file(src: &PathWrapper, dest: &PathWrapper) -> Result<(), EmptyError> {
+        // Inspect the file metadata of the destination path.
+        // If the destination doesn't exist, just skip to symlinking.
+        if dest.exists() {
+            sl_debug!("Found an existing file at the destination; checking...");
+
+            let meta = fail!(fs::symlink_metadata(dest.abs()), err => {
+                sl_error!("{$red}Couldn't read file metadata:{/$} {}", err);
+            });
+
+            let ft = meta.file_type();
+            // If it's a symlink, read the target location and check against src path.
+            // Path must be the same, not just location the same.
+            if ft.is_symlink() {
+                let starget = fail!(fs::read_link(dest.abs()), err => {
+                    sl_error!("{$red}Couldn't follow symlink:{/$} {}", err);
+                    sl_i_error!("{$red}{/$}")
+                });
+
+                if starget == *src.abs() {
+                    // src and current destination symlink are the same; emit a notice.
+                    sl_debug!("Symlink was already established; doing nothing...");
+                    return Ok(());
+                } else {
+                    // FIXME warn/error depend on opts
+                    // src and current destination symlink are different.
+                    // Emit a warning/error and delete the symlink.
+                    sl_warn!("{$yellow}An existing symlink (pointing to a different location) was found at the destination{/$}");
+                    sl_i_warn!("{$yellow}Destination:{/$} {[green]}", dest.absd());
+                    sl_i_warn!("{$yellow}It will be replaced.{/$}");
+                    fail!(fs::remove_file(dest.abs()), err => {
+                        sl_error!("{$red}Couldn't delete the symlink:{/$} {}", err);
+                        sl_i_error!("{$red}Destination:{/$} {[green]}", dest.absd());
+                    });
+                }
+            } else {
+                // Not a symlink, so emit a warning/error.
+                sl_warn!("{$yellow}An existing file or directory was found at the destination{/$}");
+                sl_i_warn!("{$yellow}Location:{/$} {[green]}", dest.absd());
+                sl_i_warn!("{$yellow}It will be replaced.{/$}");
+
+                // FIXME should be based on options
+                if dest.is_file() {
+                    fail!(fs::remove_file(dest.abs()), err => {
+                        sl_error!("{$red}Couldn't delete the file:{/$} {}", err);
+                        sl_i_error!("{$yellow}Location:{/$} {[green]}", dest.absd());
+                    });
+                } else if dest.is_dir() {
+                    fail!(fs::remove_dir_all(dest.abs()), err => {
+                        sl_error!("{$red}Couldn't delete the directory:{/$} {}", err);
+                        sl_i_error!("{$yellow}Location:{/$} {[green]}", dest.absd());
+                    });
+                }
+            }
+        }
+
+        sl_debug!(
+            "Linking file: {[green]} to {[green]}",
+            src.reld(),
+            dest.reld()
+        );
+
+        let res = inner_symlink_file(src, dest);
+        fail!(res, err => {
+            sl_error!("{$red}Couldn't symlink:{/$} {}", err);
+            sl_i_error!("Source: {[green]}",  src.absd());
+            sl_i_error!("Destination: {[green]}", dest.absd());
+        });
+
+        Ok(())
+    }
+}
+
+#[cfg(unix)]
+#[inline]
+fn inner_symlink_file(src: &PathWrapper, dest: &PathWrapper) -> io::Result<()> {
+    use std::os::unix;
+    unix::fs::symlink(src.abs(), dest.abs())
+}
+
+// FIXME implement
+#[cfg(windows)]
+#[inline]
+fn inner_symlink_file(src: &PathWrapper, dest: &PathWrapper) -> io::Result<()> {
+    todo!()
 }
 
 pub struct WriteAction {
@@ -602,12 +699,4 @@ impl<'a> Resolve for FunctionAction<'a> {
 #[inline]
 fn log_miss(path: &PathWrapper) {
     sl_error!("{$red}Failed!{/$} Missing file: {[green]}", path.absd());
-}
-
-#[inline]
-fn log_skip<M>(reason: M)
-where
-    M: fmt::Display,
-{
-    sl_debug!("{$yellow}Skipping...{/$} {}", reason);
 }
