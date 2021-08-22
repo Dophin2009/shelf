@@ -10,6 +10,7 @@ use std::process::Stdio;
 use glob::{GlobError, PatternError};
 use mlua::Function;
 
+use crate::cache::{Cache, FsCache};
 use crate::error::EmptyError;
 use crate::pathutil::PathWrapper;
 use crate::spec::{EnvMap, HandlebarsPartials, NonZeroExitBehavior, Patterns};
@@ -20,7 +21,11 @@ use crate::tree::Tree;
 pub struct ResolveOpts {}
 
 pub trait Resolve {
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError>;
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError>;
 }
 
 pub enum Resolution {
@@ -43,18 +48,22 @@ pub enum Action<'lua> {
 
 impl<'a> Resolve for Action<'a> {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         match self {
-            Self::Link(a) => a.resolve(opts),
-            Self::Write(a) => a.resolve(opts),
-            Self::Tree(a) => a.resolve(opts),
-            Self::Handlebars(a) => a.resolve(opts),
-            Self::Liquid(a) => a.resolve(opts),
-            Self::Yaml(a) => a.resolve(opts),
-            Self::Toml(a) => a.resolve(opts),
-            Self::Json(a) => a.resolve(opts),
-            Self::Command(a) => a.resolve(opts),
-            Self::Function(a) => a.resolve(opts),
+            Self::Link(a) => a.resolve(opts, cache),
+            Self::Write(a) => a.resolve(opts, cache),
+            Self::Tree(a) => a.resolve(opts, cache),
+            Self::Handlebars(a) => a.resolve(opts, cache),
+            Self::Liquid(a) => a.resolve(opts, cache),
+            Self::Yaml(a) => a.resolve(opts, cache),
+            Self::Toml(a) => a.resolve(opts, cache),
+            Self::Json(a) => a.resolve(opts, cache),
+            Self::Command(a) => a.resolve(opts, cache),
+            Self::Function(a) => a.resolve(opts, cache),
         }
     }
 }
@@ -81,7 +90,11 @@ pub struct LinkAction {
 
 impl Resolve for LinkAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self {
             src,
             dest,
@@ -104,9 +117,9 @@ impl Resolve for LinkAction {
         };
 
         if copy {
-            Self::copy_file(&src, &dest)?;
+            Self::copy_file(&src, &dest, opts, cache)?;
         } else {
-            Self::symlink_file(&src, &dest)?;
+            Self::symlink_file(&src, &dest, opts, cache)?;
         }
 
         // FIXME cache this action
@@ -118,7 +131,12 @@ impl Resolve for LinkAction {
 impl LinkAction {
     // FIXME implement missing pieces
     #[inline]
-    fn copy_file(src: &PathWrapper, dest: &PathWrapper) -> Result<(), EmptyError> {
+    fn copy_file(
+        src: &PathWrapper,
+        dest: &PathWrapper,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<(), EmptyError> {
         // Check the cache for the destination path.
 
         // If not found and the destination already has a file, emit a warning/error.
@@ -150,7 +168,12 @@ impl LinkAction {
     }
 
     #[inline]
-    fn symlink_file(src: &PathWrapper, dest: &PathWrapper) -> Result<(), EmptyError> {
+    fn symlink_file(
+        src: &PathWrapper,
+        dest: &PathWrapper,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<(), EmptyError> {
         // Inspect the file metadata of the destination path.
         // If the destination doesn't exist, just skip to symlinking.
         if dest.exists() {
@@ -244,7 +267,11 @@ pub struct WriteAction {
 
 impl Resolve for WriteAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self { dest, contents } = self;
 
         // If the destination doesn't exist yet, create the directories and write the file.
@@ -305,7 +332,11 @@ pub struct TreeAction {
 
 impl Resolve for TreeAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self {
             src,
             dest,
@@ -393,7 +424,7 @@ impl Resolve for TreeAction {
         });
 
         // FIXME handle resolutions
-        it.map(|action| action.resolve(opts))
+        it.map(|action| action.resolve(opts, cache))
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(Resolution::Done)
@@ -411,7 +442,11 @@ pub struct HandlebarsAction {
 
 impl Resolve for HandlebarsAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self {
             src,
             dest,
@@ -437,7 +472,7 @@ impl Resolve for HandlebarsAction {
             sl_error!("{$red}Couldn't render Handlebars template:{/$} {}", err);
         });
         let wa = WriteAction { dest, contents };
-        wa.resolve(opts)
+        wa.resolve(opts, cache)
     }
 }
 
@@ -451,7 +486,11 @@ pub struct LiquidAction {
 
 impl Resolve for LiquidAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self {
             src,
             dest,
@@ -476,7 +515,7 @@ impl Resolve for LiquidAction {
             sl_error!("{$red}Couldn't render Liquid template:{/$} {}", err);
         });
         let wa = WriteAction { dest, contents };
-        wa.resolve(opts)
+        wa.resolve(opts, cache)
     }
 }
 
@@ -489,7 +528,11 @@ pub struct YamlAction {
 
 impl Resolve for YamlAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self {
             dest,
             values,
@@ -505,7 +548,7 @@ impl Resolve for YamlAction {
         };
 
         let wa = WriteAction { dest, contents };
-        wa.resolve(opts)
+        wa.resolve(opts, cache)
     }
 }
 
@@ -518,7 +561,11 @@ pub struct TomlAction {
 
 impl Resolve for TomlAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self {
             dest,
             values,
@@ -534,7 +581,7 @@ impl Resolve for TomlAction {
         };
 
         let wa = WriteAction { dest, contents };
-        wa.resolve(opts)
+        wa.resolve(opts, cache)
     }
 }
 
@@ -545,7 +592,11 @@ pub struct JsonAction {
 
 impl Resolve for JsonAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self { dest, values } = self;
 
         let contents = fail!(serde_json::to_string(&values), err => {
@@ -556,7 +607,7 @@ impl Resolve for JsonAction {
             dest: dest.clone(),
             contents,
         };
-        wa.resolve(opts)
+        wa.resolve(opts, cache)
     }
 }
 
@@ -577,7 +628,11 @@ pub struct CommandAction {
 
 impl Resolve for CommandAction {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        _cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self {
             command,
             start,
@@ -659,7 +714,11 @@ pub struct FunctionAction<'lua> {
 
 impl<'a> Resolve for FunctionAction<'a> {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, EmptyError> {
+    fn resolve(
+        self,
+        opts: &ResolveOpts,
+        _cache: &mut Box<dyn Cache>,
+    ) -> Result<Resolution, EmptyError> {
         let Self {
             function,
             start,
