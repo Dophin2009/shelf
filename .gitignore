@@ -1,1 +1,3 @@
 /target
+/libshelf/target
+/libshelf/Cargo.lock

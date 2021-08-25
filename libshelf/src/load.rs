@@ -1,16 +1,20 @@
+use std::borrow::Cow;
+use std::collections::VecDeque;
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::env;
 use std::fmt;
-use std::fs;
+use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
-use std::io;
+use std::io::{self, Read};
+use std::marker::PhantomData;
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use mlua::{FromLua, Function, Lua, UserData, UserDataMethods, Variadic};
 use uuid::Uuid;
 
-use crate::error::EmptyError;
-use crate::graph::{PackageGraph, PackageState};
+use crate::error::MultipleError;
+use crate::graph::{PackageData, PackageGraph};
 use crate::pathutil::PathWrapper;
 use crate::spec::{
     CmdHook, Dep, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile, GeneratedFileTyp,
@@ -22,81 +26,174 @@ use crate::tree::Tree;
 
 static CONFIG_FILE: &str = "package.lua";
 
-macro_rules! lfail {
-    ($res:expr) => {
-        fail!($res, err => { render_err(err.into()) })
-    };
+#[derive(Debug, thiserror::Error)]
+#[error("couldn't load packages")]
+pub struct LoaderError {
+    #[from]
+    pub errors: MultipleError<LoadError, PathWrapper>,
+}
+
+impl LoaderError {
+    #[inline]
+    pub fn new(errors: Vec<(LoadError, PathWrapper)>) -> Self {
+        Self {
+            errors: errors.into(),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum LoadError {
+    #[error("couldn't open a file")]
+    Open(io::Error),
     #[error("couldn't read a file")]
-    Read(PathWrapper, io::Error),
-    #[error("Lua {}", .0)]
+    Read(io::Error),
+    #[error("couldn't execute Lua")]
     Lua(#[from] mlua::Error),
 }
 
-/// Loaded paths are not cleaned, and may be relative or absolute.
-#[inline]
-pub fn load<P>(path: P) -> Result<PackageGraph, EmptyError>
-where
-    P: AsRef<Path>,
-{
-    load_multi(&[path])
+pub struct Loader {
+    paths: Vec<PathWrapper>,
+
+    pg: PackageGraph,
 }
 
-#[inline]
-pub fn load_multi(paths: &[impl AsRef<Path>]) -> Result<PackageGraph, EmptyError> {
-    let mut s = LoaderState::new();
-
-    // FIXME option to fail-fast
-    let load_it = paths
-        .iter()
-        .map(|p| PathWrapper::from_cwd(p.as_ref().to_path_buf()))
-        .map(|p| s.load(&p));
-    if load_it.filter_map(|r| r.err()).count() != 0 {
-        Err(EmptyError)
-    } else {
-        Ok(s.graph)
-    }
-}
-
-struct LoaderState {
-    graph: PackageGraph,
-}
-
-impl LoaderState {
+impl Loader {
     #[inline]
     pub fn new() -> Self {
         Self {
-            graph: PackageGraph::new(),
+            paths: Vec::new(),
+            pg: PackageGraph::new(),
         }
     }
 
-    // FIXME needs lots of cleanup
     #[inline]
-    pub fn load(&mut self, path: &PathWrapper) -> Result<(), EmptyError> {
-        let _ = self.load_id(path)?;
-        Ok(())
+    pub fn add<P: AsRef<Path>>(&mut self, path: P) -> &mut Self {
+        let path = path.as_ref().to_path_buf();
+        let path = PathWrapper::from_cwd(path);
+        self.paths.push(path);
+        self
     }
 
     #[inline]
-    fn load_id(&mut self, path: &PathWrapper) -> Result<u64, EmptyError> {
-        tl_info!("Loading package at {[green]}", path.reld());
+    pub fn load(&mut self) -> Result<&mut Self, LoaderError> {
+        // FIXME option to fail-fast
+        let load_it = self
+            .paths
+            .into_iter()
+            .map(|p| (self.load_into_graph(&p), p));
+
+        let errors: Vec<_> = load_it
+            .filter_map(|(r, p)| r.err().map(|err| (err, p)))
+            .collect();
+        if errors.is_empty() {
+            Ok(self)
+        } else {
+            Err(LoaderError::new(errors))
+        }
+    }
+
+    #[inline]
+    pub fn load_iter<'a, I>(&'a mut self) -> impl Iterator<Item = Result<(), LoadError>> + 'a {
+        self.paths.iter().map(|p| {
+            self.load_into_graph(&p)?;
+
+            Ok(())
+        })
+    }
+
+    #[inline]
+    pub fn graph(&self) -> &PackageGraph {
+        &self.pg
+    }
+
+    #[inline]
+    pub fn to_graph(self) -> PackageGraph {
+        self.pg
+    }
+
+    #[inline]
+    fn insert_into_graph(&mut self, id: u64, package: PackageData) {
+        // Insert package data into map.
+        self.pg.map.insert(id, package);
+        // Add graph node.
+        self.pg.graph.add_node(id);
+    }
+
+    #[inline]
+    fn load_deps(&mut self, deps: &[Dep]) -> Result<(), LoadError> {
+        // Add nodes and edges for dependencies.
+        let dep_it = deps.iter().map(|dep| -> Result<(), EmptyError> {
+            // If given a relative path, make it absolute.
+            let dep_path = dep.path.clone();
+            let path = PathWrapper::from_cwd(dep_path);
+
+            let dep_id = load_into_graph(pg, &path)?;
+            pg.graph.add_edge(id, dep_id, ());
+
+            Ok(())
+        });
+
+        let errors: Vec<_> = dep_it.filter_map(Result::err).collect();
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(LoadError::Multiple(errors.into()))
+        }
+    }
+}
+
+/// Iterator for loading package configurations; it returns instances of [`LoadIterSpecLoader`],
+/// which can be used to actually load packages.
+///
+/// **Packages are loaded in an unspecified order. This means that any package may be read before
+/// its dependencies.**
+pub struct LoadIter {
+    paths: VecDeque<(PathWrapper, Option<u64>)>,
+    pg: PackageGraph,
+}
+
+impl Iterator for LoadIter {
+    type Item = Result<LoadIterSpecLoader<'_>, LoadError>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let (parent_id, path) = self.paths.pop_front()?;
+
+        Some(LoadIterSpecLoader::new(self, path, parent_id))
+    }
+}
+
+impl<'a> LoadIter<'a> {
+    /// Load a package from the given path into the graph and return its graph ID.
+    #[inline]
+    fn load_into_graph<'p, P>(&mut self, path: P) -> Result<u64, LoadError>
+    where
+        P: Into<Cow<'p, PathWrapper>>,
+    {
+        let path = Cow::from(path);
 
         // Check if this path has already been loaded.
-        let id = hash_path(&path.abs().to_path_buf());
-        if self.graph.map.get(&id).is_none() {
+        let id = hash_path(path.abs());
+        if self.pg.map.get(&id).is_none() {
+            // FIXME propogate error
             // Save current cwd.
             let cwd = env::current_dir().unwrap();
             // Work relative to the package root.
             env::set_current_dir(path.abs()).unwrap();
 
             // Load package data.
-            let package = self.load_data(path)?;
+            let package = load_data(path)?;
+
+            // Append dep paths to queue of paths to load.
+            let deps = &package.data.deps;
+            let dep_paths = deps
+                .iter()
+                .map(|Dep { path }| PathWrapper::from_cwd(path.clone()));
+            self.paths.extend(dep_paths);
 
             // Insert the data into the graph.
-            self.insert(id, package)?;
+            self.insert_into_graph(id, package);
 
             // Reload cwd.
             env::set_current_dir(&cwd).unwrap();
@@ -104,79 +201,123 @@ impl LoaderState {
 
         return Ok(id);
     }
+}
 
+pub struct LoadIterSpecLoader<'a> {
+    iter: &'a mut LoadIter,
+    sl: SpecLoader<SpecLoaderStateEmpty>,
+    parent_id: Option<u64>,
+}
+
+impl<'a> LoadIterSpecLoader<'a> {
     #[inline]
-    fn insert(&mut self, id: u64, package: PackageState) -> Result<(), EmptyError> {
-        // Save deps for later.
-        let deps = package.data.deps.clone();
-
-        // Insert package data into map.
-        self.graph.map.insert(id, package);
-        // Add graph node.
-        self.graph.graph.add_node(id);
-
-        // Add nodes and edges for dependencies.
-        sl_debug!("Resolving dependencies...");
-        let dep_it = deps
-            .iter()
-            .map(|dep| -> Result<(), EmptyError> {
-                // If given a relative path, make it absolute.
-                let dep_path = dep.path.clone();
-                let path = PathWrapper::from_cwd(dep_path);
-
-                let dep_id = self.load_id(&path)?;
-                self.graph.graph.add_edge(id, dep_id, ());
-
-                Ok(())
-            })
-            .filter_map(Result::err);
-
-        if dep_it.count() == 0 {
-            Ok(())
-        } else {
-            Err(EmptyError)
-        }
-    }
-
-    #[inline]
-    pub fn load_data(&mut self, path: &PathWrapper) -> Result<PackageState, EmptyError> {
-        // Read the configuration contents.
-        sl_debug!("Trying to load package data...");
-        let config_path = path.join(CONFIG_FILE);
-        let config_contents =
-            lfail!(fs::read_to_string(&config_path.abs())
-                .map_err(|err| LoadError::Read(config_path, err)));
-
-        // Load and evaluate Lua code.
-        sl_debug!("Evalulating Lua code...");
-        let lua = lfail!(lua_instance());
-        let chunk = lua.load(&config_contents);
-        lfail!(chunk.exec());
-
-        // FIXME better error context
-        sl_debug!("Retrieving package configuration object...");
-        let pkg_data = lfail!(lua.globals().get("pkg").into());
-        let package: SpecObject = lfail!(FromLua::from_lua(pkg_data, &lua));
-
-        Ok(PackageState {
-            path: path.clone(),
-            data: package.spec,
-            lua,
+    fn new(
+        iter: &'a mut LoadIter,
+        path: PathWrapper,
+        parent_id: Option<u64>,
+    ) -> Result<Self, LoadError> {
+        Ok(Self {
+            iter,
+            sl: SpecLoader::new(path)?,
+            parent_id,
         })
     }
 }
 
-#[inline]
-fn lua_instance() -> Result<Lua, mlua::Error> {
-    #[cfg(not(feature = "unsafe"))]
-    let lua = Lua::new();
-    #[cfg(feature = "unsafe")]
-    let lua = unsafe { Lua::unsafe_new() };
+pub struct SpecLoader<S>
+where
+    S: SpecLoaderState,
+{
+    path: PathWrapper,
+    contents: String,
+    lua: Lua,
 
-    lua.globals().set("pkg", SpecObject::new())?;
-    lua.load(std::include_str!("globals.lua")).exec()?;
+    state: PhantomData<SpecLoaderState>,
+}
 
-    Ok(lua)
+trait SpecLoaderState {}
+macro_rules! spec_loader_state {
+    ($name:ident) => {
+        pub struct $name;
+        impl SpecLoaderState for $name {}
+    };
+    ($($names:ident),* $(,)?) => {
+        $(spec_loader_state!($names);)*
+    }
+}
+
+spec_loader_state!(
+    SpecLoaderStateEmpty,
+    SpecLoaderStateRead,
+    SpecLoaderStateEvaled
+);
+
+impl SpecLoader<SpecLoaderStateEmpty> {
+    #[inline]
+    pub fn new(path: PathWrapper) -> Result<Self, LoadError> {
+        let lua = Self::new_lua_inst()?;
+        Ok(Self {
+            path,
+            contents: String::new(),
+            lua,
+            state: PhantomData::new(),
+        })
+    }
+
+    #[inline]
+    pub fn load<'a, P>(path: P) -> Result<PackageData, LoadError>
+    where
+        P: Into<Cow<'a, PathWrapper>>,
+    {
+        let path = Cow::from(path).into_owned();
+        let loader = Self::new(path)?.read()?.eval()?;
+        let pd = loader.to_package_data()?;
+        Ok(pd)
+    }
+
+    /// Read the configuration contents.
+    #[inline]
+    pub fn read(self) -> Result<SpecLoader<SpecLoaderStateRead>, io::Error> {
+        let config_path = self.path.join(CONFIG_FILE);
+        let file = File::open(config_path.abs())?;
+        file.read_to_string(&mut self.contents)?;
+
+        Ok(SpecLoader::<SpecLoaderStateRead>::from(self))
+    }
+}
+
+impl SpecLoader<SpecLoaderStateRead> {
+    #[inline]
+    pub fn eval(self) -> Result<SpecLoader<SpecLoaderStateEvaled>, mlua::Error> {
+        let chunk = self.lua.load(&config_contents);
+        chunk.exec()?;
+        Ok(SpecLoader::<SpecLoaderStateEvaled>::from(self))
+    }
+}
+
+impl SpecLoader<SpecLoaderStateEvaled> {
+    #[inline]
+    pub fn to_package_data(self) -> Result<PackageData, mlua::Error> {
+        let package: SpecObject = lua.globals().get("pkg")?;
+        Ok(PackageData {
+            path: self.path,
+            data: package.spec,
+            lua: self.lua,
+        })
+    }
+
+    #[inline]
+    fn new_lua_inst() -> Result<Lua, mlua::Error> {
+        #[cfg(not(feature = "unsafe"))]
+        let lua = Lua::new();
+        #[cfg(feature = "unsafe")]
+        let lua = unsafe { Lua::unsafe_new() };
+
+        lua.globals().set("pkg", SpecObject::new())?;
+        lua.load(std::include_str!("globals.lua")).exec()?;
+
+        Ok(lua)
+    }
 }
 
 #[inline]
@@ -338,19 +479,4 @@ impl UserData for SpecObject {
             },
         );
     }
-}
-
-#[inline]
-fn render_err(err: LoadError) {
-    fn render<E>(msg: impl fmt::Display, extra: impl fmt::Display, err: E)
-    where
-        E: std::error::Error,
-    {
-        sl_error!("{[red+bold]}: {[red]}\n      {}", msg, extra, err)
-    }
-
-    match err {
-        LoadError::Read(path, err) => render("Couldn't read the package config", path.absd(), err),
-        LoadError::Lua(err) => render("Couldn't evaluate Lua", "", err),
-    };
 }

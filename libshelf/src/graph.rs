@@ -7,7 +7,7 @@ use petgraph::{algo, graphmap::DiGraphMap};
 use crate::pathutil::PathWrapper;
 use crate::spec::Spec;
 
-pub struct PackageState {
+pub struct PackageData {
     /// Absolute path of the package.
     pub path: PathWrapper,
     /// Package specification.
@@ -20,7 +20,7 @@ pub struct PackageGraph {
     /// Directional graph of package dependencies.
     pub(crate) graph: DiGraphMap<u64, ()>,
     /// Map storing the path and package data.
-    pub(crate) map: HashMap<u64, PackageState>,
+    pub(crate) map: HashMap<u64, PackageData>,
 }
 
 impl PackageGraph {
@@ -38,12 +38,12 @@ impl PackageGraph {
     }
 
     #[inline]
-    pub fn data(&self) -> &HashMap<u64, PackageState> {
+    pub fn data(&self) -> &HashMap<u64, PackageData> {
         &self.map
     }
 
     #[inline]
-    pub fn order<'g>(&'g self) -> Result<Vec<&'g PackageState>, CircularDependencyError> {
+    pub fn order<'g>(&'g self) -> Result<Vec<&'g PackageData>, CircularDependencyError> {
         let mut sorted = match algo::toposort(&self.graph, None) {
             Ok(v) => v,
             Err(cycle) => {
@@ -70,7 +70,7 @@ impl fmt::Display for CircularDependencyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Circular dependency found for package: {}",
+            "detected circular dependency for package: {}",
             self.0.absd()
         )
     }

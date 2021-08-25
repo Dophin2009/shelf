@@ -12,12 +12,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "595d3cfa7a60d4555cb5067b99f07142a08ea778de5cf993f7b75c7d8fabc486"
-
-[[package]]
 name = "anymap"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -311,15 +305,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "home"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2456aef2e6b6a9784192ae780c0f15bc57df0e918585282325e8c8ac27737654"
-dependencies = [
- "winapi",
-]
-
-[[package]]
 name = "indexmap"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -364,6 +349,27 @@ name = "libc"
 version = "0.2.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320cfe77175da3a483efed4bc0adc1968ca050b098ce4f2f1c13a56626128790"
+
+[[package]]
+name = "libshelf"
+version = "0.1.0"
+dependencies = [
+ "bunt",
+ "bunt-logger",
+ "cfg-if",
+ "glob",
+ "handlebars",
+ "liquid",
+ "mlua",
+ "path-clean",
+ "petgraph",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "thiserror",
+ "toml",
+ "uuid",
+]
 
 [[package]]
 name = "linked-hash-map"
@@ -832,25 +838,11 @@ dependencies = [
 name = "tidy"
 version = "0.3.0"
 dependencies = [
- "anyhow",
  "bunt",
  "bunt-logger",
  "clap",
  "directories-next",
- "glob",
- "handlebars",
- "home",
- "liquid",
- "mlua",
- "once_cell",
- "path-clean",
- "petgraph",
- "serde",
- "serde_json",
- "serde_yaml",
- "thiserror",
- "toml",
- "uuid",
+ "libshelf",
 ]
 
 [[package]]

@@ -137,9 +137,29 @@ impl LinkAction {
         opts: &ResolveOpts,
         cache: &mut Box<dyn Cache>,
     ) -> Result<(), EmptyError> {
+        let dest_cache = cache.get(dest.abs().to_path_buf());
         // Check the cache for the destination path.
-
-        // If not found and the destination already has a file, emit a warning/error.
+        match (dest.exists(), dest_cache) {
+            (true, Some(dest_cache)) => match dest_cache.typ {},
+            (false, Some(dest_cache)) => {
+                // Destination file doesn't exist but found in cache; warn about changes that might've
+                // occurred since last run.
+                sl_warn!("{$yellow}Destination was found in cache, but no file exists there.{/$}");
+                sl_warn!("{$yellow}Manual changes may have removed this file since last time.{/$}");
+                sl_i_warn!("{$yellow}Location:{/$} {[green]}", dest.absd());
+            }
+            (true, None) => {
+                // Destination file exists but not found in cache, warn about overwriting.
+                sl_warn!(
+                    "{$yellow}Destination wasn't found in the cache, but a file exists there.{/$}"
+                );
+                sl_warn!("{$yellow}It will be replaced.{/$}");
+                sl_i_warn!("{$yellow}Location:{/$} {[green]}", dest.absd());
+            }
+            (false, None) => {
+                // Destination doesn't have a file and not found in cache; continue to copying.
+            }
+        };
 
         // If the content hash doesn't match the new content, emit a warning/error.
 
@@ -157,11 +177,9 @@ impl LinkAction {
         // Actually copy.
         let res = fs::copy(&src.abs(), &dest.abs());
         fail!(res, err => {
-            sl_error!("{$red}Couldn't copy {[green]} to {[green]}:{/$} {}",
-               src.absd(),
-               dest.absd(),
-               err
-            );
+            sl_error!("{$red}Couldn't copy file:{/$} {}", err);
+            sl_i_error!("{$red}Source:{/$} {[green]}", src.absd());
+            sl_i_error!("{$red}Destination:{/$} {[green]}", dest.absd());
         });
 
         Ok(())
@@ -181,6 +199,7 @@ impl LinkAction {
 
             let meta = fail!(fs::symlink_metadata(dest.abs()), err => {
                 sl_error!("{$red}Couldn't read file metadata:{/$} {}", err);
+                sl_i_error!("{$red}{/$}");
             });
 
             let ft = meta.file_type();
@@ -189,7 +208,7 @@ impl LinkAction {
             if ft.is_symlink() {
                 let starget = fail!(fs::read_link(dest.abs()), err => {
                     sl_error!("{$red}Couldn't follow symlink:{/$} {}", err);
-                    sl_i_error!("{$red}{/$}")
+                    sl_i_error!("{$red}Location:{/$} {[green]}", dest.absd());
                 });
 
                 if starget == *src.abs() {
@@ -698,7 +717,7 @@ impl Resolve for CommandAction {
                     command,
                 ),
                 NonZeroExitBehavior::Ignore => {}
-            }
+            };
         }
 
         Ok(Resolution::Done)

@@ -1,0 +1,32 @@
+[package]
+name = "libshelf"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+cfg-if = "1.0"
+glob = "0.3"
+handlebars = "4.1"
+liquid = "0.22"
+mlua = { version = "0.6", features = ["macros", "send", "serialize"] }
+path-clean = "0.1"
+petgraph = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.8"
+thiserror = "1.0"
+toml = "0.5"
+uuid = { version = "0.8", features = ["v4"] }
+
+bunt = { version = "0.2", optional = true }
+bunt-logger = { version = "0.1", optional = true }
+
+[features]
+default = []
+lua51 = ["mlua/lua51"]
+lua52 = ["mlua/lua52"]
+lua53 = ["mlua/lua53"]
+lua54 = ["mlua/lua54"]
+luajit = ["mlua/luajit"]
+unsafe = []
+__cli_logging = ["bunt", "bunt-logger"]

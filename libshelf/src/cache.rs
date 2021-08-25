@@ -6,15 +6,17 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 
 pub trait Cache {
-    fn set_file(&mut self, package: PathBuf, path: PathBuf, fm: FileMeta) -> Option<FileMeta>;
-    fn get_file(&self, package: PathBuf, path: PathBuf, fm: FileMeta) -> Option<&FileMeta>;
+    fn insert(&mut self, path: PathBuf, fm: FileMeta) -> Option<FileMeta>;
+
+    fn get(&self, path: PathBuf) -> Option<&FileMeta>;
+    fn get_mut(&mut self, path: PathBuf) -> Option<&mut FileMeta>;
 }
 
 #[derive(Debug, Clone)]
 pub struct FsCache {
     path: PathBuf,
 
-    packages: HashMap<PathBuf, PackageMeta>,
+    files: HashMap<PathBuf, FileMeta>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -30,7 +32,7 @@ impl FsCache {
     pub fn empty(path: impl AsRef<Path>) -> Self {
         Self {
             path: path.as_ref().to_path_buf(),
-            packages: HashMap::new(),
+            files: HashMap::new(),
         }
     }
 
@@ -38,11 +40,11 @@ impl FsCache {
     pub fn read_from(path: impl AsRef<Path>) -> Result<Self, FsCacheError> {
         let file = Self::open_file(&path)?;
         let rdr = BufReader::new(file);
-        let packages = serde_json::from_reader(rdr)?;
+        let files = serde_json::from_reader(rdr)?;
 
         Ok(Self {
             path: path.as_ref().to_path_buf(),
-            packages,
+            files,
         })
     }
 
@@ -50,7 +52,7 @@ impl FsCache {
     pub fn write(&self) -> Result<(), FsCacheError> {
         let file = Self::open_file(&self.path)?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer(writer, &self.packages)?;
+        serde_json::to_writer(writer, &self.files)?;
 
         Ok(())
     }
@@ -63,25 +65,24 @@ impl FsCache {
 
     #[inline]
     pub fn clear(&mut self) {
-        self.packages.clear();
+        self.files.clear();
     }
 }
 
 impl Cache for FsCache {
     #[inline]
-    fn set_file(&mut self, package: PathBuf, path: PathBuf, fm: FileMeta) -> Option<FileMeta> {
-        self.packages
-            .get_mut(&package)
-            .map(|pm| pm.set(path, fm))
-            .flatten()
+    fn insert(&mut self, path: PathBuf, fm: FileMeta) -> Option<FileMeta> {
+        self.files.insert(path, fm)
     }
 
     #[inline]
-    fn get_file(&self, package: PathBuf, path: PathBuf, fm: FileMeta) -> Option<&FileMeta> {
-        self.packages
-            .get(&package)
-            .map(|pm| pm.get(&path))
-            .flatten()
+    fn get(&self, path: PathBuf) -> Option<&FileMeta> {
+        self.files.get(&path)
+    }
+
+    #[inline]
+    fn get_mut(&mut self, path: PathBuf) -> Option<&mut FileMeta> {
+        self.files.get_mut(&path)
     }
 }
 
@@ -97,30 +98,18 @@ impl DummyCache {
 
 impl Cache for DummyCache {
     #[inline]
-    fn set_file(&mut self, _package: PathBuf, _path: PathBuf, _fm: FileMeta) -> Option<FileMeta> {
+    fn insert(&mut self, _path: PathBuf, _fm: FileMeta) -> Option<FileMeta> {
         None
     }
 
     #[inline]
-    fn get_file(&self, _package: PathBuf, _path: PathBuf, _fm: FileMeta) -> Option<&FileMeta> {
+    fn get(&self, _path: PathBuf) -> Option<&FileMeta> {
         None
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PackageMeta {
-    files: HashMap<PathBuf, FileMeta>,
-}
-
-impl PackageMeta {
-    #[inline]
-    pub fn set(&mut self, path: impl AsRef<Path>, fm: FileMeta) -> Option<FileMeta> {
-        self.files.insert(path.as_ref().to_path_buf(), fm)
-    }
 
     #[inline]
-    pub fn get(&self, path: impl AsRef<Path>) -> Option<&FileMeta> {
-        self.files.get(path.as_ref())
+    fn get_mut(&mut self, path: PathBuf) -> Option<&mut FileMeta> {
+        None
     }
 }
 

@@ -1,14 +1,12 @@
 use std::collections::VecDeque;
 use std::path::Path;
 
-use anyhow::Result;
 use mlua::{Function, Lua};
 
 use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
     TomlAction, TreeAction, WriteAction, YamlAction,
 };
-use crate::error::EmptyError;
 use crate::graph::PackageGraph;
 use crate::pathutil::PathWrapper;
 use crate::spec::{
@@ -20,31 +18,23 @@ use crate::spec::{
 pub fn link<'d, 'p>(
     dest: &'d PathWrapper,
     graph: &'p PackageGraph,
-) -> Result<impl Iterator<Item = PackageIter<'d, 'p>>, EmptyError> {
-    let order = fail!(graph.order(), err => {
-        sl_error!("{$red}Circular dependency found for package:{/$} {}", err.0.absd());
-    });
-
+) -> Result<impl Iterator<Item = PackageIter<'d, 'p>>, CircularDependencyError> {
+    let order = graph.order()?;
     let it = order.into_iter().map(move |package| {
-        link_one(
-            package.data.name.clone(),
-            dest,
-            &package.lua,
-            &package.path,
-            &package.data,
-        )
+        let name = package.data.name.clone();
+        link_package(name, dest, &package.path, &package.data, &package.lua)
     });
 
     Ok(it)
 }
 
 #[inline]
-fn link_one<'d, 'p>(
+fn link_package<'d, 'p>(
     name: String,
     dest: &'d PathWrapper,
-    lua: &'p Lua,
     path: &'p PathWrapper,
     spec: &'p Spec,
+    lua: &'p Lua,
 ) -> PackageIter<'d, 'p> {
     PackageIter {
         name,

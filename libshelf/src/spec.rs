@@ -77,6 +77,7 @@ pub struct TemplatedFile {
 }
 
 // FIXME more template engine options
+// FIXME pipe src content through function to get result
 #[derive(Debug, Clone)]
 pub enum TemplatedFileType {
     Handlebars(HandlebarsTemplatedFile),

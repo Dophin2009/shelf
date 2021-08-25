@@ -4,12 +4,11 @@ use std::path::PathBuf;
 use clap::Clap;
 use directories_next::BaseDirs;
 
-use crate::action::{Resolve, ResolveOpts};
-use crate::cache::{Cache, DummyCache, FsCache};
-use crate::error::EmptyError;
-use crate::link;
-use crate::load;
-use crate::pathutil::PathWrapper;
+use libshelf::action::{Resolve, ResolveOpts};
+use libshelf::cache::{Cache, DummyCache, FsCache};
+use libshelf::link;
+use libshelf::load::{Loader, LoaderError};
+use libshelf::pathutil::PathWrapper;
 
 const NAME: &str = "tidy";
 
@@ -36,28 +35,52 @@ pub struct Options {
     pub packages: Vec<String>,
 }
 
-pub fn cli(opts: Options) -> Result<(), EmptyError> {
+pub fn cli(opts: Options) -> Result<(), ()> {
     match run(opts) {
         Ok(_) => Ok(()),
         Err(err) => {
             tl_error!("{$red+bold}Fatal errors were encountered! See above.{/$}");
-            Err(err)
+            Err(())
         }
     }
 }
 
-fn run(opts: Options) -> Result<(), EmptyError> {
+macro_rules! fail {
+    ($res:expr) => {
+        fail!($res, _err => {})
+    };
+    ($res:expr, $err:ident => $block:block) => {
+        match $res {
+            Ok(v) => v,
+            Err($err) => {
+                $block;
+                return Err(());
+            }
+        }
+    };
+}
+
+macro_rules! failopt {
+    ($res:expr) => {
+        failopt!($res, {})
+    };
+    ($res:expr, $block:block) => {
+        match $res {
+            Some(v) => v,
+            None => {
+                $block;
+                return Err(());
+            }
+        }
+    };
+}
+
+fn run(opts: Options) -> Result<(), ()> {
     // FIXME error printing
     let (dest_path, cache_path) = resolve_paths(opts.home)?;
 
-    tl_info!("Loading packages...");
-    let graph = load::load_multi(&opts.packages)?;
-
-    tl_info!("Sorting packages...");
-    let packages = link::link(&dest_path, &graph)?;
-
-    tl_info!("Starting package linking...");
-    let resolve_opts = ResolveOpts {};
+    let graph = load(&opts.packages)?;
+    let packages = link(&opts.dest, &graph)?;
 
     let mut cache: Box<dyn Cache> = if !opts.no_cache {
         let mut cache = FsCache::empty(cache_path.abs());
@@ -69,19 +92,63 @@ fn run(opts: Options) -> Result<(), EmptyError> {
         Box::new(DummyCache::new())
     };
 
+    let resolve_opts = ResolveOpts {};
     for actions in packages {
         tl_info!("Linking {$blue}{}{/$}...", actions.name());
         for action in actions {
             // FIXME support for choosing fail-fast/skip/etc. on error
-            fail!(action.resolve(&resolve_opts, &mut cache));
+            action.resolve(&resolve_opts, &mut cache);
         }
     }
 
     Ok(())
 }
 
-#[inline]
-fn resolve_paths<'a>(dest_opt: Option<String>) -> Result<(PathWrapper, PathWrapper), EmptyError> {
+fn load(paths: &[String]) -> Result<PackageGraph, ()> {
+    tl_info!("Loading packages...");
+
+    let mut loader = Loader::new();
+    paths.iter().for_each(|path| loader.add(path));
+
+    match loader.load(&opts.packages) {
+        Ok(graph) => graph,
+        Err(err) => {
+            sl_error!("{$red}Encountered errors while loading packages:{/$}\n");
+
+            err.errors.0.iter().for_each(|(&err, path)| {
+                sl_error!("In {[green]}:", path.absd());
+                match err {
+                    LoadError::Read(err) => {
+                        sl_i_error!("{$red}Couldn't read the package config:{/$}", err);
+                    }
+                    LoadError::Lua(err) => {
+                        sl_i_error!("{$red}Couldn't evaluate Lua:{/$}", err);
+                    }
+                }
+            });
+            Err(())
+        }
+    }
+}
+
+fn link<'d, 'p, P: AsRef<Path>>(
+    dest: P,
+    graph: &PackageGraph,
+) -> Result<impl Iterator<Item = PackageIter<'d, 'p>>, ()> {
+    tl_info!("Starting package linking...");
+    match link::link(&dest_path, &graph) {
+        Ok(it) => it,
+        Err(err) => {
+            sl_error!(
+                "{$red}Circular dependency found for package:{/$} {}",
+                err.0.absd()
+            );
+            Err(())
+        }
+    }
+}
+
+fn resolve_paths<'a>(dest_opt: Option<String>) -> Result<(PathWrapper, PathWrapper), ()> {
     let base_dirs = failopt!(BaseDirs::new(), {
         tl_error!("Couldn't determine HOME directory")
     });
