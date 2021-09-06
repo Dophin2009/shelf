@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::tree::Tree;
+pub use crate::tree::Tree;
 
 #[derive(Debug, Clone)]
 pub struct Spec {

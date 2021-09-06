@@ -1,20 +1,16 @@
 use std::collections::HashSet;
 use std::env;
-use std::fmt;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 use std::process::Stdio;
 
-use glob::{GlobError, PatternError};
 use mlua::Function;
 
-use crate::cache::{Cache, FsCache};
-use crate::error::EmptyError;
+use crate::cache::Cache;
 use crate::pathutil::PathWrapper;
 use crate::spec::{EnvMap, HandlebarsPartials, NonZeroExitBehavior, Patterns};
-use crate::templating;
 use crate::tree::Tree;
 
 #[derive(Debug, Clone)]

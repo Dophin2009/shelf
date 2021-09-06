@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::env;
 use std::path::PathBuf;
 
@@ -6,9 +7,11 @@ use directories_next::BaseDirs;
 
 use libshelf::action::{Resolve, ResolveOpts};
 use libshelf::cache::{Cache, DummyCache, FsCache};
-use libshelf::link;
-use libshelf::load::{Loader, LoaderError};
+use libshelf::data::PackageGraph;
+use libshelf::link::{self, PackageIter};
+use libshelf::load::SpecLoader;
 use libshelf::pathutil::PathWrapper;
+use libshelf::spec::Dep;
 
 const NAME: &str = "tidy";
 
@@ -80,54 +83,102 @@ fn run(opts: Options) -> Result<(), ()> {
     let (dest_path, cache_path) = resolve_paths(opts.home)?;
 
     let graph = load(&opts.packages)?;
-    let packages = link(&opts.dest, &graph)?;
+    let it = link(&opts.dest, &graph)?;
 
+    let mut cache = get_cache(opts.no_cache, cache_path);
+
+    let resolve_opts = ResolveOpts {};
+    execute(it, resolve_opts, &mut cache)?;
+
+    Ok(())
+}
+
+fn get_cache<C: Cache>(no_cache: bool, path: PathWrapper) -> C {
     let mut cache: Box<dyn Cache> = if !opts.no_cache {
         let mut cache = FsCache::empty(cache_path.abs());
         if opts.clear_cache {
             cache.clear();
         }
-        Box::new(cache)
+        cache
     } else {
-        Box::new(DummyCache::new())
+        DummyCache::new()
     };
+}
 
-    let resolve_opts = ResolveOpts {};
-    for actions in packages {
-        tl_info!("Linking {$blue}{}{/$}...", actions.name());
-        for action in actions {
-            // FIXME support for choosing fail-fast/skip/etc. on error
-            action.resolve(&resolve_opts, &mut cache);
-        }
+fn load_one(
+    path: PathWrapper,
+    parent: PathBuf,
+    pg: &mut PackageGraph,
+) -> Result<Vec<PathBuf>, LoadError> {
+    if !pg.contains(path.abs()) {
+        tl_info!("Loading package {[green]}", path.reld());
+        let loader = SpecLoader::new(path.clone())?;
+
+        sl_debug!("Reading package...");
+        let loader = loader.read()?;
+
+        sl_debug!("Evaluating Lua...");
+        let loader = loader.eval()?;
+        let data = loader.to_package_data()?;
+
+        let deps = data
+            .spec
+            .deps
+            .iter()
+            .map(|Dep { path }| path.clone())
+            .collect();
+
+        // Add to package graph.
+        let _ = pg.add(path.abs(), data);
+        let _ = pg.add_parent(path.abs(), parent);
+
+        Ok(Some((path.abs().to_path_buf(), deps)))
+    } else {
+        Ok(None)
     }
-
-    Ok(())
 }
 
 fn load(paths: &[String]) -> Result<PackageGraph, ()> {
     tl_info!("Loading packages...");
 
-    let mut loader = Loader::new();
-    paths.iter().for_each(|path| loader.add(path));
+    let paths: VecDeque<_> = paths
+        .iter()
+        .map(|path| PathWrapper::from_cwd(path))
+        .map(|path| (path, None))
+        .collect();
 
-    match loader.load(&opts.packages) {
-        Ok(graph) => graph,
-        Err(err) => {
-            sl_error!("{$red}Encountered errors while loading packages:{/$}\n");
+    let pg = PackageGraph::new();
+    let errors = Vec::new();
+    while let Some((path, parent)) = paths.pop_front() {
+        let deps = match load_one(path, parent, &mut pg) {
+            Ok(v) => v,
+            Err(err) => {
+                errors.push(err);
+                continue;
+            }
+        };
 
-            err.errors.0.iter().for_each(|(&err, path)| {
-                sl_error!("In {[green]}:", path.absd());
-                match err {
-                    LoadError::Read(err) => {
-                        sl_i_error!("{$red}Couldn't read the package config:{/$}", err);
-                    }
-                    LoadError::Lua(err) => {
-                        sl_i_error!("{$red}Couldn't evaluate Lua:{/$}", err);
-                    }
+        let dep_iter = deps.into_iter().map(|dep| (path.clone(), Some(dep)));
+        paths.extend(dep_iter);
+    }
+
+    if !errors.is_empty() {
+        sl_error!("{$red}Encountered errors while trying to load packages:{/$}\n");
+        for error in errors {
+            match err {
+                LoadError::Read(err) => {
+                    sl_error!("{$red}Couldn't read the package config:{/$}", err);
+                    sl_i_error!("Location: {[green]}", path);
                 }
-            });
-            Err(())
+                LoadError::Lua(err) => {
+                    sl_error!("{$red}Couldn't evaluate Lua:{/$}", err);
+                }
+            }
         }
+
+        Err(())
+    } else {
+        Ok(pg)
     }
 }
 
@@ -148,10 +199,29 @@ fn link<'d, 'p, P: AsRef<Path>>(
     }
 }
 
+fn execute<'d, 'p>(
+    it: impl Iterator<Item = PackageIter<'d, 'p>>,
+    opts: ResolveOpts,
+    cache: &mut dyn Cache,
+) -> Result<(), ()> {
+    for package_actions in it {
+        tl_info!("Linking {$blue}{}{/$}...", actions.name());
+        for action in package_actions {
+            // FIXME support for choosing fail-fast/skip/etc. on error
+            action.resolve(&resolve_opts, &mut cache);
+        }
+    }
+
+    Ok(())
+}
+
 fn resolve_paths<'a>(dest_opt: Option<String>) -> Result<(PathWrapper, PathWrapper), ()> {
-    let base_dirs = failopt!(BaseDirs::new(), {
-        tl_error!("Couldn't determine HOME directory")
-    });
+    let base_dirs = match BaseDirs::new() {
+        Some(bd) => bd,
+        None => {
+            tl_error!("Couldn't determine HOME directory");
+        }
+    };
 
     let dest_path = match dest_opt {
         Some(p) => PathBuf::from(p),

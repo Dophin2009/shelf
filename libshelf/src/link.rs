@@ -7,7 +7,7 @@ use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
     TomlAction, TreeAction, WriteAction, YamlAction,
 };
-use crate::graph::PackageGraph;
+use crate::data::{CircularDependencyError, PackageData, PackageGraph};
 use crate::pathutil::PathWrapper;
 use crate::spec::{
     CmdHook, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
@@ -21,8 +21,8 @@ pub fn link<'d, 'p>(
 ) -> Result<impl Iterator<Item = PackageIter<'d, 'p>>, CircularDependencyError> {
     let order = graph.order()?;
     let it = order.into_iter().map(move |package| {
-        let name = package.data.name.clone();
-        link_package(name, dest, &package.path, &package.data, &package.lua)
+        let name = package.spec.name.clone();
+        link_package(name, dest, &package.path, &package.spec, &package.lua)
     });
 
     Ok(it)

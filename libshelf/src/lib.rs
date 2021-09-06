@@ -2,7 +2,7 @@ pub mod error;
 
 mod action;
 mod cache;
-mod graph;
+mod data;
 mod link;
 mod load;
 mod op;
