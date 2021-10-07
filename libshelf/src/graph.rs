@@ -24,6 +24,16 @@ pub struct PackageData {
     pub lua: Lua,
 }
 
+impl fmt::Debug for PackageData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PackageData")
+            .field("path", &self.path)
+            .field("spec", &self.spec)
+            .finish()
+    }
+}
+
+#[derive(Debug)]
 pub struct PackageGraph {
     /// Directional graph of package dependencies.
     graph: DiGraphMap<u64, ()>,
@@ -69,11 +79,13 @@ impl PackageGraph {
 
         let path = path.as_ref().to_path_buf();
         let existing = self.datamap.insert(id, (path, data));
-        if existing.is_none() {
-            self.graph.add_node(id);
+        match existing {
+            Some((_, data)) => Some(data),
+            None => {
+                self.graph.add_node(id);
+                None
+            }
         }
-
-        existing
     }
 
     /// Removes a package from the graph, returning the data if it exists and `None` if it does
@@ -85,10 +97,12 @@ impl PackageGraph {
     {
         let id = self.keyid(&path);
 
-        let data = self.datamap.remove(&id)?;
-        self.graph.remove_node(id);
+        let data = self.datamap.remove(&id).map(|(_, data)| data);
+        if data.is_some() {
+            self.graph.remove_node(id);
+        }
 
-        Some(data)
+        data
     }
 
     /// Returns true if the graph contains the package.
@@ -194,8 +208,8 @@ impl PackageGraph {
             Ok(v) => v,
             Err(cycle) => {
                 let node_id = cycle.node_id();
-                let ps = self.datamap.get(&node_id).unwrap();
-                return Err(CircularDependencyError(ps.path.clone()).into());
+                let (_, data) = self.datamap.get(&node_id).unwrap();
+                return Err(CircularDependencyError(data.path.clone()).into());
             }
         };
         sorted.reverse();
@@ -220,7 +234,7 @@ where
     I: Iterator<Item = u64>,
 {
     order: I,
-    datamap: &'g HashMap<u64, PackageData>,
+    datamap: &'g HashMap<u64, (PathBuf, PackageData)>,
 }
 
 impl<'g, I> Iterator for Iter<'g, I>
@@ -231,13 +245,15 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let id = self.nodes.next()?;
-        self.datamap.get(id).map(|(path, data)| (path, data))
+        let id = self.order.next()?;
+        self.datamap
+            .get(&id)
+            .map(|(path, data)| (path.as_path(), data))
     }
 }
 
 pub struct IterMut<'g> {
-    inner: hash_map::IterMut<'g, u64, PackageData>,
+    inner: hash_map::IterMut<'g, u64, (PathBuf, PackageData)>,
 }
 
 impl<'g> Iterator for IterMut<'g> {

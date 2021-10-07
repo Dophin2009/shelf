@@ -44,35 +44,31 @@ impl<'g> Iterator for ActionIter<'g> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let drct = self.directives.next()?;
-        let action = self.convert(drct);
-
-        self.i += 1;
-
-        Some(action)
+        Some(self.from_directive(drct))
     }
 }
 
 impl<'g> ActionIter<'g> {
     #[inline]
-    fn convert(&self, drct: &Directive) -> Action<'g> {
+    fn from_directive(&self, drct: &Directive) -> Action<'g> {
         match drct {
-            Directive::File(f) => self.convert_file(f),
-            Directive::Hook(h) => self.convert_hook(h),
+            Directive::File(f) => self.from_file(f),
+            Directive::Hook(h) => self.from_hook(h),
         }
     }
 
     #[inline]
-    fn convert_file(&self, f: &File) -> Action<'g> {
+    fn from_file(&self, f: &File) -> Action<'g> {
         match f {
-            File::Regular(rf) => self.convert_regular(rf),
-            File::Templated(tf) => self.convert_template(tf),
-            File::Tree(tf) => self.convert_tree(tf),
-            File::Generated(gf) => self.convert_generated(gf),
+            File::Regular(rf) => self.from_file_regular(rf),
+            File::Templated(tf) => self.from_file_template(tf),
+            File::Tree(tf) => self.from_file_tree(tf),
+            File::Generated(gf) => self.from_file_generated(gf),
         }
     }
 
     #[inline]
-    fn convert_regular(&self, rf: &RegularFile) -> Action<'g> {
+    fn from_file_regular(&self, rf: &RegularFile) -> Action<'g> {
         let RegularFile {
             src,
             dest,
@@ -114,7 +110,7 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn convert_template(&self, tf: &TemplatedFile) -> Action<'g> {
+    fn from_file_template(&self, tf: &TemplatedFile) -> Action<'g> {
         let TemplatedFile {
             src,
             dest,
@@ -160,7 +156,7 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn convert_tree(&self, tf: &TreeFile) -> Action<'g> {
+    fn from_file_tree(&self, tf: &TreeFile) -> Action<'g> {
         let TreeFile {
             src,
             dest,
@@ -215,7 +211,7 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn convert_generated(&self, gf: &GeneratedFile) -> Action<'g> {
+    fn from_file_generated(&self, gf: &GeneratedFile) -> Action<'g> {
         let GeneratedFile { dest, typ } = gf;
 
         // FIXME this is terrible
@@ -269,15 +265,15 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn convert_hook(&self, h: &Hook) -> Action<'g> {
+    fn from_hook(&self, h: &Hook) -> Action<'g> {
         match h {
-            Hook::Cmd(cmd) => self.convert_hook_cmd(cmd),
-            Hook::Fun(fun) => self.convert_hook_fun(fun),
+            Hook::Cmd(cmd) => self.from_hook_cmd(cmd),
+            Hook::Fun(fun) => self.from_hook_fun(fun),
         }
     }
 
     #[inline]
-    fn convert_hook_cmd(&self, cmd: &CmdHook) -> Action<'g> {
+    fn from_hook_cmd(&self, cmd: &CmdHook) -> Action<'g> {
         let CmdHook {
             command,
             start,
@@ -297,10 +293,10 @@ impl<'g> ActionIter<'g> {
         // );
 
         // Normalize start path.
-        let start_w = start
+        let start = start
             .as_ref()
             .map(|start| self.join_package(start))
-            .unwrap_or(self.path.clone());
+            .unwrap_or(self.path.to_path_buf());
 
         let command = command.clone();
         // Use sh as default shell.
@@ -313,7 +309,7 @@ impl<'g> ActionIter<'g> {
 
         Action::Command(CommandAction {
             command,
-            start: start_w,
+            start,
             shell,
             stdout,
             stderr,
@@ -324,7 +320,7 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn convert_hook_fun(&self, fun: &FunHook) -> Action<'g> {
+    fn from_hook_fun(&self, fun: &FunHook) -> Action<'g> {
         let FunHook {
             name,
             start,
@@ -342,7 +338,7 @@ impl<'g> ActionIter<'g> {
         let start = start
             .as_ref()
             .map(|start| self.join_package(start))
-            .unwrap_or_else(|| self.path.clone());
+            .unwrap_or_else(|| self.path.to_path_buf());
 
         Action::Function(FunctionAction {
             function,
@@ -368,11 +364,11 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn normalize_path<P, S>(&self, path: P, start: S) -> PathWrapper
+    fn normalize_path<P, S>(&self, path: P, start: S) -> PathBuf
     where
         P: AsRef<Path>,
         S: AsRef<Path>,
     {
-        start.as_ref().clean().join(path.clean())
+        start.as_ref().join(path).clean()
     }
 }
