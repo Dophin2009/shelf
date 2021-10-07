@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::slice;
 
 use mlua::{Function, Lua};
 
@@ -7,65 +8,41 @@ use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
     TomlAction, TreeAction, WriteAction, YamlAction,
 };
-use crate::data::{CircularDependencyError, PackageData, PackageGraph};
-use crate::pathutil::PathWrapper;
+use crate::graph::{CircularDependencyError, PackageData, PackageGraph};
 use crate::spec::{
     CmdHook, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
     NonZeroExitBehavior, RegularFile, Spec, TemplatedFile, TemplatedFileType, TreeFile,
 };
 
-#[inline]
-pub fn link<'d, 'p>(
-    dest: &'d PathWrapper,
-    graph: &'p PackageGraph,
-) -> Result<impl Iterator<Item = PackageIter<'d, 'p>>, CircularDependencyError> {
-    let order = graph.order()?;
-    let it = order.into_iter().map(move |package| {
-        let name = package.spec.name.clone();
-        link_package(name, dest, &package.path, &package.spec, &package.lua)
-    });
-
-    Ok(it)
-}
-
-#[inline]
-fn link_package<'d, 'p>(
-    name: String,
-    dest: &'d PathWrapper,
-    path: &'p PathWrapper,
-    spec: &'p Spec,
-    lua: &'p Lua,
-) -> PackageIter<'d, 'p> {
-    PackageIter {
-        name,
-        path,
-        dest,
-        lua,
-        directives: spec.directives.iter().collect(),
-        i: 0,
-        n: spec.directives.len(),
+impl PackageData {
+    #[inline]
+    pub fn action_iter(&self, dest: P) -> ActionIter<'_>
+    where
+        P: AsRef<Path>,
+    {
+        ActionIter {
+            dest: dest.as_ref().to_path_buf(),
+            path: &self.path,
+            lua: &self.lua,
+            directives: self.spec.directives.iter(),
+        }
     }
 }
 
-pub struct PackageIter<'d, 'p> {
-    name: String,
+pub struct ActionIter<'g> {
+    dest: PathBuf,
+    path: &'g Path,
+    lua: &'g Lua,
 
-    dest: &'d PathWrapper,
-    path: &'p PathWrapper,
-    lua: &'p Lua,
-
-    directives: VecDeque<&'p Directive>,
-
-    i: usize,
-    n: usize,
+    directives: vec::Iter<'g, Directive>,
 }
 
-impl<'d, 'p> Iterator for PackageIter<'d, 'p> {
+impl<'d, 'p> Iterator for ActionIter<'d, 'p> {
     type Item = Action<'p>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let drct = self.directives.pop_front()?;
+        let drct = self.directives.next()?;
         let action = self.convert(drct);
 
         self.i += 1;
@@ -74,12 +51,7 @@ impl<'d, 'p> Iterator for PackageIter<'d, 'p> {
     }
 }
 
-impl<'d, 'p> PackageIter<'d, 'p> {
-    #[inline]
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
+impl<'d, 'p> ActionIter<'d, 'p> {
     #[inline]
     fn convert(&self, drct: &Directive) -> Action<'p> {
         match drct {

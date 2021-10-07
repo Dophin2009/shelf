@@ -3,10 +3,11 @@ pub mod error;
 pub mod graph;
 pub mod spec;
 
-// mod action;
+pub mod link;
+pub mod load;
+
+mod action;
 // mod cache;
-// mod link;
-mod load;
 // mod op;
 // mod templating;
 mod tree;

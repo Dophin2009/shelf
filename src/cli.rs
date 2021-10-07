@@ -10,8 +10,9 @@ use directories_next::BaseDirs;
 use libshelf::graph::PackageGraph;
 // use libshelf::link::{self, PackageIter};
 use libshelf::load::SpecLoader;
-use libshelf::pathutil::PathWrapper;
 use libshelf::spec::Dep;
+
+use crate::pathutil::PathWrapper;
 
 const NAME: &str = "tidy";
 

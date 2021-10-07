@@ -5,10 +5,13 @@ use std::collections::{
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::vec;
 
 use mlua::Lua;
-use petgraph::graphmap::Nodes;
-use petgraph::{algo, graphmap::DiGraphMap};
+use petgraph::{
+    algo,
+    graphmap::{DiGraphMap, Nodes},
+};
 
 use crate::spec::Spec;
 
@@ -25,7 +28,7 @@ pub struct PackageGraph {
     /// Directional graph of package dependencies.
     graph: DiGraphMap<u64, ()>,
     /// Map storing package data.
-    datamap: HashMap<u64, PackageData>,
+    datamap: HashMap<u64, (PathBuf, PackageData)>,
 }
 
 impl PackageGraph {
@@ -38,12 +41,12 @@ impl PackageGraph {
     }
 
     #[inline]
-    pub fn get<P>(&self, path: P) -> Option<&PackageData>
+    pub fn get<P>(&self, path: P) -> Option<(&PathBuf, &PackageData)>
     where
         P: AsRef<Path>,
     {
-        let id = self.keyid(path);
-        self.datamap.get(&id)
+        let id = self.keyid(&path);
+        self.datamap.get(&id).map(|(path, data)| (path, data))
     }
 
     #[inline]
@@ -51,7 +54,7 @@ impl PackageGraph {
     where
         P: AsRef<Path>,
     {
-        let id = self.keyid(path);
+        let id = self.keyid(&path);
         self.datamap.contains_key(&id)
     }
 
@@ -62,9 +65,10 @@ impl PackageGraph {
     where
         P: AsRef<Path>,
     {
-        let id = self.keyid(path);
+        let id = self.keyid(&path);
 
-        let existing = self.datamap.insert(id, data);
+        let path = path.as_ref().to_path_buf();
+        let existing = self.datamap.insert(id, (path, data));
         if existing.is_none() {
             self.graph.add_node(id);
         }
@@ -79,7 +83,7 @@ impl PackageGraph {
     where
         P: AsRef<Path>,
     {
-        let id = self.keyid(path);
+        let id = self.keyid(&path);
 
         let data = self.datamap.remove(&id)?;
         self.graph.remove_node(id);
@@ -93,7 +97,7 @@ impl PackageGraph {
     where
         P: AsRef<Path>,
     {
-        let id = self.keyid(path);
+        let id = self.keyid(&path);
         self.datamap.contains_key(&id)
     }
 
@@ -168,15 +172,16 @@ impl PackageGraph {
     }
 
     #[inline]
-    pub fn iter(&self) -> PackageIter<'_> {
-        PackageIter {
-            inner: self.datamap.iter(),
+    pub fn iter(&self) -> Iter<'_, Nodes<'_, u64>> {
+        Iter {
+            order: self.graph.nodes(),
+            datamap: &self.datamap,
         }
     }
 
     #[inline]
-    pub fn iter_mut(&mut self) -> PackageIterMut<'_> {
-        PackageIterMut {
+    pub fn iter_mut(&mut self) -> IterMut<'_> {
+        IterMut {
             inner: self.datamap.iter_mut(),
         }
     }
@@ -184,7 +189,7 @@ impl PackageGraph {
     /// Returns an iterator of packages in topological sort order, with dependencies coming before
     /// dependents.
     #[inline]
-    pub fn order<'g>(&'g self) -> Result<Vec<&'g PackageData>, CircularDependencyError> {
+    pub fn order<'g>(&'g self) -> Result<Iter<'g, vec::IntoIter<u64>>, CircularDependencyError> {
         let mut sorted = match algo::toposort(&self.graph, None) {
             Ok(v) => v,
             Err(cycle) => {
@@ -195,14 +200,10 @@ impl PackageGraph {
         };
         sorted.reverse();
 
-        let vec = sorted
-            .into_iter()
-            .map(|id| {
-                // This is safe because data is guaranteed to be in map.
-                self.datamap.get(&id).unwrap()
-            })
-            .collect();
-        Ok(vec)
+        Ok(Iter {
+            order: sorted.into_iter(),
+            datamap: &self.datamap,
+        })
     }
 
     #[inline]
@@ -214,29 +215,37 @@ impl PackageGraph {
     }
 }
 
-pub struct PackageIter<'g> {
-    inner: hash_map::Iter<'g, u64, PackageData>,
+pub struct Iter<'g, I>
+where
+    I: Iterator<Item = u64>,
+{
+    order: I,
+    datamap: &'g HashMap<u64, PackageData>,
 }
 
-impl<'g> Iterator for PackageIter<'g> {
-    type Item = &'g PackageData;
+impl<'g, I> Iterator for Iter<'g, I>
+where
+    I: Iterator<Item = u64>,
+{
+    type Item = (&'g Path, &'g PackageData);
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|(_, v)| v)
+        let id = self.nodes.next()?;
+        self.datamap.get(id).map(|(path, data)| (path, data))
     }
 }
 
-pub struct PackageIterMut<'g> {
+pub struct IterMut<'g> {
     inner: hash_map::IterMut<'g, u64, PackageData>,
 }
 
-impl<'g> Iterator for PackageIterMut<'g> {
+impl<'g> Iterator for IterMut<'g> {
     type Item = &'g mut PackageData;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|(_, v)| v)
+        self.inner.next().map(|(_, (_, v))| v)
     }
 }
 
