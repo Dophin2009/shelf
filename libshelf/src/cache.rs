@@ -126,4 +126,8 @@ impl FileMeta {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum FileTyp {}
+pub enum FileTyp {
+    File { content_hash: u64 },
+    Dir,
+    Link,
+}

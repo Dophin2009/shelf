@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::fmt;
 use std::path::{Path, PathBuf};
 use std::slice;
 
@@ -9,10 +9,10 @@ use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
     TomlAction, TreeAction, WriteAction, YamlAction,
 };
-use crate::graph::{CircularDependencyError, PackageData, PackageGraph};
+use crate::graph::PackageData;
 use crate::spec::{
     CmdHook, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
-    NonZeroExitBehavior, RegularFile, Spec, TemplatedFile, TemplatedFileType, TreeFile,
+    NonZeroExitBehavior, RegularFile, TemplatedFile, TemplatedFileType, TreeFile,
 };
 
 impl PackageData {
@@ -35,7 +35,18 @@ pub struct ActionIter<'g> {
     path: &'g Path,
     lua: &'g Lua,
 
-    directives: vec::Iter<'g, Directive>,
+    directives: slice::Iter<'g, Directive>,
+}
+
+impl<'p> fmt::Debug for ActionIter<'p> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ActionIter")
+            .field("dest", &self.dest)
+            .field("path", &self.path)
+            .field("lua", &"<lua>")
+            .field("directives", &self.directives)
+            .finish()
+    }
 }
 
 impl<'g> Iterator for ActionIter<'g> {

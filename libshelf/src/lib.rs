@@ -6,8 +6,9 @@ pub mod spec;
 pub mod link;
 pub mod load;
 
-mod action;
-// mod cache;
-// mod op;
-// mod templating;
+pub mod action;
+pub mod cache;
+pub mod op;
+
+mod templating;
 mod tree;

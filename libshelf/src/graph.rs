@@ -29,6 +29,7 @@ impl fmt::Debug for PackageData {
         f.debug_struct("PackageData")
             .field("path", &self.path)
             .field("spec", &self.spec)
+            .field("lua", &"<lua>")
             .finish()
     }
 }
