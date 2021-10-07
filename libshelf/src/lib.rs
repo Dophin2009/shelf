@@ -1,12 +1,13 @@
 pub mod error;
 
-mod action;
-mod cache;
-mod data;
-mod link;
+pub mod graph;
+pub mod spec;
+
+// mod action;
+// mod cache;
+// mod link;
 mod load;
-mod op;
+// mod op;
 mod pathutil;
-mod spec;
-mod templating;
+// mod templating;
 mod tree;

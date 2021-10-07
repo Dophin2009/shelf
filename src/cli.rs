@@ -5,10 +5,10 @@ use std::path::PathBuf;
 use clap::Clap;
 use directories_next::BaseDirs;
 
-use libshelf::action::{Resolve, ResolveOpts};
-use libshelf::cache::{Cache, DummyCache, FsCache};
-use libshelf::data::PackageGraph;
-use libshelf::link::{self, PackageIter};
+// use libshelf::action::{Resolve, ResolveOpts};
+// use libshelf::cache::{Cache, DummyCache, FsCache};
+use libshelf::graph::PackageGraph;
+// use libshelf::link::{self, PackageIter};
 use libshelf::load::SpecLoader;
 use libshelf::pathutil::PathWrapper;
 use libshelf::spec::Dep;
@@ -83,27 +83,27 @@ fn run(opts: Options) -> Result<(), ()> {
     let (dest_path, cache_path) = resolve_paths(opts.home)?;
 
     let graph = load(&opts.packages)?;
-    let it = link(&opts.dest, &graph)?;
+    // let it = link(&opts.dest, &graph)?;
 
-    let mut cache = get_cache(opts.no_cache, cache_path);
+    // let mut cache = get_cache(opts.no_cache, cache_path);
 
-    let resolve_opts = ResolveOpts {};
-    execute(it, resolve_opts, &mut cache)?;
+    // let resolve_opts = ResolveOpts {};
+    // execute(it, resolve_opts, &mut cache)?;
 
     Ok(())
 }
 
-fn get_cache<C: Cache>(no_cache: bool, path: PathWrapper) -> C {
-    let mut cache: Box<dyn Cache> = if !opts.no_cache {
-        let mut cache = FsCache::empty(cache_path.abs());
-        if opts.clear_cache {
-            cache.clear();
-        }
-        cache
-    } else {
-        DummyCache::new()
-    };
-}
+// fn get_cache<C: Cache>(no_cache: bool, path: PathWrapper) -> C {
+// let mut cache: Box<dyn Cache> = if !opts.no_cache {
+// let mut cache = FsCache::empty(cache_path.abs());
+// if opts.clear_cache {
+// cache.clear();
+// }
+// cache
+// } else {
+// DummyCache::new()
+// };
+// }
 
 fn load_one(
     path: PathWrapper,
@@ -129,7 +129,7 @@ fn load_one(
             .collect();
 
         // Add to package graph.
-        let _ = pg.add(path.abs(), data);
+        let _ = pg.add_package(path.abs(), data);
         let _ = pg.add_parent(path.abs(), parent);
 
         Ok(Some((path.abs().to_path_buf(), deps)))
@@ -182,44 +182,45 @@ fn load(paths: &[String]) -> Result<PackageGraph, ()> {
     }
 }
 
-fn link<'d, 'p, P: AsRef<Path>>(
-    dest: P,
-    graph: &PackageGraph,
-) -> Result<impl Iterator<Item = PackageIter<'d, 'p>>, ()> {
-    tl_info!("Starting package linking...");
-    match link::link(&dest_path, &graph) {
-        Ok(it) => it,
-        Err(err) => {
-            sl_error!(
-                "{$red}Circular dependency found for package:{/$} {}",
-                err.0.absd()
-            );
-            Err(())
-        }
-    }
-}
+// fn link<'d, 'p, P: AsRef<Path>>(
+// dest: P,
+// graph: &PackageGraph,
+// ) -> Result<impl Iterator<Item = PackageIter<'d, 'p>>, ()> {
+// tl_info!("Starting package linking...");
+// match link::link(&dest_path, &graph) {
+// Ok(it) => it,
+// Err(err) => {
+// sl_error!(
+// "{$red}Circular dependency found for package:{/$} {}",
+// err.0.absd()
+// );
+// Err(())
+// }
+// }
+// }
 
-fn execute<'d, 'p>(
-    it: impl Iterator<Item = PackageIter<'d, 'p>>,
-    opts: ResolveOpts,
-    cache: &mut dyn Cache,
-) -> Result<(), ()> {
-    for package_actions in it {
-        tl_info!("Linking {$blue}{}{/$}...", actions.name());
-        for action in package_actions {
-            // FIXME support for choosing fail-fast/skip/etc. on error
-            action.resolve(&resolve_opts, &mut cache);
-        }
-    }
+// fn execute<'d, 'p>(
+// it: impl Iterator<Item = PackageIter<'d, 'p>>,
+// opts: ResolveOpts,
+// cache: &mut dyn Cache,
+// ) -> Result<(), ()> {
+// for package_actions in it {
+// tl_info!("Linking {$blue}{}{/$}...", actions.name());
+// for action in package_actions {
+// // FIXME support for choosing fail-fast/skip/etc. on error
+// action.resolve(&resolve_opts, &mut cache);
+// }
+// }
 
-    Ok(())
-}
+// Ok(())
+// }
 
 fn resolve_paths<'a>(dest_opt: Option<String>) -> Result<(PathWrapper, PathWrapper), ()> {
     let base_dirs = match BaseDirs::new() {
         Some(bd) => bd,
         None => {
             tl_error!("Couldn't determine HOME directory");
+            return Err(());
         }
     };
 

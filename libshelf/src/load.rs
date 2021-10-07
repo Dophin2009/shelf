@@ -1,14 +1,13 @@
-use std::borrow::Cow;
 use std::env;
 use std::fs::File;
 use std::io::{self, Read};
 use std::marker::PhantomData;
+use std::path::{Path, PathBuf};
 
 use mlua::Lua;
 
 use self::specobject::SpecObject;
-use crate::data::PackageData;
-use crate::pathutil::PathWrapper;
+use crate::graph::PackageData;
 
 static CONFIG_FILE: &str = "package.lua";
 
@@ -25,7 +24,7 @@ pub struct SpecLoader<S>
 where
     S: SpecLoaderState,
 {
-    path: PathWrapper,
+    path: PathBuf,
     contents: String,
     lua: Lua,
 
@@ -37,10 +36,11 @@ pub type SpecLoaderRead = SpecLoader<SpecLoaderStateRead>;
 pub type SpecLoaderEvaled = SpecLoader<SpecLoaderStateEvaled>;
 
 /// Typestates for [`SpecLoader`].
-trait SpecLoaderState {}
+pub trait SpecLoaderState: specobject::SpecLoaderState {}
 macro_rules! spec_loader_state {
     ($name:ident) => {
         pub struct $name;
+        impl specobject::SpecLoaderState for $name {}
         impl SpecLoaderState for $name {}
     };
     ($($names:ident),* $(,)?) => {
@@ -57,10 +57,13 @@ spec_loader_state!(
 impl SpecLoaderEmpty {
     /// Create a loader for the package at the given path.
     #[inline]
-    pub fn new(path: PathWrapper) -> Result<Self, LoadError> {
-        let lua = Self::new_lua_inst()?;
+    pub fn new<P>(path: P) -> Result<Self, LoadError>
+    where
+        P: AsRef<Path>,
+    {
+        let lua = Self::lua_instance()?;
         Ok(Self {
-            path,
+            path: path.as_ref().to_owned(),
             contents: String::new(),
             lua,
             state: PhantomData,
@@ -68,7 +71,7 @@ impl SpecLoaderEmpty {
     }
 
     #[inline]
-    fn new_lua_inst() -> Result<Lua, mlua::Error> {
+    fn lua_instance() -> Result<Lua, mlua::Error> {
         #[cfg(not(feature = "unsafe"))]
         let lua = Lua::new();
         #[cfg(feature = "unsafe")]
@@ -84,18 +87,17 @@ impl SpecLoaderEmpty {
     #[inline]
     pub fn load<'a, P>(path: P) -> Result<PackageData, LoadError>
     where
-        P: Into<Cow<'a, PathWrapper>>,
+        P: AsRef<Path>,
     {
-        let path: Cow<'a, PathWrapper> = path.into();
-        let loader = Self::new(path.into_owned())?;
+        let loader = Self::new(path)?;
         loader.finish()
     }
 
     /// Read the configuration contents.
     #[inline]
-    pub fn read(self) -> Result<SpecLoaderRead, io::Error> {
+    pub fn read(mut self) -> Result<SpecLoaderRead, io::Error> {
         let config_path = self.path.join(CONFIG_FILE);
-        let file = File::open(config_path.abs())?;
+        let mut file = File::open(config_path)?;
         file.read_to_string(&mut self.contents)?;
 
         Ok(SpecLoader {
@@ -121,7 +123,7 @@ impl SpecLoaderRead {
         // Save current cwd.
         let cwd = env::current_dir().unwrap();
         // Work relative to the package root.
-        env::set_current_dir(self.path.abs()).unwrap();
+        env::set_current_dir(&self.path).unwrap();
 
         // Eval lua.
         let chunk = self.lua.load(&self.contents);
@@ -175,6 +177,8 @@ mod specobject {
         LiquidTemplatedFile, NonZeroExitBehavior, Patterns, RegularFile, Spec, StringGeneratedFile,
         TemplatedFile, TemplatedFileType, TomlGeneratedFile, Tree, TreeFile, YamlGeneratedFile,
     };
+
+    pub trait SpecLoaderState {}
 
     #[derive(Debug, Clone)]
     pub(super) struct SpecObject {
