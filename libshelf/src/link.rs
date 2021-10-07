@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::slice;
 
 use mlua::{Function, Lua};
+use path_clean::PathClean;
 
 use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
@@ -37,8 +38,8 @@ pub struct ActionIter<'g> {
     directives: vec::Iter<'g, Directive>,
 }
 
-impl<'d, 'p> Iterator for ActionIter<'d, 'p> {
-    type Item = Action<'p>;
+impl<'g> Iterator for ActionIter<'g> {
+    type Item = Action<'g>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -51,9 +52,9 @@ impl<'d, 'p> Iterator for ActionIter<'d, 'p> {
     }
 }
 
-impl<'d, 'p> ActionIter<'d, 'p> {
+impl<'g> ActionIter<'g> {
     #[inline]
-    fn convert(&self, drct: &Directive) -> Action<'p> {
+    fn convert(&self, drct: &Directive) -> Action<'g> {
         match drct {
             Directive::File(f) => self.convert_file(f),
             Directive::Hook(h) => self.convert_hook(h),
@@ -61,7 +62,7 @@ impl<'d, 'p> ActionIter<'d, 'p> {
     }
 
     #[inline]
-    fn convert_file(&self, f: &File) -> Action<'p> {
+    fn convert_file(&self, f: &File) -> Action<'g> {
         match f {
             File::Regular(rf) => self.convert_regular(rf),
             File::Templated(tf) => self.convert_template(tf),
@@ -71,7 +72,7 @@ impl<'d, 'p> ActionIter<'d, 'p> {
     }
 
     #[inline]
-    fn convert_regular(&self, rf: &RegularFile) -> Action<'p> {
+    fn convert_regular(&self, rf: &RegularFile) -> Action<'g> {
         let RegularFile {
             src,
             dest,
@@ -79,19 +80,19 @@ impl<'d, 'p> ActionIter<'d, 'p> {
             optional,
         } = rf;
 
-        let (link_s, copy_s) = match link_type {
-            LinkType::Link => ("link", ""),
-            LinkType::Copy => ("", "copy"),
-        };
-        idx_debug!(
-            self.i,
-            self.n,
-            "{$cyan+bold}file{/$} ({[green]}{[yellow]} {[green]} {$dimmed}->{/$} {[green]})",
-            link_s,
-            copy_s,
-            src.display(),
-            dest.as_ref().unwrap_or(&src).display()
-        );
+        // let (link_s, copy_s) = match link_type {
+        // LinkType::Link => ("link", ""),
+        // LinkType::Copy => ("", "copy"),
+        // };
+        // idx_debug!(
+        // self.i,
+        // self.n,
+        // "{$cyan+bold}file{/$} ({[green]}{[yellow]} {[green]} {$dimmed}->{/$} {[green]})",
+        // link_s,
+        // copy_s,
+        // src.display(),
+        // dest.as_ref().unwrap_or(&src).display()
+        // );
 
         // Normalize src.
         let src_w = self.join_package(src);
@@ -113,7 +114,7 @@ impl<'d, 'p> ActionIter<'d, 'p> {
     }
 
     #[inline]
-    fn convert_template(&self, tf: &TemplatedFile) -> Action<'p> {
+    fn convert_template(&self, tf: &TemplatedFile) -> Action<'g> {
         let TemplatedFile {
             src,
             dest,
@@ -122,19 +123,19 @@ impl<'d, 'p> ActionIter<'d, 'p> {
             optional,
         } = tf;
 
-        let (hbs_s, liquid_s) = match typ {
-            TemplatedFileType::Handlebars(_) => ("hbs", ""),
-            TemplatedFileType::Liquid(_) => ("", "liquid"),
-        };
-        idx_debug!(
-            self.i,
-            self.n,
-            "{$yellow+bold}template{/$} ({[red]}{[blue]} {[green]} {$dimmed}->{/$} {[green]})",
-            hbs_s,
-            liquid_s,
-            src.display(),
-            dest.display()
-        );
+        // let (hbs_s, liquid_s) = match typ {
+        // TemplatedFileType::Handlebars(_) => ("hbs", ""),
+        // TemplatedFileType::Liquid(_) => ("", "liquid"),
+        // };
+        // idx_debug!(
+        // self.i,
+        // self.n,
+        // "{$yellow+bold}template{/$} ({[red]}{[blue]} {[green]} {$dimmed}->{/$} {[green]})",
+        // hbs_s,
+        // liquid_s,
+        // src.display(),
+        // dest.display()
+        // );
 
         // Normalize src.
         let src_w = self.join_package(src);
@@ -159,7 +160,7 @@ impl<'d, 'p> ActionIter<'d, 'p> {
     }
 
     #[inline]
-    fn convert_tree(&self, tf: &TreeFile) -> Action<'p> {
+    fn convert_tree(&self, tf: &TreeFile) -> Action<'g> {
         let TreeFile {
             src,
             dest,
@@ -169,21 +170,21 @@ impl<'d, 'p> ActionIter<'d, 'p> {
             optional,
         } = tf;
 
-        let (link_s, copy_s) = match link_type {
-            LinkType::Link => ("link", ""),
-            LinkType::Copy => ("", "copy"),
-        };
-        idx_debug!(
-            self.i,
-            self.n,
-            "{$yellow+bold}template{/$} ({[green]}{[yellow]} {[green]} {$dimmed}->{/$} {[green]})",
-            link_s,
-            copy_s,
-            src.display(),
-            dest.as_ref()
-                .map(|dest| dest.display().to_string())
-                .unwrap_or(".".to_string())
-        );
+        // let (link_s, copy_s) = match link_type {
+        // LinkType::Link => ("link", ""),
+        // LinkType::Copy => ("", "copy"),
+        // };
+        // idx_debug!(
+        // self.i,
+        // self.n,
+        // "{$yellow+bold}template{/$} ({[green]}{[yellow]} {[green]} {$dimmed}->{/$} {[green]})",
+        // link_s,
+        // copy_s,
+        // src.display(),
+        // dest.as_ref()
+        // .map(|dest| dest.display().to_string())
+        // .unwrap_or(".".to_string())
+        // );
 
         // Normalize src.
         let src_w = self.join_package(src);
@@ -214,28 +215,28 @@ impl<'d, 'p> ActionIter<'d, 'p> {
     }
 
     #[inline]
-    fn convert_generated(&self, gf: &GeneratedFile) -> Action<'p> {
+    fn convert_generated(&self, gf: &GeneratedFile) -> Action<'g> {
         let GeneratedFile { dest, typ } = gf;
 
         // FIXME this is terrible
-        let (empty_s, string_s, yaml_s, toml_s, json_s) = match &typ {
-            GeneratedFileTyp::Empty(_) => ("empty", "", "", "", ""),
-            GeneratedFileTyp::String(_) => ("", "toml", "", "", ""),
-            GeneratedFileTyp::Yaml(_) => ("", "", "yaml", "", ""),
-            GeneratedFileTyp::Toml(_) => ("", "", "", "toml", ""),
-            GeneratedFileTyp::Json(_) => ("", "", "", "", "json"),
-        };
-        idx_debug!(
-            self.i,
-            self.n,
-            "{$magenta+bold}generate{/$} ({[white]}{[blue]}{[green]}{[yellow]}{[red]} {[green]})",
-            empty_s,
-            string_s,
-            yaml_s,
-            toml_s,
-            json_s,
-            dest.display()
-        );
+        // let (empty_s, string_s, yaml_s, toml_s, json_s) = match &typ {
+        // GeneratedFileTyp::Empty(_) => ("empty", "", "", "", ""),
+        // GeneratedFileTyp::String(_) => ("", "toml", "", "", ""),
+        // GeneratedFileTyp::Yaml(_) => ("", "", "yaml", "", ""),
+        // GeneratedFileTyp::Toml(_) => ("", "", "", "toml", ""),
+        // GeneratedFileTyp::Json(_) => ("", "", "", "", "json"),
+        // };
+        // idx_debug!(
+        // self.i,
+        // self.n,
+        // "{$magenta+bold}generate{/$} ({[white]}{[blue]}{[green]}{[yellow]}{[red]} {[green]})",
+        // empty_s,
+        // string_s,
+        // yaml_s,
+        // toml_s,
+        // json_s,
+        // dest.display()
+        // );
 
         // Normalize dest.
         let dest_w = self.join_dest(dest);
@@ -268,7 +269,7 @@ impl<'d, 'p> ActionIter<'d, 'p> {
     }
 
     #[inline]
-    fn convert_hook(&self, h: &Hook) -> Action<'p> {
+    fn convert_hook(&self, h: &Hook) -> Action<'g> {
         match h {
             Hook::Cmd(cmd) => self.convert_hook_cmd(cmd),
             Hook::Fun(fun) => self.convert_hook_fun(fun),
@@ -276,7 +277,7 @@ impl<'d, 'p> ActionIter<'d, 'p> {
     }
 
     #[inline]
-    fn convert_hook_cmd(&self, cmd: &CmdHook) -> Action<'p> {
+    fn convert_hook_cmd(&self, cmd: &CmdHook) -> Action<'g> {
         let CmdHook {
             command,
             start,
@@ -288,14 +289,12 @@ impl<'d, 'p> ActionIter<'d, 'p> {
             nonzero_exit,
         } = cmd;
 
-        // Use sh as default shell.
-        let shell = shell.as_ref().map(String::as_str).unwrap_or("sh");
-        idx_debug!(
-            self.i,
-            self.n,
-            "{$blue+bold}hook{/$} ({$white}shell{/$} '{[dimmed]})",
-            command
-        );
+        // idx_debug!(
+        // self.i,
+        // self.n,
+        // "{$blue+bold}hook{/$} ({$white}shell{/$} '{[dimmed]})",
+        // command
+        // );
 
         // Normalize start path.
         let start_w = start
@@ -304,7 +303,8 @@ impl<'d, 'p> ActionIter<'d, 'p> {
             .unwrap_or(self.path.clone());
 
         let command = command.clone();
-        let shell = shell.to_string();
+        // Use sh as default shell.
+        let shell = shell.clone().unwrap_or("sh".to_string());
         let stdout = *stdout.as_ref().unwrap_or(&true);
         let stderr = *stderr.as_ref().unwrap_or(&true);
         let clean_env = *clean_env.as_ref().unwrap_or(&false);
@@ -324,18 +324,18 @@ impl<'d, 'p> ActionIter<'d, 'p> {
     }
 
     #[inline]
-    fn convert_hook_fun(&self, fun: &FunHook) -> Action<'p> {
+    fn convert_hook_fun(&self, fun: &FunHook) -> Action<'g> {
         let FunHook {
             name,
             start,
             error_exit,
         } = fun;
 
-        idx_debug!(
-            self.i,
-            self.n,
-            "{$blue+bold}hook{/$} ({$white}fn{/$} '{$dimmed+italic}<function>{/$})"
-        );
+        // idx_debug!(
+        // self.i,
+        // self.n,
+        // "{$blue+bold}hook{/$} ({$white}fn{/$} '{$dimmed+italic}<function>{/$})"
+        // );
 
         // Load function from Lua registry.
         let function: Function = self.lua.named_registry_value(name).unwrap();
@@ -352,19 +352,19 @@ impl<'d, 'p> ActionIter<'d, 'p> {
     }
 
     #[inline]
-    fn join_package<P>(&self, path: P) -> PathWrapper
+    fn join_package<P>(&self, path: P) -> PathBuf
     where
         P: AsRef<Path>,
     {
-        self.normalize_path(path, &self.path.abs())
+        self.normalize_path(path, &self.path)
     }
 
     #[inline]
-    fn join_dest<P>(&self, path: P) -> PathWrapper
+    fn join_dest<P>(&self, path: P) -> PathBuf
     where
         P: AsRef<Path>,
     {
-        self.normalize_path(path, &self.dest.abs())
+        self.normalize_path(path, &self.dest)
     }
 
     #[inline]
@@ -373,6 +373,6 @@ impl<'d, 'p> ActionIter<'d, 'p> {
         P: AsRef<Path>,
         S: AsRef<Path>,
     {
-        PathWrapper::from_with_start(path.as_ref().to_path_buf(), start)
+        start.as_ref().clean().join(path.clean())
     }
 }

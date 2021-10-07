@@ -361,6 +361,7 @@ dependencies = [
  "handlebars",
  "liquid",
  "mlua",
+ "path-clean",
  "petgraph",
  "serde",
  "serde_json",
