@@ -1,6 +1,7 @@
 #[macro_use]
 mod output;
 mod cli;
+mod pathutil;
 
 use std::process;
 

@@ -17,6 +17,7 @@ bunt = "0.2"
 bunt-logger = "0.1"
 clap = "3.0.0-beta.4"
 directories-next = "2.0"
+path-clean = "0.1"
 
 libshelf = { path = "libshelf" }
 

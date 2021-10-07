@@ -361,7 +361,6 @@ dependencies = [
  "handlebars",
  "liquid",
  "mlua",
- "path-clean",
  "petgraph",
  "serde",
  "serde_json",
@@ -843,6 +842,7 @@ dependencies = [
  "clap",
  "directories-next",
  "libshelf",
+ "path-clean",
 ]
 
 [[package]]

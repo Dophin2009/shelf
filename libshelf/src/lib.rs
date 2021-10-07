@@ -8,6 +8,5 @@ pub mod spec;
 // mod link;
 mod load;
 // mod op;
-mod pathutil;
 // mod templating;
 mod tree;
