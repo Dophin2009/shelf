@@ -4,8 +4,6 @@ use std::slice;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-fn main() {}
-
 pub trait Rollback {
     fn rollback(&self) -> Self;
 }
