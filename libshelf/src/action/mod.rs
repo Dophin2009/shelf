@@ -15,7 +15,7 @@ use std::process::{Command, Stdio};
 
 use mlua::Function;
 
-use crate::cache::{Cache, FileTyp};
+use crate::cache::Cache;
 use crate::op::LinkOp;
 use crate::op::RmOp;
 use crate::op::{CopyOp, MkdirOp, Op};
