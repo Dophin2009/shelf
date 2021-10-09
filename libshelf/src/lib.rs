@@ -7,8 +7,10 @@ pub mod link;
 pub mod load;
 
 pub mod action;
-pub mod cache;
 pub mod op;
+
+pub mod cache;
+pub mod journal;
 
 mod templating;
 mod tree;
