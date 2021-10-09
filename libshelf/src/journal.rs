@@ -1,4 +1,5 @@
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
+use std::slice;
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -7,6 +8,12 @@ fn main() {}
 
 pub trait Rollback {
     fn rollback(&self) -> Self;
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub enum Record<T> {
+    Action(T),
+    Commit,
 }
 
 /// Write-ahead logging.
@@ -42,6 +49,26 @@ where
             records: Vec::new(),
             writer,
         }
+    }
+
+    #[inline]
+    pub fn size(&self) -> usize {
+        self.records.len()
+    }
+
+    #[inline]
+    pub fn get(&self, idx: usize) -> Option<&Record<T>> {
+        self.records.get(idx)
+    }
+
+    #[inline]
+    pub fn get_back(&self, idx: usize) -> Option<&Record<T>> {
+        if self.records.is_empty() || idx >= self.records.len() {
+            return None;
+        }
+
+        let idx = self.records.len() - idx - 1;
+        self.records.get(idx)
     }
 
     /// Append a new record to the journal.
@@ -105,22 +132,106 @@ where
     }
 }
 
+#[derive(Debug)]
+pub struct Iter<'j, T> {
+    inner: slice::Iter<'j, Record<T>>,
+}
+
 impl<T, W> Journal<T, W>
 where
-    T: Rollback + Clone + Serialize,
+    T: Serialize,
     W: Write,
 {
-    /// Rollback until the last commit.
     #[inline]
-    pub fn rollback(&mut self) -> RollbackIter<'_, T, W> {
-        RollbackIter::new(self)
+    pub fn iter(&self) -> Iter<'_, T> {
+        Iter::new(self)
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum Record<T> {
-    Action(T),
-    Commit,
+impl<'j, T> Iter<'j, T> {
+    #[inline]
+    fn new<W>(journal: &'j Journal<T, W>) -> Self
+    where
+        T: Serialize,
+        W: Write,
+    {
+        Self {
+            inner: journal.records.iter(),
+        }
+    }
+}
+
+impl<'j, T> Iterator for Iter<'j, T>
+where
+    T: Serialize,
+{
+    type Item = &'j Record<T>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+impl<'j, T> DoubleEndedIterator for Iter<'j, T>
+where
+    T: Serialize,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.inner.next_back()
+    }
+}
+
+impl<T, W> Journal<T, W>
+where
+    T: Serialize,
+    W: Write,
+{
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        IterMut::new(self)
+    }
+}
+
+#[derive(Debug)]
+pub struct IterMut<'j, T> {
+    inner: slice::IterMut<'j, Record<T>>,
+}
+
+impl<'j, T> IterMut<'j, T> {
+    #[inline]
+    fn new<W>(journal: &'j mut Journal<T, W>) -> Self
+    where
+        T: Serialize,
+        W: Write,
+    {
+        Self {
+            inner: journal.records.iter_mut(),
+        }
+    }
+}
+
+impl<'j, T> Iterator for IterMut<'j, T>
+where
+    T: Serialize,
+{
+    type Item = &'j mut Record<T>;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+
+impl<'j, T> DoubleEndedIterator for IterMut<'j, T>
+where
+    T: Serialize,
+{
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.inner.next_back()
+    }
 }
 
 #[derive(Debug)]
@@ -133,6 +244,18 @@ where
     idx: usize,
 }
 
+impl<T, W> Journal<T, W>
+where
+    T: Rollback + Clone + Serialize,
+    W: Write,
+{
+    /// Rollback until the last commit.
+    #[inline]
+    pub fn rollback(&mut self) -> RollbackIter<'_, T, W> {
+        RollbackIter::new(self)
+    }
+}
+
 impl<'j, T, W> RollbackIter<'j, T, W>
 where
     T: Rollback + Clone + Serialize,
@@ -140,7 +263,7 @@ where
 {
     #[inline]
     pub fn new(journal: &'j mut Journal<T, W>) -> Self {
-        let idx = journal.records.len();
+        let idx = journal.size();
         Self { journal, idx }
     }
 }
