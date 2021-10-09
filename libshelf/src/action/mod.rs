@@ -1,10 +1,18 @@
-pub mod command;
-pub mod function;
-pub mod generated;
-pub mod link;
-pub mod template;
-pub mod tree;
-pub mod write;
+mod command;
+mod function;
+mod generated;
+mod link;
+mod template;
+mod tree;
+mod write;
+
+pub use self::command::*;
+pub use self::function::*;
+pub use self::generated::*;
+pub use self::link::*;
+pub use self::template::*;
+pub use self::tree::*;
+pub use self::write::*;
 
 use std::collections::HashSet;
 use std::env;
@@ -16,19 +24,9 @@ use std::process::{Command, Stdio};
 use mlua::Function;
 
 use crate::cache::Cache;
-use crate::op::LinkOp;
-use crate::op::RmOp;
-use crate::op::{CopyOp, MkdirOp, Op};
+use crate::op::{CopyOp, LinkOp, MkdirOp, Op, RmOp};
 use crate::spec::{EnvMap, HandlebarsPartials, NonZeroExitBehavior, Patterns};
 use crate::tree::Tree;
-
-use self::command::CommandAction;
-use self::function::FunctionAction;
-use self::generated::{JsonAction, TomlAction, YamlAction};
-use self::link::LinkAction;
-use self::template::{HandlebarsAction, LiquidAction};
-use self::tree::TreeAction;
-use self::write::WriteAction;
 
 #[derive(Debug, Clone)]
 pub struct ResolveOpts {}
