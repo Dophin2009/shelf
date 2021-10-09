@@ -24,6 +24,8 @@ where
 {
     records: Vec<Record<T>>,
     writer: BufWriter<W>,
+
+    borked: bool,
 }
 
 /// Error type for errors that may occur when working with [`Journal`].
@@ -47,6 +49,8 @@ where
         Self {
             records: Vec::new(),
             writer,
+
+            borked: false,
         }
     }
 
@@ -70,7 +74,8 @@ where
         self.records.get(idx)
     }
 
-    /// Append a new record to the journal.
+    /// Append a new record to the journal. If this operation does not succeed, then no record has
+    /// been pushed the list. However, some bytes may have been written to the writer buffer.
     #[inline]
     pub fn append(&mut self, record: Record<T>) -> Result<(), JournalError> {
         // Write the record to the output buffer.
@@ -90,15 +95,13 @@ where
 
     #[inline]
     fn write_record(&mut self, record: &Record<T>) -> Result<(), JournalError> {
-        let s = self.serialize_record(record)?;
-        self.writer.write_all(s.as_bytes())?;
-
+        self.serialize_record(record)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_record(&self, record: &Record<T>) -> Result<String, serde_json::Error> {
-        serde_json::to_string(record)
+    fn serialize_record(&mut self, record: &Record<T>) -> Result<(), serde_json::Error> {
+        serde_json::to_writer_pretty(&self.writer, record)
     }
 }
 
@@ -173,57 +176,6 @@ where
 }
 
 impl<'j, T> DoubleEndedIterator for Iter<'j, T>
-where
-    T: Serialize,
-{
-    #[inline]
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.inner.next_back()
-    }
-}
-
-impl<T, W> Journal<T, W>
-where
-    T: Serialize,
-    W: Write,
-{
-    #[inline]
-    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
-        IterMut::new(self)
-    }
-}
-
-#[derive(Debug)]
-pub struct IterMut<'j, T> {
-    inner: slice::IterMut<'j, Record<T>>,
-}
-
-impl<'j, T> IterMut<'j, T> {
-    #[inline]
-    fn new<W>(journal: &'j mut Journal<T, W>) -> Self
-    where
-        T: Serialize,
-        W: Write,
-    {
-        Self {
-            inner: journal.records.iter_mut(),
-        }
-    }
-}
-
-impl<'j, T> Iterator for IterMut<'j, T>
-where
-    T: Serialize,
-{
-    type Item = &'j mut Record<T>;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
-    }
-}
-
-impl<'j, T> DoubleEndedIterator for IterMut<'j, T>
 where
     T: Serialize,
 {

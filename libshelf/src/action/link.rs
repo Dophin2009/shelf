@@ -1,8 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::cache::{Cache, FileMeta, FileMetaTyp};
-
 use super::{
     DoneOutput, InfoNotice, Notice, Resolution, ResolutionError, Resolve, ResolveOpts,
     ResolveResult, SkipReason, WarnNotice,
@@ -19,10 +17,7 @@ pub struct LinkAction {
 
 impl Resolve for LinkAction {
     #[inline]
-    fn resolve<C>(self, opts: &ResolveOpts, cache: &mut C) -> ResolveResult
-    where
-        C: Cache,
-    {
+    fn resolve(self, opts: &ResolveOpts) -> ResolveResult {
         let Self {
             src,
             dest,
@@ -45,9 +40,9 @@ impl Resolve for LinkAction {
         };
 
         if copy {
-            self.resolve_copy(opts, cache)
+            self.resolve_copy(opts)
         } else {
-            self.resolve_link(opts, cache)
+            self.resolve_link(opts)
         }
     }
 }
@@ -55,10 +50,7 @@ impl Resolve for LinkAction {
 impl LinkAction {
     // FIXME implement missing pieces
     #[inline]
-    fn resolve_copy<C>(self, opts: &ResolveOpts, cache: &mut C) -> ResolveResult
-    where
-        C: Cache,
-    {
+    fn resolve_copy(self, opts: &ResolveOpts) -> ResolveResult {
         let Self { src, dest, .. } = self;
 
         let mut ops = Vec::new();
@@ -143,10 +135,7 @@ impl LinkAction {
     }
 
     #[inline]
-    fn resolve_link<C>(self, opts: &ResolveOpts, cache: &mut C) -> ResolveResult
-    where
-        C: Cache,
-    {
+    fn resolve_link(self, opts: &ResolveOpts) -> ResolveResult {
         let Self { src, dest, .. } = self;
 
         let mut ops = Vec::new();

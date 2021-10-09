@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use super::Finish;
+use super::{Finish, ShouldFinish};
 
 #[derive(Debug, Clone)]
 pub struct MkdirOp {
@@ -16,12 +16,23 @@ impl Finish for MkdirOp {
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
-        if parents {
-            fs::create_dir_all(&self.path)
-        } else {
-            fs::create_dir(&self.path)
-        }
+        let Self { path, parents } = self;
 
-        // sl_error!("{$red}Couldn't create parent directories at{/$} {[green]} {$red}:{/$} {}", parent.absd(), err);
+        let res = if parents {
+            fs::create_dir_all(path)
+        } else {
+            fs::create_dir(path)
+        };
+        Ok(res?)
+    }
+}
+
+impl ShouldFinish for MkdirOp {
+    /// Returns true if the target path doesn't exist.
+    #[inline]
+    fn should_finish(&self) -> Result<bool, Self::Error> {
+        let Self { path, parents: _ } = self;
+
+        Ok(!self.path.exists())
     }
 }

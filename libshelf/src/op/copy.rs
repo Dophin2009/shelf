@@ -16,6 +16,9 @@ impl Finish for CopyOp {
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
-        fs::copy(&self.src, &self.dest).map(|_| ())
+        let Self { src, dest } = self;
+
+        let _ = fs::copy(src, dest)?;
+        Ok(())
     }
 }

@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use super::Finish;
+use super::{Finish, ShouldFinish};
 
 #[derive(Debug, Clone)]
 pub struct RmOp {
@@ -15,19 +15,22 @@ impl Finish for RmOp {
     type Error = io::Error;
 
     fn finish(&self) -> Result<Self::Output, Self::Error> {
-        if dir {
-            fs::remove_dir_all(&self.dest)
+        let Self { path, dir } = self;
+        let res = if dir {
+            fs::remove_dir_all(path)
         } else {
-            fs::remove_file(&self.dest)
-        }
+            fs::remove_file(path)
+        };
 
-        // sl_error!("{$red}Couldn't delete the symlink:{/$} {}", err);
-        // sl_i_error!("{$red}Destination:{/$} {[green]}", dest.absd());
+        Ok(res?)
+    }
+}
 
-        // sl_error!("{$red}Couldn't delete the file:{/$} {}", err);
-        // sl_i_error!("{$yellow}Location:{/$} {[green]}", dest.absd());
-
-        // sl_error!("{$red}Couldn't delete the directory:{/$} {}", err);
-        // sl_i_error!("{$yellow}Location:{/$} {[green]}", dest.absd());
+impl ShouldFinish for RmOp {
+    /// Returns true if a file or directory exists at the target path.
+    #[inline]
+    fn should_finish(&self) -> Result<bool, Self::Error> {
+        let Self { path, dir: _ } = self;
+        Ok(path.exists())
     }
 }
