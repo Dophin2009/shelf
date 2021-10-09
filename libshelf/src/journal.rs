@@ -1,6 +1,7 @@
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
 use std::slice;
 
+use liquid::ObjectView;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -247,10 +248,24 @@ where
     T: Rollback + Clone + Serialize,
     W: Write,
 {
-    /// Rollback until the last commit.
+    /// Rollback until the last commit. If the latest record is a commit, this returns an empty
+    /// iterator.
     #[inline]
     pub fn rollback(&mut self) -> RollbackIter<'_, T, W> {
         RollbackIter::new(self)
+    }
+
+    /// Rollback the last transaction. If the latest record is not a commit, this returns `None`.
+    #[inline]
+    pub fn rollback_last(&mut self) -> Option<RollbackIter<'_, T, W>> {
+        match self.records.last()? {
+            Record::Action(_) => None,
+            Record::Commit => {
+                let iter = RollbackIter::new_idx(journal, journal.size() - 1);
+                iter.next();
+                Some(iter)
+            }
+        }
     }
 }
 
@@ -260,8 +275,13 @@ where
     W: Write,
 {
     #[inline]
-    pub fn new(journal: &'j mut Journal<T, W>) -> Self {
+    fn new(journal: &'j mut Journal<T, W>) -> Self {
         let idx = journal.size();
+        Self::new_idx(journal, idx)
+    }
+
+    #[inline]
+    fn new_idx(journal: &'j mut Journal<T, W>, idx: usize) -> Self {
         Self { journal, idx }
     }
 }
