@@ -13,4 +13,3 @@ pub mod cache;
 pub mod journal;
 
 mod templating;
-mod tree;
