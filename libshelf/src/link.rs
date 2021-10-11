@@ -12,8 +12,8 @@ use crate::action::{
 };
 use crate::graph::PackageData;
 use crate::spec::{
-    CmdHook, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
-    NonZeroExitBehavior, RegularFile, TemplatedFile, TemplatedFileType, TreeFile,
+    CmdHook, DirFile, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook,
+    LinkType, NonZeroExitBehavior, RegularFile, TemplatedFile, TemplatedFileType, TreeFile,
 };
 
 impl PackageData {
@@ -76,6 +76,7 @@ impl<'g> ActionIter<'g> {
             File::Templated(tf) => self.from_file_template(tf),
             File::Tree(tf) => self.from_file_tree(tf),
             File::Generated(gf) => self.from_file_generated(gf),
+            File::Dir(df) => self.from_file_dir(df),
         }
     }
 
@@ -274,6 +275,14 @@ impl<'g> ActionIter<'g> {
                 values: j.values.clone(),
             }),
         }
+    }
+
+    #[inline]
+    fn from_file_dir(&self, df: &DirFile) -> Action<'g> {
+        let DirFile { dest } = df;
+
+        let path = self.join_dest(dest);
+        Action::Mkdir(MkdirAction { path })
     }
 
     #[inline]

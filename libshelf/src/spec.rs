@@ -28,9 +28,11 @@ pub enum File {
     Tree(TreeFile),
     Templated(TemplatedFile),
     Generated(GeneratedFile),
+    Dir(DirFile),
 }
 
 // FIXME existing file replacement options
+// FIXME: permission
 #[derive(Debug, Clone)]
 pub struct RegularFile {
     pub src: PathBuf,
@@ -64,6 +66,7 @@ pub enum LinkType {
     Copy,
 }
 
+// FIXME: permissions
 #[derive(Debug, Clone)]
 pub struct TemplatedFile {
     pub src: PathBuf,
@@ -95,6 +98,7 @@ pub type HandlebarsPartials = HashMap<String, PathBuf>;
 #[derive(Debug, Clone)]
 pub struct LiquidTemplatedFile {}
 
+// FIXME: permissions
 #[derive(Debug, Clone)]
 pub struct GeneratedFile {
     pub dest: PathBuf,
@@ -133,6 +137,12 @@ pub struct TomlGeneratedFile {
 #[derive(Debug, Clone)]
 pub struct JsonGeneratedFile {
     pub values: Tree,
+}
+
+// TODO: permissions
+#[derive(Debug, Clone)]
+pub struct DirFile {
+    pub dest: PathBuf,
 }
 
 #[derive(Debug, Clone)]

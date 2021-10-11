@@ -2,6 +2,7 @@ mod command;
 mod function;
 mod generated;
 mod link;
+mod mkdir;
 mod template;
 mod tree;
 mod write;
@@ -10,6 +11,7 @@ pub use self::command::*;
 pub use self::function::*;
 pub use self::generated::*;
 pub use self::link::*;
+pub use self::mkdir::*;
 pub use self::template::*;
 pub use self::tree::*;
 pub use self::write::*;
@@ -93,6 +95,7 @@ pub enum Action<'lua> {
     Yaml(YamlAction),
     Toml(TomlAction),
     Json(JsonAction),
+    Mkdir(MkdirAction),
     Command(CommandAction),
     Function(FunctionAction<'lua>),
 }
@@ -109,6 +112,7 @@ impl<'a> Resolve for Action<'a> {
             Self::Yaml(a) => a.resolve(opts),
             Self::Toml(a) => a.resolve(opts),
             Self::Json(a) => a.resolve(opts),
+            Self::MKdir(a) => a.resolve(opts),
             Self::Command(a) => a.resolve(opts),
             Self::Function(a) => a.resolve(opts),
         }

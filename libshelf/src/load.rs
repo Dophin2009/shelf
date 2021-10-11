@@ -172,7 +172,7 @@ mod specobject {
     use uuid::Uuid;
 
     use crate::spec::{
-        CmdHook, Dep, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile,
+        CmdHook, Dep, DirFile, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile,
         GeneratedFileTyp, HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType,
         LiquidTemplatedFile, NonZeroExitBehavior, Patterns, RegularFile, Spec, StringGeneratedFile,
         TemplatedFile, TemplatedFileType, TomlGeneratedFile, Tree, TreeFile, YamlGeneratedFile,
@@ -296,6 +296,11 @@ mod specobject {
             Gen; GeneratedFile {
                 dest: dest.into(), typ: GeneratedFileTyp::Json(JsonGeneratedFile { values })
             });
+
+            method!("mkdir"; (dest; String);
+            File; File::Dir(DirFile {
+                dest: dest.into()
+            }));
 
             method!("cmd"; (command; String, start; Option<String>, shell; Option<String>,
                             stdout; Option<bool>, stderr; Option<bool>,

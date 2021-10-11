@@ -192,6 +192,17 @@ function json(arg)
 	end
 end
 
+-- mkdir 'd'
+-- mkdir {'d'}
+function mkdir(arg)
+	if type(arg) == "table" then
+		local dest = arg[1] or error("mkdir dest was not provided")
+		pkg:mkdir(dest)
+	else
+		pkg:mkdir(arg)
+	end
+end
+
 -- cmd [[echo "a"]]
 -- cmd {[[echo "a"]]}
 -- cmd {[[echo "a"]], quiet = true}
