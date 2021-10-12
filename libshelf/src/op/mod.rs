@@ -29,6 +29,10 @@ trait Finish {
     fn finish(&self) -> Result<Self::Output, Self::Error>;
 }
 
+trait ShouldFinish: Finish {
+    fn should_finish(&self) -> Result<bool, Self::Error>;
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Op {
     Link(LinkOp),

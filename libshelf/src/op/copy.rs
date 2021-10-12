@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use super::Finish;
+use super::{Finish, ShouldFinish};
 
 #[derive(Debug, Clone)]
 pub struct CopyOp {
@@ -20,5 +20,13 @@ impl Finish for CopyOp {
 
         let _ = fs::copy(src, dest)?;
         Ok(())
+    }
+}
+
+impl ShouldFinish for CopyOp {
+    #[inline]
+    fn should_finish(&self) -> Result<bool, Self::Error> {
+        let Self { src: _, dest } = self;
+        Ok(dest.exists())
     }
 }

@@ -7,17 +7,12 @@ use crate::journal::{self, Journal, JournalError};
 
 use super::{CopyOp, Finish, LinkOp, MkdirOp, Op, OpError, OpOutput, RmOp};
 
-trait ShouldFinish: Finish {
-    fn should_finish(&self) -> Result<bool, Self::Error>;
-}
-
 #[derive(Debug)]
 pub struct OpJournal<W>
 where
     W: Write,
 {
     inner: Journal<Op, W>,
-    state: HashMap<PathBuf, FileMeta>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -34,12 +29,12 @@ where
 {
     #[inline]
     pub fn new(w: W) -> Self {
-        Self::new_parts(Journal::new(w), HashMap::new())
+        Self::new_parts(Journal::new(w))
     }
 
     #[inline]
-    fn new_parts(inner: Journal<Op, W>, state: HashMap<PathBuf, FileMeta>) -> Self {
-        Self { inner, state }
+    fn new_parts(inner: Journal<Op, W>) -> Self {
+        Self { inner }
     }
 
     #[inline]
@@ -48,14 +43,13 @@ where
         R: Read,
     {
         let inner = Journal::load(w, r)?;
-        let journal = Self::new_parts(inner, HashMap::new());
-
-        let state = inner
-            .iter()
-            .filter_map(|record| journal.update_state(record))
-            .collect();
-
+        let journal = Self::new_parts(inner);
         Ok(journal)
+    }
+
+    #[inline]
+    pub fn journal(&self) -> &Journal<Op, W> {
+        &self.inner
     }
 
     /// Execute an op and append a record.
@@ -85,52 +79,13 @@ where
             return Ok(None);
         }
 
-        let output = op.finish()?;
-
-        // Update to the new state.
-        self.update_state(op);
-
-        Ok(Some(output))
+        op.finish().map(|out| Some(out))
     }
 
     /// Checks if an op should finish, given the current state.
     #[inline]
     fn should_finish(&self, op: &Op) -> Result<bool, OpJournalError> {
         op.should_finish()
-    }
-
-    /// Update the state for an op (that was presumably just finished).
-    #[inline]
-    fn update_state(&mut self, op: &Op) {
-        match op {
-            Op::Link(LinkOp { src, dest }) => {
-                self.insert_state(dest, FileMeta::new_link(src.clone()))
-            }
-            Op::Copy(CopyOp { src: _, dest }) => {
-                self.insert_state(dest, FileMeta::new_file());
-            }
-            Op::Mkdir(MkdirOp { path, parents: _ }) => {
-                self.insert_state(path, FileMeta::new_dir());
-            }
-            Op::Rm(RmOp { path, dir: _ }) => {
-                self.remove_state(&path);
-            }
-        };
-    }
-
-    #[inline]
-    fn insert_state(&mut self, path: PathBuf, data: FileMeta) {
-        self.state.insert(path, data);
-    }
-
-    #[inline]
-    fn remove_state(&mut self, path: &PathBuf) {
-        self.state.remove(&path);
-    }
-
-    #[inline]
-    fn get_state(&self, path: &PathBuf) {
-        self.state.get(path)
     }
 
     /// Returns a [`RollbackIter`]. Callers should call [`Self::finish`] on outputted items.
@@ -213,44 +168,4 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-struct FileMeta {
-    pub typ: FileMetaTyp,
-}
-
-impl FileMeta {
-    #[inline]
-    pub fn new(typ: FileMetaTyp) -> Self {
-        Self { typ }
-    }
-
-    #[inline]
-    pub fn new_file() -> Self {
-        Self {
-            typ: FileMetaTyp::File,
-        }
-    }
-
-    #[inline]
-    pub fn new_dir() -> Self {
-        Self {
-            typ: FileMetaTyp::Dir,
-        }
-    }
-
-    #[inline]
-    pub fn new_link(target: PathBuf) -> Self {
-        Self {
-            typ: FileMetaTyp::Link { target },
-        }
-    }
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum FileMetaTyp {
-    File,
-    Dir,
-    Link { target: PathBuf },
 }
