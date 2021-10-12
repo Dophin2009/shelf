@@ -2,8 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::fsutil;
-use crate::op::{CopyOp, LinkOp, Op, RmOp};
+use crate::op::{CopyOp, LinkOp, MkdirOp, Op, RmOp};
 
+use super::error::FileMissingError;
 use super::{
     DoneOutput, InfoNotice, MkdirAction, Notice, Resolution, Resolve, ResolveOpts, SkipReason,
     WarnNotice,
@@ -28,7 +29,7 @@ impl Resolve for LinkAction {
     type Error = LinkActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, LinkActionError> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
         let Self {
             src,
             dest,
@@ -45,7 +46,9 @@ impl Resolve for LinkAction {
                 }));
             }
             (false, false) => {
-                return Err(Self::Error::FileMissing { path: src.clone() });
+                return Err(Self::Error::FileMissing(FileMissingError {
+                    path: src.clone(),
+                }));
             }
             _ => {}
         };
@@ -61,7 +64,7 @@ impl Resolve for LinkAction {
 impl LinkAction {
     // FIXME implement missing pieces
     #[inline]
-    fn resolve_link(&self, opts: &ResolveOpts) -> ResolveResult {
+    fn resolve_link(&self, opts: &ResolveOpts) -> Result<Resolution, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();
@@ -107,7 +110,7 @@ impl LinkAction {
     }
 
     #[inline]
-    fn resolve_copy(&self, opts: &ResolveOpts) -> ResolveResult {
+    fn resolve_copy(&self, opts: &ResolveOpts) -> Result<Resolution, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();
@@ -169,19 +172,15 @@ impl LinkAction {
 
 // FIXME: consider rollback behavior for this action...
 #[inline]
-pub(super) fn mkparents_op<P>(
-    path: P,
-    opts: &ResolveOpts,
-) -> Result<Resolution, <MkdirAction as Resolve>::Error>
+pub(super) fn mkparents_op<P>(path: P) -> Option<MkdirOp>
 where
     P: AsRef<Path>,
 {
     match path.as_ref().parent() {
-        Some(parent) if !fsutil::exists(parent) => MkdirAction {
-            path: path.to_path_buf(),
+        Some(parent) if !fsutil::exists(parent) => Some(Op::Mkdir(MkdirOp {
+            path: parent.to_path_buf(),
             parents: true,
-        }
-        .resolve(opts),
+        })),
         _ => None,
     }
 }
