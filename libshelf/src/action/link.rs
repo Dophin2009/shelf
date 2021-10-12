@@ -5,7 +5,8 @@ use crate::fsutil;
 use crate::op::{CopyOp, LinkOp, Op, RmOp};
 
 use super::{
-    DoneOutput, InfoNotice, Notice, Resolution, Resolve, ResolveOpts, SkipReason, WarnNotice,
+    DoneOutput, InfoNotice, MkdirAction, Notice, Resolution, Resolve, ResolveOpts, SkipReason,
+    WarnNotice,
 };
 
 #[derive(Debug, Clone)]
@@ -64,54 +65,43 @@ impl LinkAction {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();
-        let mut do_link = true;
 
-        let dest_meta = match fs::symlink_metadata(dest) {
-            Ok(meta) => {
-                if meta.is_file() {
-                    // For files, warn about an overwrite, remove the file, and then link.
-                    output
-                        .notices
-                        .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
-                    output.ops.push(Op::Rm(RmOp {
-                        path: dest.clone(),
-                        dir: false,
+        match fs::symlink_metadata(dest) {
+            // For symlinks, check the target. If it's the same as src, then we should do nothing.
+            Ok(meta) if meta.is_symlink() => {
+                let target = fs::read_link(dest)?;
+                if target == src {
+                    return Ok(Resolution::Skip(SkipReason::DestinationExists {
+                        path: path.clone(),
                     }));
-                } else if meta.is_dir() {
-                    // For directories, warn about an overwrite, remove the directory, and then
-                    // link.
-                    output
-                        .notices
-                        .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
-                    output.ops.push(Op::Rm(RmOp {
-                        path: dest.clone(),
-                        dir: true,
-                    }));
-                } else if meta.is_symlink() {
-                    // For symlinks, check the target. If it's the same as src, then we should do
-                    // nothing.
-                    let target = fs::read_link(dest)?;
-                    if target == src {
-                        do_link = false;
-                    }
                 }
             }
+            // For files and directories, warn about an overwrite, remove the file, and then link.
+            Ok(meta) if meta.is_dir() || meta.is_file() => {
+                output
+                    .notices
+                    .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
+
+                let dir = meta.is_dir();
+                output.ops.push(Op::Rm(RmOp {
+                    path: dest.clone(),
+                    dir,
+                }));
+            }
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
-            Err(_) => {}
+            Some(_) | Err(_) => {}
         };
 
-        if do_link {
-            // Check for existence of parent directories and add op to make parent directories if
-            // they don't exist.
-            if let (mkparents_op) = mkparents_op(dest) {
-                output.ops.push(mkparents_op);
-            }
-
-            output.ops.push(Op::Link(LinkOp {
-                src: src.clone(),
-                dest: dest.clone(),
-            }));
+        // Check for existence of parent directories and add op to make parent directories if they
+        // don't exist.
+        if let (mkparents_op) = mkparents_op(dest) {
+            output.ops.push(mkparents_op);
         }
+
+        output.ops.push(Op::Link(LinkOp {
+            src: src.clone(),
+            dest: dest.clone(),
+        }));
 
         Ok(Resolution::Done(output))
     }
@@ -121,66 +111,57 @@ impl LinkAction {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();
-        let mut do_copy = true;
 
         match fs::symlink_metadata(dest) {
-            Ok(meta) => {
-                if meta.is_file() {
-                    output
-                        .notices
-                        .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
-                    output.ops.push(Op::Rm(RmOp {
-                        path: dest.clone(),
-                        dir: false,
-                    }));
+            // FIXME: For files, check the contents. If they match, we should do nothing.
+            Ok(meta) if meta.is_file() => {
+                output
+                    .notices
+                    .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
+                output.ops.push(Op::Rm(RmOp {
+                    path: dest.clone(),
+                    dir: false,
+                }));
 
-                    // FIXME: For files, check the contents. If they match, we should do nothing.
-                    // let content_same = match fs::read_to_string(dest) {
-                    // Ok(dest_contents) => dest_contents == contents,
-                    // // If error, just assume content is different
-                    // Err(_) => false,
-                    // };
+                // let content_same = match fs::read_to_string(dest) {
+                // Ok(dest_contents) => dest_contents == contents,
+                // // If error, just assume content is different
+                // Err(_) => false,
+                // };
 
-                    // if content_same {
-                    // do_copy = false;
-                    // }
-                } else if meta.is_dir() {
-                    // For directories, warn about an overwrite, remove the directory, and then
-                    // link.
-                    output
-                        .notices
-                        .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
-                    output.ops.push(Op::Rm(RmOp {
-                        path: dest.clone(),
-                        dir: true,
-                    }));
-                } else if meta.is_symlink() {
-                    // For symlinks, warn about an overwrite, remove the file, and then copy.
-                    output
-                        .notices
-                        .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
-                    output.ops.push(Op::Rm(RmOp {
-                        path: dest.clone(),
-                        dir: false,
-                    }));
-                }
+                // if content_same {
+                // return Ok(Resolution::Skip(SkipReason::DestinationExists {
+                // path: path.clone(),
+                // }));
+                // }
+            }
+            // For directories and symlinks, warn about an overwrite, remove the directory, and then
+            // link.
+            Ok(meta) if meta.is_dir() | meta.is_symlink() => {
+                output
+                    .notices
+                    .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
+
+                let dir = meta.is_dir();
+                output.ops.push(Op::Rm(RmOp {
+                    path: dest.clone(),
+                    dir,
+                }));
             }
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
-            Err(_) => {}
+            Ok(_) | Err(_) => {}
         };
 
-        if do_copy {
-            // Check for existence of parent directories and add op to make parent directories if
-            // they don't exist.
-            if let (mkparents_op) = mkparents_op(dest) {
-                output.ops.push(mkparents_op);
-            }
-
-            output.ops.push(Op::Copy(CopyOp {
-                src: src.clone(),
-                dest: dest.clone(),
-            }));
+        // Check for existence of parent directories and add op to make parent directories if
+        // they don't exist.
+        if let (mkparents_op) = mkparents_op(dest) {
+            output.ops.push(mkparents_op);
         }
+
+        output.ops.push(Op::Copy(CopyOp {
+            src: src.clone(),
+            dest: dest.clone(),
+        }));
 
         Ok(Resolution::Done(output))
     }
@@ -188,15 +169,19 @@ impl LinkAction {
 
 // FIXME: consider rollback behavior for this action...
 #[inline]
-pub(super) fn mkparents_op<P>(path: P) -> Option<Op>
+pub(super) fn mkparents_op<P>(
+    path: P,
+    opts: &ResolveOpts,
+) -> Result<Resolution, <MkdirAction as Resolve>::Error>
 where
     P: AsRef<Path>,
 {
     match path.as_ref().parent() {
-        Some(parent) if !fsutil::exists(parent) => Some(Op::Mkdir(MkdirOp {
-            path: parent.to_path_buf(),
+        Some(parent) if !fsutil::exists(parent) => MkdirAction {
+            path: path.to_path_buf(),
             parents: true,
-        })),
+        }
+        .resolve(opts),
         _ => None,
     }
 }

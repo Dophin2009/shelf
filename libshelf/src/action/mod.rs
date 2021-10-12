@@ -106,9 +106,11 @@ pub enum WarnNotice {
     Overwrite { pub path: PathBuf },
 }
 
+// TODO: split up as with ResolutionError?
 #[derive(Debug)]
 pub enum SkipReason {
     OptionalFileMissing { pub path: PathBuf },
+    DestinationExists { pub path: PathBuf },
 }
 
 #[derive(Debug)]
