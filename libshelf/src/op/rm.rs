@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use super::{Finish, ShouldFinish};
+use super::Finish;
 
 #[derive(Debug, Clone)]
 pub struct RmOp {
@@ -10,9 +10,15 @@ pub struct RmOp {
     pub dir: bool,
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum RmOpError {
+    #[error("i/o error")]
+    Io(#[from] io::Error),
+}
+
 impl Finish for RmOp {
     type Output = ();
-    type Error = io::Error;
+    type Error = RmOpError;
 
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let Self { path, dir } = self;
@@ -23,14 +29,5 @@ impl Finish for RmOp {
         };
 
         Ok(res?)
-    }
-}
-
-impl ShouldFinish for RmOp {
-    /// Returns true if a file or directory exists at the target path.
-    #[inline]
-    fn should_finish(&self) -> Result<bool, Self::Error> {
-        let Self { path, dir: _ } = self;
-        Ok(path.exists())
     }
 }

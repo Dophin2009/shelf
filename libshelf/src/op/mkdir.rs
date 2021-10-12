@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use super::{Finish, ShouldFinish};
+use super::Finish;
 
 #[derive(Debug, Clone)]
 pub struct MkdirOp {
@@ -10,9 +10,15 @@ pub struct MkdirOp {
     pub parents: bool,
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum MkdirOpError {
+    #[error("i/o error")]
+    Io(#[from] io::Error),
+}
+
 impl Finish for MkdirOp {
     type Output = ();
-    type Error = io::Error;
+    type Error = MkdirOpError;
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
@@ -24,15 +30,5 @@ impl Finish for MkdirOp {
             fs::create_dir(path)
         };
         Ok(res?)
-    }
-}
-
-impl ShouldFinish for MkdirOp {
-    /// Returns true if the target path doesn't exist.
-    #[inline]
-    fn should_finish(&self) -> Result<bool, Self::Error> {
-        let Self { path, parents: _ } = self;
-
-        Ok(!self.path.exists())
     }
 }

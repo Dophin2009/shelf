@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use super::{Finish, ShouldFinish};
+use super::{Finish, Rollback};
 
 #[derive(Debug, Clone)]
 pub struct CopyOp {
@@ -10,9 +10,15 @@ pub struct CopyOp {
     pub dest: PathBuf,
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum CopyOpError {
+    #[error("i/o error")]
+    Io(#[from] io::Error),
+}
+
 impl Finish for CopyOp {
     type Output = ();
-    type Error = io::Error;
+    type Error = CopyOpError;
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
@@ -23,10 +29,9 @@ impl Finish for CopyOp {
     }
 }
 
-impl ShouldFinish for CopyOp {
+impl Rollback for CopyOp {
     #[inline]
-    fn should_finish(&self) -> Result<bool, Self::Error> {
-        let Self { src: _, dest } = self;
-        Ok(dest.exists())
+    fn rollback(&self) -> Self {
+        todo!()
     }
 }

@@ -173,7 +173,7 @@ pub struct CmdHook {
 
 pub type EnvMap = HashMap<String, String>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum NonZeroExitBehavior {
     Error,
     Warn,

@@ -2,7 +2,8 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use super::{Finish, ShouldFinish};
+use super::Finish;
+use super::Rollback;
 
 #[derive(Debug, Clone)]
 pub struct LinkOp {
@@ -10,29 +11,20 @@ pub struct LinkOp {
     pub dest: PathBuf,
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum LinkOpError {
+    #[error("i/o error")]
+    Io(#[from] io::Error),
+}
+
 impl Finish for LinkOp {
     type Output = ();
-    type Error = io::Error;
+    type Error = LinkOpError;
 
+    #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let res = self.symlink()?;
         Ok(res)
-    }
-}
-
-impl ShouldFinish for LinkOp {
-    // Returns false if the destination file is a symlink that points to the same target as `src`
-    // and true otherwise.
-    #[inline]
-    fn should_finish(&self) -> Result<bool, Self::Error> {
-        let Self { src, dest } = self;
-
-        if dest.exists() {
-            let target = fs::read_link(&dest)?;
-            return Ok(target == src);
-        } else {
-            return Ok(true);
-        }
     }
 }
 
@@ -51,5 +43,12 @@ impl LinkOp {
     fn symlink(&self) -> io::Result<()> {
         // FIXME: implement
         unimplemented!()
+    }
+}
+
+impl Rollback for LinkOp {
+    #[inline]
+    fn rollback(&self) -> Self {
+        todo!()
     }
 }

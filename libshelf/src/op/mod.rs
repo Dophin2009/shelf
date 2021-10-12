@@ -1,17 +1,22 @@
 pub mod journal;
 
+mod command;
 mod copy;
+mod function;
 mod link;
 mod mkdir;
 mod rm;
 mod write;
 
+pub(super) use crate::journal::Rollback;
+
+pub use self::command::*;
 pub use self::copy::*;
+pub use self::function::*;
 pub use self::link::*;
 pub use self::mkdir::*;
 pub use self::rm::*;
 pub use self::write::*;
-pub(super) use crate::journal::Rollback;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -32,10 +37,6 @@ trait Finish {
     fn finish(&self) -> Result<Self::Output, Self::Error>;
 }
 
-trait ShouldFinish: Finish {
-    fn should_finish(&self) -> Result<bool, Self::Error>;
-}
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Op {
     Link(LinkOp),
@@ -43,6 +44,8 @@ pub enum Op {
     Write(WriteOp),
     Mkdir(MkdirOp),
     Rm(RmOp),
+    Command(CommandOp),
+    Function(FunctionOp),
 }
 
 impl Rollback for Op {
@@ -54,6 +57,8 @@ impl Rollback for Op {
             Op::Write(op) => op.rollback(),
             Op::Mkdir(op) => op.rollback(),
             Op::Rm(op) => op.rollback(),
+            Op::Command(op) => op.rollback(),
+            Op::Function(op) => op.rollback(),
         }
     }
 }
@@ -87,6 +92,8 @@ impl Finish for Op {
             Op::Write(op) => op.finish(),
             Op::Mkdir(op) => op.finish(),
             Op::Rm(op) => op.finish(),
+            Op::Command(op) => op.finish(),
+            Op::Function(op) => op.finish(),
         };
 
         let res = res?.into();
@@ -103,6 +110,8 @@ impl ShouldFinish for Op {
             Op::Write(op) => op.should_finish(),
             Op::Mkdir(op) => op.should_finish(),
             Op::Rm(op) => op.should_finish(),
+            Op::Command(op) => op.should_finish(),
+            Op::Function(op) => op.should_finish(),
         }
     }
 }
