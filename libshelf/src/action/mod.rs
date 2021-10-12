@@ -19,8 +19,6 @@ pub use self::template::*;
 pub use self::tree::*;
 pub use self::write::*;
 
-pub use crate::spec::Patterns;
-
 use std::collections::HashSet;
 use std::env;
 use std::fs;

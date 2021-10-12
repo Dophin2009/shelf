@@ -1,88 +1,115 @@
+pub use super::Tree;
+
+use std::path::PathBuf;
+
+use super::{Resolution, Resolve, WriteAction, WriteActionError};
+
+#[derive(Debug, Clone)]
 pub struct YamlAction {
-    pub dest: PathWrapper,
+    pub dest: PathBuf,
     pub values: Tree,
 
     pub header: Option<String>,
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum YamlActionError {
+    #[error("serde error")]
+    Serde(#[from] serde_yaml::Error),
 }
 
 impl Resolve for YamlAction {
+    type Error = YamlActionError;
+
     #[inline]
-    fn resolve<C>(self, opts: &ResolveOpts, cache: &mut C) -> ResolveResult
-    where
-        C: Cache,
-    {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
         let Self {
             dest,
             values,
             header,
         } = self;
 
-        let mut contents = fail!(serde_yaml::to_string(&values), err => {
-            sl_error!("{$red}Couldn't convert value map into yaml:{/$} {}", err);
-        });
-        contents = match header {
-            Some(header) => format!("{}\n{}", header, contents),
-            None => contents,
-        };
+        // Render contents.
+        let mut contents = serde_yaml::to_string(&values)?;
+        if let Some(header) = header {
+            contents.insert_str(0, header);
+            contents.insert_str(0, "\n");
+        }
 
-        let wa = WriteAction { dest, contents };
-        wa.resolve(opts, cache)
-    }
-}
-
-pub struct TomlAction {
-    pub dest: PathWrapper,
-    pub values: Tree,
-
-    pub header: Option<String>,
-}
-
-impl Resolve for TomlAction {
-    #[inline]
-    fn resolve<C>(self, opts: &ResolveOpts, cache: &mut C) -> ResolveResult
-    where
-        C: Cache,
-    {
-        let Self {
-            dest,
-            values,
-            header,
-        } = self;
-
-        let mut contents = fail!(toml::to_string_pretty(&values), err => {
-            sl_error!("{$red}Couldn't convert value map into toml:{/$} {}", err);
-        });
-        contents = match header {
-            Some(header) => format!("{}\n{}", header, contents),
-            None => contents,
-        };
-
-        let wa = WriteAction { dest, contents };
-        wa.resolve(opts, cache)
-    }
-}
-
-pub struct JsonAction {
-    pub dest: PathWrapper,
-    pub values: Tree,
-}
-
-impl Resolve for JsonAction {
-    #[inline]
-    fn resolve<C>(self, opts: &ResolveOpts, cache: &mut C) -> ResolveResult
-    where
-        C: Cache,
-    {
-        let Self { dest, values } = self;
-
-        let contents = fail!(serde_json::to_string(&values), err => {
-            sl_error!("{$red}Couldn't convert value map into json:{/$} {}", err);
-        });
-
+        // Write contents.
         let wa = WriteAction {
             dest: dest.clone(),
             contents,
         };
-        wa.resolve(opts, cache)
+        let resolution = WriteActionError::unwrap(wa.resolve(opts));
+        Ok(resolution)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TomlAction {
+    pub dest: PathBuf,
+    pub values: Tree,
+
+    pub header: Option<String>,
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum TomlActionError {
+    #[error("serde error")]
+    Serde(#[from] toml::ser::Error),
+}
+
+impl Resolve for TomlAction {
+    type Error = TomlActionError;
+
+    #[inline]
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+        let Self {
+            dest,
+            values,
+            header,
+        } = self;
+
+        // Render contents.
+        let mut contents = toml::to_string_pretty(&values)?;
+        if let Some(header) = header {
+            contents.insert_str(0, header);
+            contents.insert_str(0, "\n");
+        }
+
+        // Write contents.
+        let wa = WriteAction {
+            dest: dest.clone(),
+            contents,
+        };
+        let resolution = WriteActionError::unwrap(wa.resolve(opts));
+        Ok(resolution)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct JsonAction {
+    pub dest: PathBuf,
+    pub values: Tree,
+}
+
+impl Resolve for JsonAction {
+    type Error = JsonActionError;
+
+    #[inline]
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+        let Self { dest, values } = self;
+
+        // Render contents.
+        let contents = serde_json::to_string(&values)?;
+
+        // Write contents.
+        let wa = WriteAction {
+            dest: dest.clone(),
+            contents,
+        };
+        let resolution = WriteActionError::unwrap(wa.resolve(opts));
+        Ok(resolution)
     }
 }

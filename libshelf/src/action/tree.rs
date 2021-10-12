@@ -1,3 +1,5 @@
+pub use crate::spec::Patterns;
+
 use std::collections::HashSet;
 use std::env;
 use std::path::{Path, PathBuf};
@@ -6,7 +8,7 @@ use glob::GlobError;
 
 use crate::fsutil;
 
-use super::{LinkAction, Patterns, Resolution, Resolve, ResolveOpts};
+use super::{LinkAction, Resolution, Resolve, ResolveOpts};
 
 #[derive(Debug, Clone)]
 pub struct TreeAction {

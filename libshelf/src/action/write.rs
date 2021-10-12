@@ -1,11 +1,10 @@
-pub use super::error::NoError;
-
 use std::fs;
 use std::path::PathBuf;
 
 use crate::fsutil;
 use crate::op::{Op, RmOp};
 
+use super::error::NoError;
 use super::{link, DoneOutput, Notice, Resolution, Resolve, WarnNotice};
 
 #[derive(Debug, Clone)]

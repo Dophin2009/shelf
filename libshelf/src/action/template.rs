@@ -16,13 +16,7 @@ pub struct HandlebarsAction {
     pub partials: HandlebarsPartials,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum HandlebarsActionError {
-    #[error("handlebars error")]
-    Handlebars(#[from] hbs::Error),
-    #[error("write action resolution error")]
-    Write(#[from] WriteActionError),
-}
+pub type HandlebarsActionError = hbs::Error;
 
 impl Resolve for HandlebarsAction {
     type Error = HandlebarsActionError;
@@ -59,7 +53,8 @@ impl Resolve for HandlebarsAction {
             dest: dest.clone(),
             contents,
         };
-        let resolution = wa.resolve(opts)?;
+
+        let resolution = WriteActionError::unwrap(wa.resolve(opts));
         Ok(resolution)
     }
 }
@@ -73,13 +68,7 @@ pub struct LiquidAction {
     pub optional: bool,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum LiquidActionError {
-    #[error("liquid error")]
-    Liquid(#[from] liquid::Error),
-    #[error("write action resolution error")]
-    Write(#[from] WriteActionError),
-}
+pub type LiquidActionError = hbs::Error;
 
 impl Resolve for LiquidAction {
     type Error = LiquidActionError;
@@ -115,7 +104,7 @@ impl Resolve for LiquidAction {
             dest: dest.clone(),
             contents,
         };
-        let resolution = wa.resolve(opts)?;
+        let resolution = WriteActionError::unwrap(wa.resolve(opts));
         Ok(resolution)
     }
 }
