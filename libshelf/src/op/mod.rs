@@ -4,11 +4,14 @@ mod copy;
 mod link;
 mod mkdir;
 mod rm;
+mod write;
 
 pub use self::copy::*;
 pub use self::link::*;
 pub use self::mkdir::*;
 pub use self::rm::*;
+pub use self::write::*;
+pub(super) use crate::journal::Rollback;
 
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -20,7 +23,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::journal::{self, Journal, JournalError, Record, Rollback};
+use crate::journal::{self, Journal, JournalError, Record};
 
 trait Finish {
     type Output;
@@ -37,6 +40,7 @@ trait ShouldFinish: Finish {
 pub enum Op {
     Link(LinkOp),
     Copy(CopyOp),
+    Write(WriteOp),
     Mkdir(MkdirOp),
     Rm(RmOp),
 }
@@ -47,6 +51,7 @@ impl Rollback for Op {
         match self {
             Op::Link(op) => op.rollback(),
             Op::Copy(op) => op.rollback(),
+            Op::Write(op) => op.rollback(),
             Op::Mkdir(op) => op.rollback(),
             Op::Rm(op) => op.rollback(),
         }
@@ -79,6 +84,7 @@ impl Finish for Op {
         let res = match self {
             Op::Link(op) => op.finish(),
             Op::Copy(op) => op.finish(),
+            Op::Write(op) => op.finish(),
             Op::Mkdir(op) => op.finish(),
             Op::Rm(op) => op.finish(),
         };
@@ -94,6 +100,7 @@ impl ShouldFinish for Op {
         match op {
             Op::Link(op) => op.should_finish(),
             Op::Copy(op) => op.should_finish(),
+            Op::Write(op) => op.should_finish(),
             Op::Mkdir(op) => op.should_finish(),
             Op::Rm(op) => op.should_finish(),
         }

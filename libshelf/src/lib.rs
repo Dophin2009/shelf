@@ -5,11 +5,11 @@ pub mod spec;
 
 pub mod link;
 pub mod load;
+mod templating;
 
 pub mod action;
 pub mod op;
 
-pub mod cache;
 pub mod journal;
 
-mod templating;
+mod fsutil;

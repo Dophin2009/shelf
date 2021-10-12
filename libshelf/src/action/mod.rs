@@ -27,13 +27,12 @@ use mlua::Function;
 
 use crate::op::{CopyOp, LinkOp, MkdirOp, Op, RmOp};
 use crate::spec::{EnvMap, HandlebarsPartials, NonZeroExitBehavior, Patterns};
-use crate::tree::Tree;
 
 #[derive(Debug, Clone)]
 pub struct ResolveOpts {}
 
 pub trait Resolve {
-    fn resolve(self, opts: &ResolveOpts) -> ResolveResult;
+    fn resolve(&self, opts: &ResolveOpts) -> ResolveResult;
 }
 
 pub type ResolveResult = Result<Resolution, ResolutionError>;
@@ -57,8 +56,27 @@ pub enum Resolution {
 
 #[derive(Debug)]
 pub struct DoneOutput {
-    ops: Vec<Op>,
-    notices: Notice,
+    pub ops: Vec<Op>,
+    pub notices: Notice,
+}
+
+impl DoneOutput {
+    #[inline]
+    pub fn new(ops: Vec<Op>, notices: Notice) -> Self {
+        Self { ops, notices }
+    }
+
+    #[inline]
+    pub fn empty() -> Self {
+        Self::new(Vec::new(), Vec::new())
+    }
+}
+
+impl Default for DoneOutput {
+    #[inline]
+    fn default() -> Self {
+        Self::empty()
+    }
 }
 
 #[derive(Debug)]
