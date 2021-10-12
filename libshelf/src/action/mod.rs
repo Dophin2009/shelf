@@ -9,6 +9,7 @@ mod template;
 mod tree;
 mod write;
 
+// FIXME: re-export errors in separate mod
 pub use self::command::*;
 pub use self::function::*;
 pub use self::generated::*;
@@ -49,6 +50,10 @@ pub enum ResolutionError {
     Write(#[from] WriteActionError),
     #[error("tree action resolution error")]
     Tree(#[from] TreeActionError),
+    #[error("handlebars action resolution error")]
+    Handlebars(#[from] HandlebarsActionError),
+    #[error("liquid action resolution error")]
+    Liquid(#[from] LiquidActionError),
 }
 
 #[derive(Debug)]
