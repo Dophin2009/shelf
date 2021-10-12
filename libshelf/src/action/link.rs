@@ -5,8 +5,7 @@ use crate::fsutil;
 use crate::op::{CopyOp, LinkOp, Op, RmOp};
 
 use super::{
-    DoneOutput, InfoNotice, Notice, Resolution, ResolutionError, Resolve, ResolveOpts,
-    ResolveResult, SkipReason, WarnNotice,
+    DoneOutput, InfoNotice, Notice, Resolution, Resolve, ResolveOpts, SkipReason, WarnNotice,
 };
 
 #[derive(Debug, Clone)]
@@ -18,9 +17,17 @@ pub struct LinkAction {
     pub optional: bool,
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum LinkActionError {
+    #[error("missing file")]
+    FileMissing(#[from] FileMissingError),
+}
+
 impl Resolve for LinkAction {
+    type Error = LinkActionError;
+
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> ResolveResult {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, LinkActionError> {
         let Self {
             src,
             dest,
@@ -37,7 +44,7 @@ impl Resolve for LinkAction {
                 }));
             }
             (false, false) => {
-                return Err(ResolutionError::FileMissing { path: src.clone() });
+                return Err(Self::Error::FileMissing { path: src.clone() });
             }
             _ => {}
         };

@@ -1,3 +1,5 @@
+pub use super::error::NoError;
+
 use std::fs;
 use std::path::PathBuf;
 
@@ -12,9 +14,13 @@ pub struct WriteAction {
     pub contents: String,
 }
 
+pub type WriteActionError = NoError;
+
 impl Resolve for WriteAction {
+    type Error = WriteActionError;
+
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> ResolveResult {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
         let Self { dest, contents } = self;
 
         let mut output = DoneOutput::empty();

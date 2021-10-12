@@ -1,6 +1,17 @@
+use std::collections::HashSet;
+use std::env;
+use std::path::{Path, PathBuf};
+
+use glob::GlobError;
+
+use crate::fsutil;
+
+use super::{LinkAction, Patterns, Resolution, Resolve, ResolveOpts};
+
+#[derive(Debug, Clone)]
 pub struct TreeAction {
-    pub src: PathWrapper,
-    pub dest: PathWrapper,
+    pub src: PathBuf,
+    pub dest: PathBuf,
     pub globs: Patterns,
     pub ignore: Patterns,
 
@@ -8,12 +19,17 @@ pub struct TreeAction {
     pub optional: bool,
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum TreeActionError {
+    #[error("glob error")]
+    Glob(#[from] GlobError),
+}
+
 impl Resolve for TreeAction {
+    type Error = TreeActionError;
+
     #[inline]
-    fn resolve<C>(self, opts: &ResolveOpts, cache: &mut C) -> ResolveResult
-    where
-        C: Cache,
-    {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
         let Self {
             src,
             dest,
@@ -23,52 +39,42 @@ impl Resolve for TreeAction {
             optional,
         } = self;
 
-        // If src does not exist, and optional flag enabled, skip.
+        // If file does not exist and optional flag enabled, skip.
         // If optional flag disabled, error.
-        // If src exists but isn't a directory, and optional flag enabled, skip it.
-        // If optional flag disabled, return error.
-        if !src.exists() || !src.is_dir() {
-            if optional {
-                // log_skip(format!("{[green]} does not exist", src.reld()));
-                return Ok(Resolution::Skip);
-            } else {
-                log_miss(&src);
-                return Err(EmptyError);
+        match (optional, fsutil::exists(src)) {
+            (true, false) => {
+                return Ok(Resolution::Skip(SkipReason::OptionalMissing {
+                    path: src.clone(),
+                }));
             }
+            (false, false) => {
+                return Err(ResolutionError::FileMissing { path: src.clone() });
+            }
+            _ => {}
         }
 
-        // FIXME handle absolute path globs
+        // FIXME: handle absolute path globs
         #[inline]
-        fn glob_tree(
-            src: &PathWrapper,
-            pats: &Vec<String>,
-        ) -> Result<HashSet<PathBuf>, EmptyError> {
+        fn glob_tree<P>(src: P, pats: &[String]) -> Result<HashSet<PathBuf>, GlobError>
+        where
+            P: AsRef<Path>,
+        {
             let cwd = env::current_dir().unwrap();
             env::set_current_dir(src.abs()).unwrap();
 
             let matches: Vec<glob::Paths> = pats
                 .iter()
                 .map(|pat| glob::glob(pat))
-                .map(|r| {
-                    r.map_err(|err| {
-                        // FIXME path in error
-                        sl_error!("{$red}Couldn't glob a pattern:{/$} {}", err);
-                        EmptyError
-                    })
-                })
                 .collect::<Result<_, _>>()?;
 
             let res = matches
                 .into_iter()
                 .flatten()
                 .filter_map(|r| match r {
+                    // FIXME: ??
                     Ok(path) if path.is_file() => Some(Ok(path)),
                     Ok(_) => None,
-                    Err(err) => {
-                        // FIXME path in error
-                        sl_error!("{$red}Couldn't read path while globbing:{/$} {}", err);
-                        Some(Err(EmptyError))
-                    }
+                    Err(err) => Some(Err(err)),
                 })
                 .collect::<Result<_, _>>()?;
 
@@ -87,23 +93,23 @@ impl Resolve for TreeAction {
             paths.remove(&path);
         }
 
+        // Join these back into full paths for src and dest.
         let src_paths = paths.iter().map(|path| src.join(path));
         let dest_paths = paths.iter().map(|path| dest.join(path));
 
         // Map paths and dest paths into linking actions.
-        let it = src_paths.zip(dest_paths).map(move |(fsrc, fdest)| {
-            Action::Link(LinkAction {
+        let it = src_paths
+            .zip(dest_paths)
+            .map(move |(fsrc, fdest)| LinkAction {
                 src: fsrc,
                 dest: fdest,
                 copy,
                 optional: false,
-            })
-        });
+            });
 
-        // FIXME handle resolutions
-        it.map(|action| action.resolve(opts, cache))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(Resolution::Done)
+        let resolutions: Vec<_> = it
+            .map(|action| action.resolve(opts))
+            .collect::<Result<_, _>>()?;
+        Ok(Resolution::Multiple(resolutions))
     }
 }

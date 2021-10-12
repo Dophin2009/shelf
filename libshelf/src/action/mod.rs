@@ -1,3 +1,5 @@
+pub mod error;
+
 mod command;
 mod function;
 mod generated;
@@ -16,6 +18,8 @@ pub use self::template::*;
 pub use self::tree::*;
 pub use self::write::*;
 
+pub use crate::spec::Patterns;
+
 use std::collections::HashSet;
 use std::env;
 use std::fs;
@@ -26,43 +30,43 @@ use std::process::{Command, Stdio};
 use mlua::Function;
 
 use crate::op::{CopyOp, LinkOp, MkdirOp, Op, RmOp};
-use crate::spec::{EnvMap, HandlebarsPartials, NonZeroExitBehavior, Patterns};
+use crate::spec::{EnvMap, HandlebarsPartials, NonZeroExitBehavior};
 
 #[derive(Debug, Clone)]
 pub struct ResolveOpts {}
 
 pub trait Resolve {
-    fn resolve(&self, opts: &ResolveOpts) -> ResolveResult;
-}
+    type Error;
 
-pub type ResolveResult = Result<Resolution, ResolutionError>;
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error>;
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum ResolutionError {
-    #[error("missing file: {0}")]
-    FileMissing { pub path: PathBuf },
-    #[error("couldn't read file metadata: {0}")]
-    FileReadMetadata {
-        pub path: PathBuf,
-        pub err: io::Error,
-    },
+    #[error("link action resolution error")]
+    Link(#[from] LinkActionError),
+    #[error("write action resolution error")]
+    Write(#[from] WriteActionError),
+    #[error("tree action resolution error")]
+    Tree(#[from] TreeActionError),
 }
 
 #[derive(Debug)]
 pub enum Resolution {
     Done(DoneOutput),
     Skip(SkipReason),
+    Multiple(Vec<Resolution>),
 }
 
 #[derive(Debug)]
 pub struct DoneOutput {
     pub ops: Vec<Op>,
-    pub notices: Notice,
+    pub notices: Vec<Notice>,
 }
 
 impl DoneOutput {
     #[inline]
-    pub fn new(ops: Vec<Op>, notices: Notice) -> Self {
+    pub fn new(ops: Vec<Op>, notices: Vec<Notice>) -> Self {
         Self { ops, notices }
     }
 
@@ -104,6 +108,7 @@ pub enum SkipReason {
     OptionalFileMissing { pub path: PathBuf },
 }
 
+#[derive(Debug)]
 pub enum Action<'lua> {
     Link(LinkAction),
     Write(WriteAction),
@@ -120,19 +125,20 @@ pub enum Action<'lua> {
 
 impl<'a> Resolve for Action<'a> {
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> ResolveResult {
-        match self {
-            Self::Link(a) => a.resolve(opts),
-            Self::Write(a) => a.resolve(opts),
-            Self::Tree(a) => a.resolve(opts),
-            Self::Handlebars(a) => a.resolve(opts),
-            Self::Liquid(a) => a.resolve(opts),
-            Self::Yaml(a) => a.resolve(opts),
-            Self::Toml(a) => a.resolve(opts),
-            Self::Json(a) => a.resolve(opts),
-            Self::MKdir(a) => a.resolve(opts),
-            Self::Command(a) => a.resolve(opts),
-            Self::Function(a) => a.resolve(opts),
-        }
+    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolutionError> {
+        let res = match self {
+            Self::Link(a) => a.resolve(opts)?,
+            Self::Write(a) => a.resolve(opts)?,
+            Self::Tree(a) => a.resolve(opts)?,
+            Self::Handlebars(a) => a.resolve(opts)?,
+            Self::Liquid(a) => a.resolve(opts)?,
+            Self::Yaml(a) => a.resolve(opts)?,
+            Self::Toml(a) => a.resolve(opts)?,
+            Self::Json(a) => a.resolve(opts)?,
+            Self::MKdir(a) => a.resolve(opts)?,
+            Self::Command(a) => a.resolve(opts)?,
+            Self::Function(a) => a.resolve(opts)?,
+        };
+        Ok(res)
     }
 }
