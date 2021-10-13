@@ -19,17 +19,9 @@ pub use self::template::*;
 pub use self::tree::*;
 pub use self::write::*;
 
-use std::collections::HashSet;
-use std::env;
-use std::fs;
-use std::io;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
 
-use mlua::Function;
-
-use crate::op::{CopyOp, LinkOp, MkdirOp, Op, RmOp};
-use crate::spec::{EnvMap, HandlebarsPartials, NonZeroExitBehavior};
+use crate::op::Op;
 
 #[derive(Debug, Clone)]
 pub struct ResolveOpts {}
@@ -55,21 +47,21 @@ pub enum ResolutionError {
 }
 
 #[derive(Debug)]
-pub enum Resolution {
-    Done(DoneOutput),
+pub enum Resolution<'lua> {
+    Done(DoneOutput<'lua>),
     Skip(SkipReason),
-    Multiple(Vec<Resolution>),
+    Multiple(Vec<Resolution<'lua>>),
 }
 
 #[derive(Debug)]
-pub struct DoneOutput {
-    pub ops: Vec<Op>,
+pub struct DoneOutput<'lua> {
+    pub ops: Vec<Op<'lua>>,
     pub notices: Vec<Notice>,
 }
 
-impl DoneOutput {
+impl<'lua> DoneOutput<'lua> {
     #[inline]
-    pub fn new(ops: Vec<Op>, notices: Vec<Notice>) -> Self {
+    pub fn new(ops: Vec<Op<'lua>>, notices: Vec<Notice>) -> Self {
         Self { ops, notices }
     }
 
@@ -79,7 +71,7 @@ impl DoneOutput {
     }
 }
 
-impl Default for DoneOutput {
+impl<'lua> Default for DoneOutput<'lua> {
     #[inline]
     fn default() -> Self {
         Self::empty()
@@ -94,23 +86,20 @@ pub enum Notice {
 
 #[derive(Debug)]
 pub enum InfoNotice {
-    ExistingSymlink {
-        pub path: PathBuf,
-        pub target: PathBuf,
-    },
+    ExistingSymlink { path: PathBuf, target: PathBuf },
 }
 
 #[derive(Debug)]
 pub enum WarnNotice {
-    ManualChange { pub path: PathBuf },
-    Overwrite { pub path: PathBuf },
+    ManualChange { path: PathBuf },
+    Overwrite { path: PathBuf },
 }
 
 // TODO: split up as with ResolutionError?
 #[derive(Debug)]
 pub enum SkipReason {
-    OptionalFileMissing { pub path: PathBuf },
-    DestinationExists { pub path: PathBuf },
+    OptionalFileMissing { path: PathBuf },
+    DestinationExists { path: PathBuf },
 }
 
 #[derive(Debug)]

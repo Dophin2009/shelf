@@ -5,10 +5,7 @@ use crate::fsutil;
 use crate::op::{CopyOp, LinkOp, MkdirOp, Op, RmOp};
 
 use super::error::FileMissingError;
-use super::{
-    DoneOutput, InfoNotice, MkdirAction, Notice, Resolution, Resolve, ResolveOpts, SkipReason,
-    WarnNotice,
-};
+use super::{DoneOutput, Notice, Resolution, Resolve, ResolveOpts, SkipReason, WarnNotice};
 
 #[derive(Debug, Clone)]
 pub struct LinkAction {
@@ -29,7 +26,7 @@ impl Resolve for LinkAction {
     type Error = LinkActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
             dest,
@@ -64,7 +61,10 @@ impl Resolve for LinkAction {
 impl LinkAction {
     // FIXME implement missing pieces
     #[inline]
-    fn resolve_link(&self, opts: &ResolveOpts) -> Result<Resolution, <Self as Resolve>::Error> {
+    fn resolve_link<'lua>(
+        &self,
+        opts: &ResolveOpts,
+    ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();
@@ -75,7 +75,7 @@ impl LinkAction {
                 let target = fs::read_link(dest)?;
                 if target == src {
                     return Ok(Resolution::Skip(SkipReason::DestinationExists {
-                        path: path.clone(),
+                        path: dest.clone(),
                     }));
                 }
             }
@@ -97,8 +97,8 @@ impl LinkAction {
 
         // Check for existence of parent directories and add op to make parent directories if they
         // don't exist.
-        if let (mkparents_op) = mkparents_op(dest) {
-            output.ops.push(mkparents_op);
+        if let Some(mkparents_op) = mkparents_op(dest) {
+            output.ops.push(Op::Mkdir(mkparents_op));
         }
 
         output.ops.push(Op::Link(LinkOp {
@@ -110,7 +110,10 @@ impl LinkAction {
     }
 
     #[inline]
-    fn resolve_copy(&self, opts: &ResolveOpts) -> Result<Resolution, <Self as Resolve>::Error> {
+    fn resolve_copy<'lua>(
+        &self,
+        opts: &ResolveOpts,
+    ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();
@@ -157,8 +160,8 @@ impl LinkAction {
 
         // Check for existence of parent directories and add op to make parent directories if
         // they don't exist.
-        if let (mkparents_op) = mkparents_op(dest) {
-            output.ops.push(mkparents_op);
+        if let Some(mkparents_op) = mkparents_op(dest) {
+            output.ops.push(Op::Mkdir(mkparents_op));
         }
 
         output.ops.push(Op::Copy(CopyOp {
@@ -177,10 +180,10 @@ where
     P: AsRef<Path>,
 {
     match path.as_ref().parent() {
-        Some(parent) if !fsutil::exists(parent) => Some(Op::Mkdir(MkdirOp {
+        Some(parent) if !fsutil::exists(parent) => Some(MkdirOp {
             path: parent.to_path_buf(),
             parents: true,
-        })),
+        }),
         _ => None,
     }
 }

@@ -297,9 +297,10 @@ mod specobject {
                 dest: dest.into(), typ: GeneratedFileTyp::Json(JsonGeneratedFile { values })
             });
 
-            method!("mkdir"; (dest; String);
+            method!("mkdir"; (dest; String, parents; bool);
             File; File::Dir(DirFile {
-                dest: dest.into()
+                dest: dest.into(),
+                parents,
             }));
 
             method!("cmd"; (command; String, start; Option<String>, shell; Option<String>,

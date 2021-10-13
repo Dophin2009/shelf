@@ -9,23 +9,23 @@ use crate::fsutil;
 use crate::op::{FunctionOp, Op};
 
 use super::error::FileMissingError;
-use super::{DoneOutput, Resolve};
+use super::{DoneOutput, Resolution, Resolve, ResolveOpts};
 
 #[derive(Clone)]
 pub struct FunctionAction<'lua> {
     pub function: Function<'lua>,
 
     pub start: PathBuf,
-    pub error_exit: NonZeroExitBehavior,
+    pub nonzero_exit: NonZeroExitBehavior,
 }
 
-impl fmt::Debug for FunctionAction {
+impl<'lua> fmt::Debug for FunctionAction<'lua> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("FunctionAction")
             .field("function", &"<lua function>")
             .field("start", &self.start)
-            .field("error_exit", &self.error_exit)
+            .field("error_exit", &self.nonzero_exit)
             .finish()
     }
 }
@@ -44,7 +44,7 @@ impl<'lua> Resolve for FunctionAction<'lua> {
         let Self {
             function,
             start,
-            error_exit,
+            nonzero_exit,
         } = self;
 
         // If the start directory doesn't exist, we should error.

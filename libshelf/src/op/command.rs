@@ -29,7 +29,7 @@ impl Finish for CommandOp {
             nonzero_exit: _,
         } = self;
 
-        /// Spawn the command and wait for it to finish.
+        // Spawn the command and wait for it to finish.
         let mut child = cmd.spawn()?;
         let res = child.wait()?;
 

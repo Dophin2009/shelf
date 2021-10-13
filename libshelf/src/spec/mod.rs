@@ -146,6 +146,7 @@ pub struct JsonGeneratedFile {
 #[derive(Debug, Clone)]
 pub struct DirFile {
     pub dest: PathBuf,
+    pub parents: bool,
 }
 
 #[derive(Debug, Clone)]

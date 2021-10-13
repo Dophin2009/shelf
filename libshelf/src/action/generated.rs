@@ -2,7 +2,7 @@ pub use super::Tree;
 
 use std::path::PathBuf;
 
-use super::{Resolution, Resolve, WriteAction, WriteActionError};
+use super::{Resolution, Resolve, ResolveOpts, WriteAction, WriteActionError};
 
 #[derive(Debug, Clone)]
 pub struct YamlAction {
@@ -22,7 +22,7 @@ impl Resolve for YamlAction {
     type Error = YamlActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             dest,
             values,
@@ -64,7 +64,7 @@ impl Resolve for TomlAction {
     type Error = TomlActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             dest,
             values,
@@ -94,11 +94,17 @@ pub struct JsonAction {
     pub values: Tree,
 }
 
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum JsonActionError {
+    #[error("serde error")]
+    Serde(#[from] toml::ser::Error),
+}
+
 impl Resolve for JsonAction {
     type Error = JsonActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self { dest, values } = self;
 
         // Render contents.

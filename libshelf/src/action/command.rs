@@ -1,13 +1,13 @@
-use crate::fsutil;
 pub use crate::spec::{EnvMap, NonZeroExitBehavior};
 
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
+use crate::fsutil;
 use crate::op::{CommandOp, Op};
 
 use super::error::FileMissingError;
-use super::{DoneOutput, Resolve};
+use super::{DoneOutput, Resolution, Resolve, ResolveOpts};
 
 #[derive(Debug, Clone)]
 pub struct CommandAction {
@@ -35,7 +35,7 @@ impl Resolve for CommandAction {
     type Error = CommandActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             command,
             start,

@@ -213,7 +213,8 @@ where
         match self.records.last()? {
             Record::Action(_) => None,
             Record::Commit => {
-                let iter = RollbackIter::new_idx(journal, journal.size() - 1);
+                let idx = self.journal.size() - 1;
+                let iter = RollbackIter::new_idx(&mut self.journal, idx);
                 iter.next();
                 Some(iter)
             }

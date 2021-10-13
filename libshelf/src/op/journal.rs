@@ -1,18 +1,15 @@
-use std::collections::HashMap;
-use std::fmt::Write;
-use std::fs;
-use std::path::PathBuf;
+use std::io::{Read, Write};
 
-use crate::journal::{self, Journal, JournalError};
+use crate::journal::{self, Journal, JournalError, Record};
 
-use super::{CopyOp, Finish, LinkOp, MkdirOp, Op, OpError, OpOutput, RmOp};
+use super::{Finish, Op, OpError, OpOutput};
 
 #[derive(Debug)]
-pub struct OpJournal<W>
+pub struct OpJournal<'lua, W>
 where
     W: Write,
 {
-    inner: Journal<Op, W>,
+    inner: Journal<Op<'lua>, W>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -23,7 +20,7 @@ pub enum OpJournalError {
     Op(#[from] OpError),
 }
 
-impl<W> OpJournal<W>
+impl<'lua, W> OpJournal<'lua, W>
 where
     W: Write,
 {
@@ -33,7 +30,7 @@ where
     }
 
     #[inline]
-    fn new_parts(inner: Journal<Op, W>) -> Self {
+    fn new_parts(inner: Journal<Op<'lua>, W>) -> Self {
         Self { inner }
     }
 
@@ -48,13 +45,13 @@ where
     }
 
     #[inline]
-    pub fn journal(&self) -> &Journal<Op, W> {
+    pub fn journal(&self) -> &Journal<Op<'lua>, W> {
         &self.inner
     }
 
     /// Execute an op and append a record.
     #[inline]
-    pub fn append_and_finish(&mut self, op: Op) -> Result<Option<OpOutput>, OpJournalError> {
+    pub fn append_and_finish(&mut self, op: Op<'lua>) -> Result<Option<OpOutput>, OpJournalError> {
         // Append the record.
         let record = Record::Action(op.clone());
         self.inner.append(record)?;
@@ -73,7 +70,7 @@ where
     /// Finish an op. This checks the state, and if the operation is unecessary, will not finish it
     /// and return `Ok(None)`.
     #[inline]
-    pub fn finish(&self, op: &Op) -> Result<Option<OpOutput>, OpJournalError> {
+    pub fn finish(&self, op: &Op<'lua>) -> Result<Option<OpOutput>, OpJournalError> {
         // Finish the op if necessary.
         if !self.should_finish(&op)? {
             return Ok(None);
@@ -84,35 +81,35 @@ where
 
     /// Checks if an op should finish, given the current state.
     #[inline]
-    fn should_finish(&self, op: &Op) -> Result<bool, OpJournalError> {
+    fn should_finish(&self, op: &Op<'lua>) -> Result<bool, OpJournalError> {
         op.should_finish()
     }
 
     /// Returns a [`RollbackIter`]. Callers should call [`Self::finish`] on outputted items.
     #[inline]
-    pub fn rollback(&mut self) -> RollbackIter<'_, W> {
+    pub fn rollback(&mut self) -> RollbackIter<'_, 'lua, W> {
         RollbackIter::new(self)
     }
 }
 
 #[derive(Debug)]
-pub struct Iter<'j> {
-    inner: journal::Iter<'j, Op>,
+pub struct Iter<'j, 'lua> {
+    inner: journal::Iter<'j, Op<'lua>>,
 }
 
-impl<W> OpJournal<W>
+impl<'lua, W> OpJournal<'lua, W>
 where
     W: Write,
 {
     #[inline]
-    pub fn iter(&self) -> Iter<'_, T> {
+    pub fn iter(&self) -> Iter<'_, 'lua> {
         Iter::new(self)
     }
 }
 
-impl<'j> Iter<'j> {
+impl<'j, 'lua> Iter<'j, 'lua> {
     #[inline]
-    fn new<W>(journal: &'j OpJournal<W>) -> Self
+    fn new<W>(journal: &'j OpJournal<'lua, W>) -> Self
     where
         W: Write,
     {
@@ -122,8 +119,8 @@ impl<'j> Iter<'j> {
     }
 }
 
-impl<'j> Iterator for Iter<'j> {
-    type Item = &'j Record<Op>;
+impl<'j, 'lua> Iterator for Iter<'j, 'lua> {
+    type Item = &'j Record<Op<'lua>>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -131,7 +128,7 @@ impl<'j> Iterator for Iter<'j> {
     }
 }
 
-impl<'j> DoubleEndedIterator for Iter<'j> {
+impl<'j, 'lua> DoubleEndedIterator for Iter<'j, 'lua> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.inner.next_back()
@@ -139,30 +136,30 @@ impl<'j> DoubleEndedIterator for Iter<'j> {
 }
 
 #[derive(Debug)]
-pub struct RollbackIter<'j, W>
+pub struct RollbackIter<'j, 'lua, W>
 where
     W: Write,
 {
-    inner: journal::RollbackIter<'j, Op, W>,
+    inner: journal::RollbackIter<'j, Op<'lua>, W>,
 }
 
-impl<'j, W> RollbackIter<'j, W>
+impl<'j, 'lua, W> RollbackIter<'j, 'lua, W>
 where
     W: Write,
 {
     #[inline]
-    pub fn new(journal: &'j OpJournal<W>) -> Self {
+    pub fn new(journal: &'j OpJournal<'lua, W>) -> Self {
         Self {
             inner: journal.inner.rollback(),
         }
     }
 }
 
-impl<'j, W> Iterator for RollbackIter<'j, W>
+impl<'j, 'lua, W> Iterator for RollbackIter<'j, 'lua, W>
 where
     W: Write,
 {
-    type Item = Result<Op, JournalError>;
+    type Item = Result<Op<'lua>, JournalError>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

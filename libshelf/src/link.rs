@@ -8,7 +8,7 @@ use path_clean::PathClean;
 
 use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
-    TomlAction, TreeAction, WriteAction, YamlAction,
+    MkdirAction, TomlAction, TreeAction, WriteAction, YamlAction,
 };
 use crate::graph::PackageData;
 use crate::spec::{
@@ -18,7 +18,7 @@ use crate::spec::{
 
 impl PackageData {
     #[inline]
-    pub fn action_iter(&self, dest: P) -> ActionIter<'_>
+    pub fn action_iter<P>(&self, dest: P) -> ActionIter<'_>
     where
         P: AsRef<Path>,
     {
@@ -279,10 +279,10 @@ impl<'g> ActionIter<'g> {
 
     #[inline]
     fn from_file_dir(&self, df: &DirFile) -> Action<'g> {
-        let DirFile { dest } = df;
+        let DirFile { dest, parents } = df;
 
         let path = self.join_dest(dest);
-        Action::Mkdir(MkdirAction { path })
+        Action::Mkdir(MkdirAction { path, parents })
     }
 
     #[inline]
@@ -364,7 +364,7 @@ impl<'g> ActionIter<'g> {
         Action::Function(FunctionAction {
             function,
             start,
-            error_exit: error_exit.clone().unwrap_or(NonZeroExitBehavior::Ignore),
+            nonzero_exit: error_exit.clone().unwrap_or(NonZeroExitBehavior::Ignore),
         })
     }
 

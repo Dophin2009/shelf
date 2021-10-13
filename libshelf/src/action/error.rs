@@ -1,6 +1,8 @@
+use std::io;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, thiserror::Error)]
+#[error("no error placeholder")]
 pub struct NoError {}
 
 impl NoError {
@@ -12,11 +14,13 @@ impl NoError {
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
+#[error("file is missing")]
 pub struct FileMissingError {
     pub path: PathBuf,
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
+#[error("cannot read file metadata")]
 pub struct FileReadMetadataError {
     pub path: PathBuf,
     #[source]

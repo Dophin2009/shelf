@@ -1,9 +1,11 @@
+use crate::fsutil;
 pub use crate::spec::{HandlebarsPartials, Tree};
 
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use super::SkipReason;
 use super::{Resolution, Resolve, ResolveOpts, WriteAction, WriteActionError};
 
 #[derive(Debug, Clone)]
@@ -22,7 +24,7 @@ impl Resolve for HandlebarsAction {
     type Error = HandlebarsActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
             dest,
@@ -46,7 +48,7 @@ impl Resolve for HandlebarsAction {
         };
 
         // Render contents.
-        let contents = templating::hbs::render(&src, &vars, &partials)?;
+        let contents = self::hbs::render(&src, &vars, &partials)?;
 
         // Write the contents.
         let wa = WriteAction {
@@ -68,13 +70,13 @@ pub struct LiquidAction {
     pub optional: bool,
 }
 
-pub type LiquidActionError = hbs::Error;
+pub type LiquidActionError = liquid::Error;
 
 impl Resolve for LiquidAction {
     type Error = LiquidActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
             dest,
@@ -97,7 +99,7 @@ impl Resolve for LiquidAction {
         };
 
         // Render contents.
-        let contents = templating::liquid::render(src.abs(), &vars)?;
+        let contents = self::liquid::render(src.abs(), &vars)?;
 
         // Write contents.
         let wa = WriteAction {

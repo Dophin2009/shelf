@@ -1,20 +1,32 @@
 pub use crate::spec::NonZeroExitBehavior;
 
 use std::env;
+use std::fmt;
 use std::path::PathBuf;
 
 use mlua::Function;
 
-use crate::action::FunctionActionError;
+use super::{Finish, Rollback};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FunctionOp<'lua> {
     function: Function<'lua>,
     start: PathBuf,
     nonzero_exit: NonZeroExitBehavior,
 }
 
-#[derive(Debug, Clone)]
+impl<'lua> fmt::Debug for FunctionOp<'lua> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FunctionOp")
+            .field("function", &"<lua function>")
+            .field("start", &self.start)
+            .field("nonzero_exit", &self.nonzero_exit)
+            .finish()
+    }
+}
+
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum FunctionOpError {
     #[error("lua error")]
     Lua(#[from] mlua::Error),
@@ -49,7 +61,7 @@ impl<'lua> Finish for FunctionOp<'lua> {
 impl<'lua> FunctionOp<'lua> {
     #[inline]
     fn call(&self) -> Result<Option<mlua::Value<'lua>>, FunctionOpError> {
-        let ret: mlua::Value = function.call(())?;
+        let ret: mlua::Value = self.function.call(())?;
         match ret {
             mlua::Value::Nil => None,
             v => Some(v),

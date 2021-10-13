@@ -2,16 +2,18 @@ use std::fs;
 use std::path::PathBuf;
 
 use crate::action::SkipReason;
-use crate::fsutil;
-use crate::op::{MkdirOp, Op};
+use crate::op::{MkdirOp, Op, RmOp};
 
-use super::{DoneOutput, Resolution, Resolve, ResolveOpts};
+use super::error::NoError;
+use super::{DoneOutput, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
 
 #[derive(Debug, Clone)]
 pub struct MkdirAction {
     path: PathBuf,
     parents: bool,
 }
+
+pub type MkdirActionError = NoError;
 
 impl Resolve for MkdirAction {
     type Error = MkdirActionError;
@@ -22,7 +24,7 @@ impl Resolve for MkdirAction {
 
         let mut output = DoneOutput::empty();
 
-        match fs::symlink_metadata(dest) {
+        match fs::symlink_metadata(path) {
             // For directories, we should do nothing, as it already exists.
             Ok(meta) if meta.is_dir() => {
                 return Ok(Resolution::Skip(SkipReason::DestinationExists {
@@ -33,9 +35,9 @@ impl Resolve for MkdirAction {
             Ok(meta) if meta.is_file() || meta.is_symlink() => {
                 output
                     .notices
-                    .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
+                    .push(Notice::Warn(WarnNotice::Overwrite { path: path.clone() }));
                 output.ops.push(Op::Rm(RmOp {
-                    path: dest.clone(),
+                    path: path.clone(),
                     dir: false,
                 }));
             }

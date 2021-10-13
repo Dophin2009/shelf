@@ -1,11 +1,10 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::fsutil;
-use crate::op::{Op, RmOp};
+use crate::op::{Op, RmOp, WriteOp};
 
 use super::error::NoError;
-use super::{link, DoneOutput, Notice, Resolution, Resolve, WarnNotice};
+use super::{link, DoneOutput, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
 
 #[derive(Debug, Clone)]
 pub struct WriteAction {
@@ -19,7 +18,7 @@ impl Resolve for WriteAction {
     type Error = WriteActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self { dest, contents } = self;
 
         let mut output = DoneOutput::empty();
@@ -67,8 +66,8 @@ impl Resolve for WriteAction {
 
         // Check for existence of parent directories and add op to make parent directories if
         // they don't exist.
-        if let (mkparents_op) = link::mkparents_op(dest) {
-            output.ops.push(mkparents_op);
+        if let Some(mkparents_op) = link::mkparents_op(dest) {
+            output.ops.push(Op::Mkdir(mkparents_op));
         }
 
         output.ops.push(Op::Write(WriteOp {

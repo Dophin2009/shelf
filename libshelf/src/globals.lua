@@ -197,9 +197,10 @@ end
 function mkdir(arg)
 	if type(arg) == "table" then
 		local dest = arg[1] or error("mkdir dest was not provided")
-		pkg:mkdir(dest)
+		local parents = arg.parents or error("mkdir parents was not provided")
+		pkg:mkdir(dest, parents)
 	else
-		pkg:mkdir(arg)
+		pkg:mkdir(arg, true)
 	end
 end
 

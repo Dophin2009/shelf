@@ -18,17 +18,10 @@ pub use self::mkdir::*;
 pub use self::rm::*;
 pub use self::write::*;
 
-use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fs;
-use std::io;
-use std::io::Read;
-use std::io::Write;
-use std::path::PathBuf;
+use std::io::{self, Write};
 
 use serde::{Deserialize, Serialize};
-
-use crate::journal::{self, Journal, JournalError, Record};
 
 trait Finish {
     type Output;
@@ -38,17 +31,17 @@ trait Finish {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum Op {
+pub enum Op<'lua> {
     Link(LinkOp),
     Copy(CopyOp),
     Write(WriteOp),
     Mkdir(MkdirOp),
     Rm(RmOp),
     Command(CommandOp),
-    Function(FunctionOp),
+    Function(FunctionOp<'lua>),
 }
 
-impl Rollback for Op {
+impl<'lua> Rollback for Op<'lua> {
     #[inline]
     fn rollback(&self) -> Self {
         match self {
@@ -81,7 +74,7 @@ pub enum OpError {
     Io(#[from] io::Error),
 }
 
-impl Finish for Op {
+impl<'lua> Finish for Op<'lua> {
     type Output = OpOutput;
     type Error = OpError;
 
@@ -98,20 +91,5 @@ impl Finish for Op {
 
         let res = res?.into();
         Ok(res)
-    }
-}
-
-impl ShouldFinish for Op {
-    #[inline]
-    fn should_finish(&self) -> Result<bool, Self::Error> {
-        match op {
-            Op::Link(op) => op.should_finish(),
-            Op::Copy(op) => op.should_finish(),
-            Op::Write(op) => op.should_finish(),
-            Op::Mkdir(op) => op.should_finish(),
-            Op::Rm(op) => op.should_finish(),
-            Op::Command(op) => op.should_finish(),
-            Op::Function(op) => op.should_finish(),
-        }
     }
 }

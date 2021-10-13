@@ -1,9 +1,7 @@
-use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use super::Finish;
-use super::Rollback;
+use super::{Finish, Rollback};
 
 #[derive(Debug, Clone)]
 pub struct LinkOp {

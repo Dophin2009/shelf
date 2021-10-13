@@ -8,7 +8,8 @@ use glob::GlobError;
 
 use crate::fsutil;
 
-use super::{LinkAction, Resolution, Resolve, ResolveOpts};
+use super::error::FileMissingError;
+use super::{LinkAction, Resolution, Resolve, ResolveOpts, SkipReason};
 
 #[derive(Debug, Clone)]
 pub struct TreeAction {
@@ -25,13 +26,15 @@ pub struct TreeAction {
 pub enum TreeActionError {
     #[error("glob error")]
     Glob(#[from] GlobError),
+    #[error("file missing")]
+    FileMissing(#[from] FileMissingError),
 }
 
 impl Resolve for TreeAction {
     type Error = TreeActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
             dest,
@@ -50,7 +53,9 @@ impl Resolve for TreeAction {
                 }));
             }
             (false, false) => {
-                return Err(ResolutionError::FileMissing { path: src.clone() });
+                return Err(TreeActionError::FileMissing(FileMissingError {
+                    path: src.clone(),
+                }));
             }
             _ => {}
         }
