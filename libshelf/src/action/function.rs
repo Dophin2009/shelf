@@ -55,9 +55,9 @@ impl<'lua> Resolve for FunctionAction<'lua> {
         }
 
         let ops = vec![Op::Function(FunctionOp {
-            function,
+            function: function.clone(),
             start: start.clone(),
-            nonzero_exit,
+            nonzero_exit: *nonzero_exit,
         })];
         Ok(Resolution::Done(DoneOutput {
             ops,

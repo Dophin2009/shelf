@@ -12,7 +12,7 @@ pub struct YamlAction {
     pub header: Option<String>,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum YamlActionError {
     #[error("serde error")]
     Serde(#[from] serde_yaml::Error),
@@ -22,7 +22,7 @@ impl Resolve for YamlAction {
     type Error = YamlActionError;
 
     #[inline]
-    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
         let Self {
             dest,
             values,
@@ -64,7 +64,7 @@ impl Resolve for TomlAction {
     type Error = TomlActionError;
 
     #[inline]
-    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
         let Self {
             dest,
             values,
@@ -94,17 +94,17 @@ pub struct JsonAction {
     pub values: Tree,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum JsonActionError {
     #[error("serde error")]
-    Serde(#[from] toml::ser::Error),
+    Serde(#[from] serde_json::Error),
 }
 
 impl Resolve for JsonAction {
     type Error = JsonActionError;
 
     #[inline]
-    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
         let Self { dest, values } = self;
 
         // Render contents.

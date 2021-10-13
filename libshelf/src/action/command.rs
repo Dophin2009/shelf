@@ -1,7 +1,6 @@
 pub use crate::spec::{EnvMap, NonZeroExitBehavior};
 
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
 
 use crate::fsutil;
 use crate::op::{CommandOp, Op};
@@ -35,7 +34,7 @@ impl Resolve for CommandAction {
     type Error = CommandActionError;
 
     #[inline]
-    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
         let Self {
             command,
             start,
@@ -47,35 +46,22 @@ impl Resolve for CommandAction {
             nonzero_exit,
         } = self;
 
-        let mut cmd = Command::new(shell);
-        cmd.args(&["-c", &command]);
-
-        if fsutil::exists(start) {
-            cmd.current_dir(start);
-        } else {
+        if !fsutil::exists(start) {
             return Err(CommandActionError::FileMissing(FileMissingError {
                 path: start.clone(),
             }));
         }
 
-        if !stdout {
-            cmd.stdout(Stdio::null());
-        }
-        if !stderr {
-            cmd.stderr(Stdio::null());
-        }
-
-        if clean_env {
-            cmd.env_clear();
-        }
-
-        if !env.is_empty() {
-            for (k, v) in env {
-                cmd.env(k, v);
-            }
-        }
-
-        let ops = vec![Op::Command(CommandOp { cmd, nonzero_exit })];
+        let ops = vec![Op::Command(CommandOp {
+            command: command.clone(),
+            start: start.clone(),
+            shell: shell.clone(),
+            stdout: stdout.clone(),
+            stderr: stderr.clone(),
+            clean_env: *clean_env,
+            env: env.clone(),
+            nonzero_exit: *nonzero_exit,
+        })];
         Ok(Resolution::Done(DoneOutput {
             ops,
             notices: vec![],

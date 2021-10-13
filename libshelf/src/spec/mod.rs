@@ -4,6 +4,8 @@ mod tree;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use serde::{Deserialize, Serialize};
+
 pub use self::tree::Tree;
 
 #[derive(Debug, Clone)]
@@ -174,7 +176,7 @@ pub struct CmdHook {
 
 pub type EnvMap = HashMap<String, String>;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 pub enum NonZeroExitBehavior {
     Error,
     Warn,

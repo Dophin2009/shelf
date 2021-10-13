@@ -1,15 +1,17 @@
 use std::path::PathBuf;
 use std::{fs, io};
 
+use serde::{Deserialize, Serialize};
+
 use super::{Finish, Rollback};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WriteOp {
     path: PathBuf,
     contents: String,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum WriteOpError {
     #[error("i/o error")]
     Io(#[from] io::Error),

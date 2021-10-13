@@ -1,15 +1,17 @@
 use std::io;
 use std::path::PathBuf;
 
+use serde::{Deserialize, Serialize};
+
 use super::{Finish, Rollback};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LinkOp {
     pub src: PathBuf,
     pub dest: PathBuf,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum LinkOpError {
     #[error("i/o error")]
     Io(#[from] io::Error),

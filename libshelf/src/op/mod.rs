@@ -19,7 +19,6 @@ pub use self::rm::*;
 pub use self::write::*;
 
 use std::fmt::Debug;
-use std::io::{self, Write};
 
 use serde::{Deserialize, Serialize};
 
@@ -38,58 +37,117 @@ pub enum Op<'lua> {
     Mkdir(MkdirOp),
     Rm(RmOp),
     Command(CommandOp),
+
+    // FIXME: any ways around this?
+    #[serde(skip)]
     Function(FunctionOp<'lua>),
 }
+
+macro_rules! op_from {
+    ($Variant:ident => $SubOp:ty) => {
+        impl<'lua> From<$SubOp> for Op<'lua> {
+            #[inline]
+            fn from(op: $SubOp) -> Self {
+                Self::$Variant(op)
+            }
+        }
+    };
+    ($($Variant:ident => $SubOp:ty),*) => {
+        $(op_from!($Variant => $SubOp);)*
+    };
+}
+
+op_from!(
+    Link => LinkOp,
+    Copy => CopyOp,
+    Write => WriteOp,
+    Mkdir => MkdirOp,
+    Rm => RmOp,
+    Command => CommandOp,
+    Function => FunctionOp<'lua>
+);
 
 impl<'lua> Rollback for Op<'lua> {
     #[inline]
     fn rollback(&self) -> Self {
         match self {
-            Op::Link(op) => op.rollback(),
-            Op::Copy(op) => op.rollback(),
-            Op::Write(op) => op.rollback(),
-            Op::Mkdir(op) => op.rollback(),
-            Op::Rm(op) => op.rollback(),
-            Op::Command(op) => op.rollback(),
-            Op::Function(op) => op.rollback(),
+            Op::Link(op) => op.rollback().into(),
+            Op::Copy(op) => op.rollback().into(),
+            Op::Write(op) => op.rollback().into(),
+            Op::Mkdir(op) => op.rollback().into(),
+            Op::Rm(op) => op.rollback().into(),
+            Op::Command(op) => op.rollback().into(),
+            Op::Function(op) => op.rollback().into(),
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum OpOutput {
+pub enum OpOutput<'lua> {
+    Command(Option<i32>),
+    Function(Option<mlua::Value<'lua>>),
     None,
 }
 
-impl From<()> for OpOutput {
+impl<'lua> From<()> for OpOutput<'lua> {
     #[inline]
     fn from(_: ()) -> Self {
         Self::None
     }
 }
 
+macro_rules! op_output_from {
+    ($Variant:ident => $SubOp:ty) => {
+        impl<'lua> From<$SubOp> for OpOutput<'lua> {
+            #[inline]
+            fn from(v: $SubOp) -> Self {
+                Self::$Variant(v)
+            }
+        }
+    };
+    ($($Variant:ident => $SubOp:ty),*) => {
+        $(op_output_from!($Variant => $SubOp);)*
+    };
+}
+
+op_output_from!(
+    Command => Option<i32>,
+    Function => Option<mlua::Value<'lua>>
+);
+
 #[derive(Debug, thiserror::Error)]
 pub enum OpError {
-    #[error("i/o error")]
-    Io(#[from] io::Error),
+    #[error("link op error")]
+    Link(#[from] LinkOpError),
+    #[error("copy op error")]
+    Copy(#[from] CopyOpError),
+    #[error("write op error")]
+    Write(#[from] WriteOpError),
+    #[error("mkdir op error")]
+    Mkdir(#[from] MkdirOpError),
+    #[error("rm op error")]
+    Rm(#[from] RmOpError),
+    #[error("command op error")]
+    Command(#[from] CommandOpError),
+    #[error("function op error")]
+    Function(#[from] FunctionOpError),
 }
 
 impl<'lua> Finish for Op<'lua> {
-    type Output = OpOutput;
+    type Output = OpOutput<'lua>;
     type Error = OpError;
 
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let res = match self {
-            Op::Link(op) => op.finish(),
-            Op::Copy(op) => op.finish(),
-            Op::Write(op) => op.finish(),
-            Op::Mkdir(op) => op.finish(),
-            Op::Rm(op) => op.finish(),
-            Op::Command(op) => op.finish(),
-            Op::Function(op) => op.finish(),
+            Op::Link(op) => op.finish()?.into(),
+            Op::Copy(op) => op.finish()?.into(),
+            Op::Write(op) => op.finish()?.into(),
+            Op::Mkdir(op) => op.finish()?.into(),
+            Op::Rm(op) => op.finish()?.into(),
+            Op::Command(op) => op.finish()?.into(),
+            Op::Function(op) => op.finish()?.into(),
         };
 
-        let res = res?.into();
         Ok(res)
     }
 }

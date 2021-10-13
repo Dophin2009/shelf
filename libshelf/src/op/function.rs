@@ -62,10 +62,12 @@ impl<'lua> FunctionOp<'lua> {
     #[inline]
     fn call(&self) -> Result<Option<mlua::Value<'lua>>, FunctionOpError> {
         let ret: mlua::Value = self.function.call(())?;
-        match ret {
+        let ret = match ret {
             mlua::Value::Nil => None,
             v => Some(v),
-        }
+        };
+
+        Ok(ret)
     }
 }
 

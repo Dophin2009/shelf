@@ -282,7 +282,10 @@ impl<'g> ActionIter<'g> {
         let DirFile { dest, parents } = df;
 
         let path = self.join_dest(dest);
-        Action::Mkdir(MkdirAction { path, parents })
+        Action::Mkdir(MkdirAction {
+            path,
+            parents: *parents,
+        })
     }
 
     #[inline]

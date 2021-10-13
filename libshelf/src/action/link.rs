@@ -1,4 +1,5 @@
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 use crate::fsutil;
@@ -16,17 +17,19 @@ pub struct LinkAction {
     pub optional: bool,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum LinkActionError {
     #[error("missing file")]
     FileMissing(#[from] FileMissingError),
+    #[error("i/o error")]
+    Io(#[from] io::Error),
 }
 
 impl Resolve for LinkAction {
     type Error = LinkActionError;
 
     #[inline]
-    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
         let Self {
             src,
             dest,
@@ -38,7 +41,7 @@ impl Resolve for LinkAction {
         // If optional flag disabled, error.
         match (optional, fsutil::exists(src)) {
             (true, false) => {
-                return Ok(Resolution::Skip(SkipReason::OptionalMissing {
+                return Ok(Resolution::Skip(SkipReason::OptionalFileMissing {
                     path: src.clone(),
                 }));
             }
@@ -50,7 +53,7 @@ impl Resolve for LinkAction {
             _ => {}
         };
 
-        if copy {
+        if *copy {
             self.resolve_copy(opts)
         } else {
             self.resolve_link(opts)
@@ -61,10 +64,7 @@ impl Resolve for LinkAction {
 impl LinkAction {
     // FIXME implement missing pieces
     #[inline]
-    fn resolve_link<'lua>(
-        &self,
-        opts: &ResolveOpts,
-    ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
+    fn resolve_link(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();
@@ -73,7 +73,7 @@ impl LinkAction {
             // For symlinks, check the target. If it's the same as src, then we should do nothing.
             Ok(meta) if meta.is_symlink() => {
                 let target = fs::read_link(dest)?;
-                if target == src {
+                if target == *src {
                     return Ok(Resolution::Skip(SkipReason::DestinationExists {
                         path: dest.clone(),
                     }));
@@ -92,7 +92,7 @@ impl LinkAction {
                 }));
             }
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
-            Some(_) | Err(_) => {}
+            Ok(_) | Err(_) => {}
         };
 
         // Check for existence of parent directories and add op to make parent directories if they
@@ -110,10 +110,7 @@ impl LinkAction {
     }
 
     #[inline]
-    fn resolve_copy<'lua>(
-        &self,
-        opts: &ResolveOpts,
-    ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
+    fn resolve_copy(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();

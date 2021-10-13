@@ -1,7 +1,6 @@
 use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
 use std::slice;
 
-use liquid::ObjectView;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -24,8 +23,6 @@ where
 {
     records: Vec<Record<T>>,
     writer: BufWriter<W>,
-
-    borked: bool,
 }
 
 /// Error type for errors that may occur when working with [`Journal`].
@@ -49,8 +46,6 @@ where
         Self {
             records: Vec::new(),
             writer,
-
-            borked: false,
         }
     }
 
@@ -101,7 +96,7 @@ where
 
     #[inline]
     fn serialize_record(&mut self, record: &Record<T>) -> Result<(), serde_json::Error> {
-        serde_json::to_writer_pretty(&self.writer, record)
+        serde_json::to_writer(&mut self.writer, record)
     }
 }
 
@@ -213,8 +208,8 @@ where
         match self.records.last()? {
             Record::Action(_) => None,
             Record::Commit => {
-                let idx = self.journal.size() - 1;
-                let iter = RollbackIter::new_idx(&mut self.journal, idx);
+                let idx = self.size() - 1;
+                let iter = RollbackIter::new_idx(&mut self, idx);
                 iter.next();
                 Some(iter)
             }

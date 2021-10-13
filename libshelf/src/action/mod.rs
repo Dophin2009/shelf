@@ -44,6 +44,16 @@ pub enum ResolutionError {
     Handlebars(#[from] HandlebarsActionError),
     #[error("liquid action resolution error")]
     Liquid(#[from] LiquidActionError),
+    #[error("yaml action resolution error")]
+    Yaml(#[from] YamlActionError),
+    #[error("toml action resolution error")]
+    Toml(#[from] TomlActionError),
+    #[error("json action resolution error")]
+    Json(#[from] JsonActionError),
+    #[error("command action resolution error")]
+    Command(#[from] CommandActionError),
+    #[error("function action resolution error")]
+    Function(#[from] FunctionActionError),
 }
 
 #[derive(Debug)]
@@ -117,20 +127,22 @@ pub enum Action<'lua> {
     Function(FunctionAction<'lua>),
 }
 
-impl<'a> Resolve for Action<'a> {
+impl<'lua> Resolve for Action<'lua> {
+    type Error = ResolutionError;
+
     #[inline]
-    fn resolve(self, opts: &ResolveOpts) -> Result<Resolution, ResolutionError> {
-        let res = match self {
-            Self::Link(a) => a.resolve(opts)?,
-            Self::Write(a) => a.resolve(opts)?,
-            Self::Tree(a) => a.resolve(opts)?,
-            Self::Handlebars(a) => a.resolve(opts)?,
-            Self::Liquid(a) => a.resolve(opts)?,
-            Self::Yaml(a) => a.resolve(opts)?,
-            Self::Toml(a) => a.resolve(opts)?,
-            Self::Json(a) => a.resolve(opts)?,
-            Self::MKdir(a) => a.resolve(opts)?,
-            Self::Command(a) => a.resolve(opts)?,
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+        let res: Resolution<'lua> = match self {
+            Self::Link(a) => todo!(),
+            Self::Write(a) => todo!(),
+            Self::Tree(a) => todo!(),
+            Self::Handlebars(a) => todo!(),
+            Self::Liquid(a) => todo!(),
+            Self::Yaml(a) => todo!(),
+            Self::Toml(a) => todo!(),
+            Self::Json(a) => todo!(),
+            Self::Mkdir(a) => todo!(),
+            Self::Command(a) => todo!(),
             Self::Function(a) => a.resolve(opts)?,
         };
         Ok(res)

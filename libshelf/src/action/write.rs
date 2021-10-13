@@ -18,7 +18,7 @@ impl Resolve for WriteAction {
     type Error = WriteActionError;
 
     #[inline]
-    fn resolve<'lua>(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
         let Self { dest, contents } = self;
 
         let mut output = DoneOutput::empty();
@@ -49,6 +49,8 @@ impl Resolve for WriteAction {
             }
             // For directories, warn about an overwrite, remove the directory, and then
             // link.
+            //
+            // FIXME: https://github.com/rust-lang/rust/pull/89677
             Ok(meta) if meta.is_dir() | meta.is_symlink() => {
                 output
                     .notices

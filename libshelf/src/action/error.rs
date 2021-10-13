@@ -8,8 +8,8 @@ pub struct NoError {}
 impl NoError {
     // Wish we had ! type :(
     #[inline]
-    fn unwrap<T>(res: Result<T, Self>) -> T {
-        res.unwrap_or_else(|| unreachable!())
+    pub fn unwrap<T>(res: Result<T, Self>) -> T {
+        res.unwrap_or_else(|_| unreachable!())
     }
 }
 
@@ -19,7 +19,7 @@ pub struct FileMissingError {
     pub path: PathBuf,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 #[error("cannot read file metadata")]
 pub struct FileReadMetadataError {
     pub path: PathBuf,

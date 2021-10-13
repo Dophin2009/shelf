@@ -1,3 +1,5 @@
+#![feature(is_symlink)]
+
 pub mod error;
 
 pub mod graph;

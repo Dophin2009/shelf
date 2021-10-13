@@ -1,17 +1,30 @@
-pub use crate::spec::NonZeroExitBehavior;
+pub use crate::spec::{EnvMap, NonZeroExitBehavior};
 
 use std::io;
-use std::process::Command;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+
+use serde::{Deserialize, Serialize};
 
 use super::{Finish, Rollback};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CommandOp {
-    pub cmd: Command,
+    pub command: String,
+
+    pub start: PathBuf,
+    pub shell: String,
+
+    pub stdout: bool,
+    pub stderr: bool,
+
+    pub clean_env: bool,
+    pub env: EnvMap,
+
     pub nonzero_exit: NonZeroExitBehavior,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum CommandOpError {
     #[error("i/o error")]
     Io(#[from] io::Error),
@@ -25,9 +38,37 @@ impl Finish for CommandOp {
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let Self {
-            cmd,
-            nonzero_exit: _,
+            command,
+            start,
+            shell,
+            stdout,
+            stderr,
+            clean_env,
+            env,
+            nonzero_exit,
         } = self;
+
+        let mut cmd = Command::new(shell);
+        cmd.args(&["-c", &command]);
+
+        cmd.current_dir(start);
+
+        if !stdout {
+            cmd.stdout(Stdio::null());
+        }
+        if !stderr {
+            cmd.stderr(Stdio::null());
+        }
+
+        if *clean_env {
+            cmd.env_clear();
+        }
+
+        if !env.is_empty() {
+            for (k, v) in env {
+                cmd.env(k, v);
+            }
+        }
 
         // Spawn the command and wait for it to finish.
         let mut child = cmd.spawn()?;

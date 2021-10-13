@@ -48,7 +48,7 @@ impl Resolve for MkdirAction {
         // Add op to mkdir.
         output.ops.push(Op::Mkdir(MkdirOp {
             path: path.clone(),
-            parents,
+            parents: *parents,
         }));
 
         Ok(Resolution::Done(output))

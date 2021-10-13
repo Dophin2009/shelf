@@ -51,7 +51,7 @@ where
 
     /// Execute an op and append a record.
     #[inline]
-    pub fn append_and_finish(&mut self, op: Op<'lua>) -> Result<Option<OpOutput>, OpJournalError> {
+    pub fn append_and_finish(&mut self, op: Op<'lua>) -> Result<OpOutput<'lua>, OpJournalError> {
         // Append the record.
         let record = Record::Action(op.clone());
         self.inner.append(record)?;
@@ -70,19 +70,9 @@ where
     /// Finish an op. This checks the state, and if the operation is unecessary, will not finish it
     /// and return `Ok(None)`.
     #[inline]
-    pub fn finish(&self, op: &Op<'lua>) -> Result<Option<OpOutput>, OpJournalError> {
-        // Finish the op if necessary.
-        if !self.should_finish(&op)? {
-            return Ok(None);
-        }
-
-        op.finish().map(|out| Some(out))
-    }
-
-    /// Checks if an op should finish, given the current state.
-    #[inline]
-    fn should_finish(&self, op: &Op<'lua>) -> Result<bool, OpJournalError> {
-        op.should_finish()
+    pub fn finish(&self, op: &Op<'lua>) -> Result<OpOutput<'lua>, OpJournalError> {
+        let ret = op.finish()?;
+        Ok(ret)
     }
 
     /// Returns a [`RollbackIter`]. Callers should call [`Self::finish`] on outputted items.
