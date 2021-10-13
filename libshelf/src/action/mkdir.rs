@@ -9,8 +9,8 @@ use super::{DoneOutput, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
 
 #[derive(Debug, Clone)]
 pub struct MkdirAction {
-    path: PathBuf,
-    parents: bool,
+    pub path: PathBuf,
+    pub parents: bool,
 }
 
 pub type MkdirActionError = NoError;

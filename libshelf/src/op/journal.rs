@@ -138,7 +138,7 @@ where
     W: Write,
 {
     #[inline]
-    pub fn new(journal: &'j OpJournal<'lua, W>) -> Self {
+    pub fn new(journal: &'j mut OpJournal<'lua, W>) -> Self {
         Self {
             inner: journal.inner.rollback(),
         }

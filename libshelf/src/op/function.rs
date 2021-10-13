@@ -10,9 +10,9 @@ use super::{Finish, Rollback};
 
 #[derive(Clone)]
 pub struct FunctionOp<'lua> {
-    function: Function<'lua>,
-    start: PathBuf,
-    nonzero_exit: NonZeroExitBehavior,
+    pub function: Function<'lua>,
+    pub start: PathBuf,
+    pub nonzero_exit: NonZeroExitBehavior,
 }
 
 impl<'lua> fmt::Debug for FunctionOp<'lua> {

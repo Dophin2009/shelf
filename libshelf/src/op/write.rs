@@ -7,8 +7,8 @@ use super::{Finish, Rollback};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WriteOp {
-    path: PathBuf,
-    contents: String,
+    pub path: PathBuf,
+    pub contents: String,
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -209,7 +209,7 @@ where
             Record::Action(_) => None,
             Record::Commit => {
                 let idx = self.size() - 1;
-                let iter = RollbackIter::new_idx(&mut self, idx);
+                let mut iter = RollbackIter::new_idx(self, idx);
                 iter.next();
                 Some(iter)
             }
