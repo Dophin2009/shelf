@@ -26,10 +26,10 @@ use crate::op::Op;
 #[derive(Debug, Clone)]
 pub struct ResolveOpts {}
 
-pub trait Resolve {
+pub trait Resolve<'lua> {
     type Error;
 
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error>;
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -127,22 +127,22 @@ pub enum Action<'lua> {
     Function(FunctionAction<'lua>),
 }
 
-impl<'lua> Resolve for Action<'lua> {
+impl<'lua> Resolve<'lua> for Action<'lua> {
     type Error = ResolutionError;
 
     #[inline]
     fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let res: Resolution<'lua> = match self {
-            Self::Link(a) => todo!(),
-            Self::Write(a) => todo!(),
-            Self::Tree(a) => todo!(),
-            Self::Handlebars(a) => todo!(),
-            Self::Liquid(a) => todo!(),
-            Self::Yaml(a) => todo!(),
-            Self::Toml(a) => todo!(),
-            Self::Json(a) => todo!(),
-            Self::Mkdir(a) => todo!(),
-            Self::Command(a) => todo!(),
+            Self::Link(a) => self.resolve(opts)?,
+            Self::Write(a) => self.resolve(opts)?,
+            Self::Tree(a) => self.resolve(opts)?,
+            Self::Handlebars(a) => self.resolve(opts)?,
+            Self::Liquid(a) => self.resolve(opts)?,
+            Self::Yaml(a) => self.resolve(opts)?,
+            Self::Toml(a) => self.resolve(opts)?,
+            Self::Json(a) => self.resolve(opts)?,
+            Self::Mkdir(a) => self.resolve(opts)?,
+            Self::Command(a) => self.resolve(opts)?,
             Self::Function(a) => a.resolve(opts)?,
         };
         Ok(res)

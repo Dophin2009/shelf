@@ -43,11 +43,11 @@ impl From<hbst::Error> for HandlebarsActionError {
     }
 }
 
-impl Resolve for HandlebarsAction {
+impl<'lua> Resolve<'lua> for HandlebarsAction {
     type Error = HandlebarsActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
             dest,
@@ -115,11 +115,11 @@ impl From<liquidt::Error> for LiquidActionError {
     }
 }
 
-impl Resolve for LiquidAction {
+impl<'lua> Resolve<'lua> for LiquidAction {
     type Error = LiquidActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
             dest,

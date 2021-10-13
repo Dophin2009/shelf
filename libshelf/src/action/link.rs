@@ -25,11 +25,11 @@ pub enum LinkActionError {
     Io(#[from] io::Error),
 }
 
-impl Resolve for LinkAction {
+impl<'lua> Resolve<'lua> for LinkAction {
     type Error = LinkActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
             dest,
@@ -64,7 +64,10 @@ impl Resolve for LinkAction {
 impl LinkAction {
     // FIXME implement missing pieces
     #[inline]
-    fn resolve_link(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, <Self as Resolve>::Error> {
+    fn resolve_link<'lua>(
+        &self,
+        opts: &ResolveOpts,
+    ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();
@@ -110,7 +113,10 @@ impl LinkAction {
     }
 
     #[inline]
-    fn resolve_copy(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, <Self as Resolve>::Error> {
+    fn resolve_copy<'lua>(
+        &self,
+        opts: &ResolveOpts,
+    ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
         let mut output = DoneOutput::empty();

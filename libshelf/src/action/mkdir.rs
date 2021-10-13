@@ -15,11 +15,11 @@ pub struct MkdirAction {
 
 pub type MkdirActionError = NoError;
 
-impl Resolve for MkdirAction {
+impl<'lua> Resolve<'lua> for MkdirAction {
     type Error = MkdirActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self { path, parents } = self;
 
         let mut output = DoneOutput::empty();

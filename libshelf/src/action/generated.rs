@@ -18,11 +18,11 @@ pub enum YamlActionError {
     Serde(#[from] serde_yaml::Error),
 }
 
-impl Resolve for YamlAction {
+impl<'lua> Resolve<'lua> for YamlAction {
     type Error = YamlActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             dest,
             values,
@@ -60,11 +60,11 @@ pub enum TomlActionError {
     Serde(#[from] toml::ser::Error),
 }
 
-impl Resolve for TomlAction {
+impl<'lua> Resolve<'lua> for TomlAction {
     type Error = TomlActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             dest,
             values,
@@ -100,11 +100,11 @@ pub enum JsonActionError {
     Serde(#[from] serde_json::Error),
 }
 
-impl Resolve for JsonAction {
+impl<'lua> Resolve<'lua> for JsonAction {
     type Error = JsonActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self { dest, values } = self;
 
         // Render contents.

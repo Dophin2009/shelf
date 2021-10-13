@@ -30,11 +30,11 @@ pub enum CommandActionError {
     FileMissing(#[from] FileMissingError),
 }
 
-impl Resolve for CommandAction {
+impl<'lua> Resolve<'lua> for CommandAction {
     type Error = CommandActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             command,
             start,

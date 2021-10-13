@@ -36,11 +36,11 @@ pub enum FunctionActionError {
     FileMissing(#[from] FileMissingError),
 }
 
-impl<'lua> Resolve for FunctionAction<'lua> {
+impl<'lua> Resolve<'lua> for FunctionAction<'lua> {
     type Error = FunctionActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             function,
             start,

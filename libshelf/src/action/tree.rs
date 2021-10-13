@@ -34,11 +34,11 @@ pub enum TreeActionError {
     Link(#[from] LinkActionError),
 }
 
-impl Resolve for TreeAction {
+impl<'lua> Resolve<'lua> for TreeAction {
     type Error = TreeActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'_>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
             dest,
