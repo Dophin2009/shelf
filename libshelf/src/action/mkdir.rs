@@ -19,7 +19,7 @@ impl<'lua> Resolve<'lua> for MkdirAction {
     type Error = MkdirActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, _opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self { path, parents } = self;
 
         let mut output = DoneOutput::empty();

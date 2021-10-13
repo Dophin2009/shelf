@@ -18,7 +18,7 @@ impl<'lua> Resolve<'lua> for WriteAction {
     type Error = WriteActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, _opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self { dest, contents } = self;
 
         let mut output = DoneOutput::empty();

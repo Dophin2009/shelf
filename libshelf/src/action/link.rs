@@ -32,7 +32,7 @@ impl<'lua> Resolve<'lua> for LinkAction {
     fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
-            dest,
+            dest: _,
             copy,
             optional,
         } = self;
@@ -66,7 +66,7 @@ impl LinkAction {
     #[inline]
     fn resolve_link<'lua>(
         &self,
-        opts: &ResolveOpts,
+        _opts: &ResolveOpts,
     ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
@@ -115,7 +115,7 @@ impl LinkAction {
     #[inline]
     fn resolve_copy<'lua>(
         &self,
-        opts: &ResolveOpts,
+        _opts: &ResolveOpts,
     ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 

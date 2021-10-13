@@ -39,7 +39,7 @@ impl<'lua> Finish for FunctionOp<'lua> {
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let Self {
-            function,
+            function: _,
             start,
             nonzero_exit: _,
         } = self;

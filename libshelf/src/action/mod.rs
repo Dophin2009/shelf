@@ -133,16 +133,16 @@ impl<'lua> Resolve<'lua> for Action<'lua> {
     #[inline]
     fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let res: Resolution<'lua> = match self {
-            Self::Link(a) => self.resolve(opts)?,
-            Self::Write(a) => self.resolve(opts)?,
-            Self::Tree(a) => self.resolve(opts)?,
-            Self::Handlebars(a) => self.resolve(opts)?,
-            Self::Liquid(a) => self.resolve(opts)?,
-            Self::Yaml(a) => self.resolve(opts)?,
-            Self::Toml(a) => self.resolve(opts)?,
-            Self::Json(a) => self.resolve(opts)?,
-            Self::Mkdir(a) => self.resolve(opts)?,
-            Self::Command(a) => self.resolve(opts)?,
+            Self::Link(a) => a.resolve(opts)?,
+            Self::Write(a) => a.resolve(opts)?,
+            Self::Tree(a) => a.resolve(opts)?,
+            Self::Handlebars(a) => a.resolve(opts)?,
+            Self::Liquid(a) => a.resolve(opts)?,
+            Self::Yaml(a) => a.resolve(opts)?,
+            Self::Toml(a) => a.resolve(opts)?,
+            Self::Json(a) => a.resolve(opts)?,
+            Self::Mkdir(a) => a.resolve(opts)?,
+            Self::Command(a) => a.resolve(opts)?,
             Self::Function(a) => a.resolve(opts)?,
         };
         Ok(res)

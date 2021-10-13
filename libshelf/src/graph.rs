@@ -126,7 +126,7 @@ impl PackageGraph {
         Q: AsRef<Path>,
     {
         let id = self.keyid(&path);
-        let pid = self.keyid(&path);
+        let pid = self.keyid(&parent);
         match (self.datamap.get(&id), self.datamap.get(&pid)) {
             (Some(_), Some(_)) => {
                 self.graph.add_edge(pid, id, ());
@@ -145,7 +145,7 @@ impl PackageGraph {
         Q: AsRef<Path>,
     {
         let id = self.keyid(&path);
-        let pid = self.keyid(&path);
+        let pid = self.keyid(&parent);
         match (self.datamap.get(&id), self.datamap.get(&pid)) {
             (Some(_), Some(_)) => self.graph.remove_edge(pid, id).is_some(),
             _ => false,
@@ -160,7 +160,7 @@ impl PackageGraph {
         Q: AsRef<Path>,
     {
         let id = self.keyid(&path);
-        let pid = self.keyid(&path);
+        let pid = self.keyid(&parent);
 
         self.datamap.contains_key(&id)
             && self.datamap.contains_key(&pid)

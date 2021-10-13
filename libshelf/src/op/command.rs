@@ -45,7 +45,7 @@ impl Finish for CommandOp {
             stderr,
             clean_env,
             env,
-            nonzero_exit,
+            nonzero_exit: _,
         } = self;
 
         let mut cmd = Command::new(shell);
