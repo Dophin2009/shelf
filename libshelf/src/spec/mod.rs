@@ -188,5 +188,5 @@ pub struct FunHook {
     pub name: String,
 
     pub start: Option<PathBuf>,
-    pub error_exit: Option<NonZeroExitBehavior>,
+    pub nonzero_exit: Option<NonZeroExitBehavior>,
 }

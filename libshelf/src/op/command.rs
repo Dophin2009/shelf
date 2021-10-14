@@ -49,7 +49,7 @@ impl Finish for CommandOp {
         } = self;
 
         let mut cmd = Command::new(shell);
-        cmd.args(&["-c", &command]);
+        cmd.args(&["-c", command]);
 
         cmd.current_dir(start);
 

@@ -25,6 +25,12 @@ impl Tree {
     }
 }
 
+impl Default for Tree {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 mod lua {
     use mlua::{Error as LuaError, FromLua, Value as LuaValue};
 

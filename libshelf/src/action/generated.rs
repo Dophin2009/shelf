@@ -33,7 +33,7 @@ impl<'lua> Resolve<'lua> for YamlAction {
         let mut contents = serde_yaml::to_string(&values)?;
         if let Some(header) = header {
             contents.insert_str(0, header);
-            contents.insert_str(0, "\n");
+            contents.insert(0, '\n');
         }
 
         // Write contents.
@@ -75,7 +75,7 @@ impl<'lua> Resolve<'lua> for TomlAction {
         let mut contents = toml::to_string_pretty(&values)?;
         if let Some(header) = header {
             contents.insert_str(0, header);
-            contents.insert_str(0, "\n");
+            contents.insert(0, '\n');
         }
 
         // Write contents.

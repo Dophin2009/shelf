@@ -204,8 +204,8 @@ impl<'g> ActionIter<'g> {
             .unwrap_or_else(|| self.dest.clone());
 
         // FIXME no clone
-        let globs = globs.clone().unwrap_or(vec!["**/*".to_string()]);
-        let ignore = ignore.clone().unwrap_or(vec![]);
+        let globs = globs.clone().unwrap_or_else(|| vec!["**/*".to_string()]);
+        let ignore = ignore.clone().unwrap_or_default();
 
         // Determine copy flag.
         let copy = match link_type {
@@ -320,16 +320,16 @@ impl<'g> ActionIter<'g> {
         let start = start
             .as_ref()
             .map(|start| self.join_package(start))
-            .unwrap_or(self.path.to_path_buf());
+            .unwrap_or_else(|| self.path.to_path_buf());
 
         let command = command.clone();
         // Use sh as default shell.
-        let shell = shell.clone().unwrap_or("sh".to_string());
+        let shell = shell.clone().unwrap_or_else(|| "sh".to_string());
         let stdout = *stdout.as_ref().unwrap_or(&true);
         let stderr = *stderr.as_ref().unwrap_or(&true);
         let clean_env = *clean_env.as_ref().unwrap_or(&false);
-        let env = env.clone().unwrap_or_else(|| EnvMap::new());
-        let nonzero_exit = nonzero_exit.clone().unwrap_or(NonZeroExitBehavior::Ignore);
+        let env = env.clone().unwrap_or_else(EnvMap::new);
+        let nonzero_exit = (*nonzero_exit).unwrap_or(NonZeroExitBehavior::Ignore);
 
         Action::Command(CommandAction {
             command,
@@ -348,7 +348,7 @@ impl<'g> ActionIter<'g> {
         let FunHook {
             name,
             start,
-            error_exit,
+            nonzero_exit,
         } = fun;
 
         // idx_debug!(
@@ -367,7 +367,7 @@ impl<'g> ActionIter<'g> {
         Action::Function(FunctionAction {
             function,
             start,
-            nonzero_exit: error_exit.clone().unwrap_or(NonZeroExitBehavior::Ignore),
+            nonzero_exit: (*nonzero_exit).unwrap_or(NonZeroExitBehavior::Ignore),
         })
     }
 

@@ -204,13 +204,13 @@ impl PackageGraph {
     /// Returns an iterator of packages in topological sort order, with dependencies coming before
     /// dependents.
     #[inline]
-    pub fn order<'g>(&'g self) -> Result<Iter<'g, vec::IntoIter<u64>>, CircularDependencyError> {
+    pub fn order(&self) -> Result<Iter<'_, vec::IntoIter<u64>>, CircularDependencyError> {
         let mut sorted = match algo::toposort(&self.graph, None) {
             Ok(v) => v,
             Err(cycle) => {
                 let node_id = cycle.node_id();
                 let (_, data) = self.datamap.get(&node_id).unwrap();
-                return Err(CircularDependencyError(data.path.clone()).into());
+                return Err(CircularDependencyError(data.path.clone()));
             }
         };
         sorted.reverse();
@@ -227,6 +227,12 @@ impl PackageGraph {
         let mut s = DefaultHasher::new();
         path.hash(&mut s);
         s.finish()
+    }
+}
+
+impl Default for PackageGraph {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

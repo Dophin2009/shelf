@@ -24,6 +24,7 @@ impl Finish for RmOp {
     type Output = ();
     type Error = RmOpError;
 
+    #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let Self { path, dir } = self;
         let res = if *dir {

@@ -85,7 +85,7 @@ impl SpecLoaderEmpty {
 
     /// Load the package, returning a [`PackageData`].
     #[inline]
-    pub fn load<'a, P>(path: P) -> Result<PackageData, LoadError>
+    pub fn load<P>(path: P) -> Result<PackageData, LoadError>
     where
         P: AsRef<Path>,
     {
@@ -321,7 +321,7 @@ mod specobject {
             methods.add_method_mut(
                 "fn",
                 |lua, this, arg: (Function, Option<String>, Option<NonZeroExitBehavior>)| {
-                    let (fun, start, error_exit) = arg;
+                    let (fun, start, nonzero_exit) = arg;
 
                     let name = Uuid::new_v4().to_string();
                     lua.set_named_registry_value(&name, fun)?;
@@ -331,7 +331,7 @@ mod specobject {
                     let drct = Directive::Hook(Hook::Fun(FunHook {
                         name,
                         start,
-                        error_exit,
+                        nonzero_exit,
                     }));
                     this.spec.directives.push(drct);
                     Ok(())

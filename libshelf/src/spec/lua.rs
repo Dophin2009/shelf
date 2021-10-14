@@ -43,7 +43,7 @@ impl<'lua> FromLua<'lua> for NonZeroExitBehavior {
     }
 }
 
-fn conv_err<'lua, R>(value: LuaValue<'lua>, to: &'static str, should: &str) -> mlua::Result<R> {
+fn conv_err<R>(value: LuaValue<'_>, to: &'static str, should: &str) -> mlua::Result<R> {
     Err(LuaError::FromLuaConversionError {
         from: value.type_name(),
         to,

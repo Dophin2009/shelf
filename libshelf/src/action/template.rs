@@ -73,7 +73,7 @@ impl<'lua> Resolve<'lua> for HandlebarsAction {
         };
 
         // Render contents.
-        let contents = self::hbst::render(&src, &vars, &partials)?;
+        let contents = self::hbst::render(src, vars, partials)?;
 
         // Write the contents.
         let wa = WriteAction {

@@ -65,9 +65,9 @@ impl<'lua> Resolve<'lua> for TreeAction {
         }
 
         // Glob to get file paths.
-        let mut paths = Self::glob_tree(&src, &globs)?;
+        let mut paths = Self::glob_tree(&src, globs)?;
         // Glob to get ignored paths.
-        let ignore_paths = Self::glob_tree(&src, &ignore)?;
+        let ignore_paths = Self::glob_tree(&src, ignore)?;
 
         // Remove all the ignored paths from the globbed paths.
         for path in ignore_paths {
