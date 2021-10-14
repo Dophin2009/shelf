@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::op::{Op, RmOp, WriteOp};
+use crate::op::{CreateOp, Op, RmOp, WriteOp};
 
 use super::error::NoError;
 use super::{link, DoneOutput, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
@@ -63,7 +63,10 @@ impl<'lua> Resolve<'lua> for WriteAction {
                 }));
             }
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
-            Ok(_) | Err(_) => {}
+            Ok(_) | Err(_) => {
+                // We need to first create a file before writing to it.
+                output.ops.push(Op::Create(CreateOp { path: dest.clone() }));
+            }
         };
 
         // Check for existence of parent directories and add op to make parent directories if

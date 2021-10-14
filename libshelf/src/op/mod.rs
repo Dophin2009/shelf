@@ -2,6 +2,7 @@ pub mod journal;
 
 mod command;
 mod copy;
+mod create;
 mod function;
 mod link;
 mod mkdir;
@@ -12,6 +13,7 @@ pub(super) use crate::journal::Rollback;
 
 pub use self::command::*;
 pub use self::copy::*;
+pub use self::create::*;
 pub use self::function::*;
 pub use self::link::*;
 pub use self::mkdir::*;
@@ -33,6 +35,7 @@ trait Finish {
 pub enum Op<'lua> {
     Link(LinkOp),
     Copy(CopyOp),
+    Create(CreateOp),
     Write(WriteOp),
     Mkdir(MkdirOp),
     Rm(RmOp),
@@ -60,6 +63,7 @@ macro_rules! op_from {
 op_from!(
     Link => LinkOp,
     Copy => CopyOp,
+    Create => CreateOp,
     Write => WriteOp,
     Mkdir => MkdirOp,
     Rm => RmOp,
@@ -73,6 +77,7 @@ impl<'lua> Rollback<Op<'lua>> for Op<'lua> {
         match self {
             Op::Link(op) => op.rollback(),
             Op::Copy(op) => op.rollback(),
+            Op::Create(op) => op.rollback(),
             Op::Write(op) => op.rollback(),
             Op::Mkdir(op) => op.rollback(),
             Op::Rm(op) => op.rollback(),
@@ -121,6 +126,8 @@ pub enum OpError {
     Link(#[from] LinkOpError),
     #[error("copy op error")]
     Copy(#[from] CopyOpError),
+    #[error("create op error")]
+    Create(#[from] CreateOpError),
     #[error("write op error")]
     Write(#[from] WriteOpError),
     #[error("mkdir op error")]
@@ -142,6 +149,7 @@ impl<'lua> Finish for Op<'lua> {
         let res = match self {
             Op::Link(op) => op.finish()?.into(),
             Op::Copy(op) => op.finish()?.into(),
+            Op::Create(op) => op.finish()?.into(),
             Op::Write(op) => op.finish()?.into(),
             Op::Mkdir(op) => op.finish()?.into(),
             Op::Rm(op) => op.finish()?.into(),
