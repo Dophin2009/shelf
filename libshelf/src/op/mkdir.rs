@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::Finish;
+use super::Op;
 use super::Rollback;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -36,9 +37,9 @@ impl Finish for MkdirOp {
     }
 }
 
-impl Rollback for MkdirOp {
+impl<'lua> Rollback<Op<'lua>> for MkdirOp {
     #[inline]
-    fn rollback(&self) -> Self {
+    fn rollback(&self) -> Op<'lua> {
         todo!()
     }
 }

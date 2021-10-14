@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
 
-use super::{Finish, Rollback};
+use super::{Finish, Op, Rollback};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CommandOp {
@@ -78,9 +78,9 @@ impl Finish for CommandOp {
     }
 }
 
-impl Rollback for CommandOp {
+impl<'lua> Rollback<Op<'lua>> for CommandOp {
     #[inline]
-    fn rollback(&self) -> Self {
+    fn rollback(&self) -> Op<'lua> {
         todo!()
     }
 }

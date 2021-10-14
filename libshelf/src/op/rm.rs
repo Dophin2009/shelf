@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use super::Finish;
+use super::Op;
 use super::Rollback;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -35,9 +36,9 @@ impl Finish for RmOp {
     }
 }
 
-impl Rollback for RmOp {
+impl<'lua> Rollback<Op<'lua>> for RmOp {
     #[inline]
-    fn rollback(&self) -> Self {
+    fn rollback(&self) -> Op<'lua> {
         todo!()
     }
 }

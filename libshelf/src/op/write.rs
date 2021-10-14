@@ -3,7 +3,7 @@ use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 
-use super::{Finish, Rollback};
+use super::{Finish, Op, Rollback};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WriteOp {
@@ -30,9 +30,9 @@ impl Finish for WriteOp {
     }
 }
 
-impl Rollback for WriteOp {
+impl<'lua> Rollback<Op<'lua>> for WriteOp {
     #[inline]
-    fn rollback(&self) -> Self {
+    fn rollback(&self) -> Op<'lua> {
         todo!()
     }
 }

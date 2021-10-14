@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use mlua::Function;
 
+use super::Op;
 use super::{Finish, Rollback};
 
 #[derive(Clone)]
@@ -71,9 +72,9 @@ impl<'lua> FunctionOp<'lua> {
     }
 }
 
-impl<'lua> Rollback for FunctionOp<'lua> {
+impl<'lua> Rollback<Op<'lua>> for FunctionOp<'lua> {
     #[inline]
-    fn rollback(&self) -> Self {
+    fn rollback(&self) -> Op<'lua> {
         todo!()
     }
 }

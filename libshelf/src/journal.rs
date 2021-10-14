@@ -4,8 +4,8 @@ use std::slice;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-pub trait Rollback {
-    fn rollback(&self) -> Self;
+pub trait Rollback<R> {
+    fn rollback(&self) -> R;
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -183,7 +183,7 @@ where
 #[derive(Debug)]
 pub struct RollbackIter<'j, T, W>
 where
-    T: Rollback + Clone + Serialize,
+    T: Rollback<T> + Clone + Serialize,
     W: Write,
 {
     journal: &'j mut Journal<T, W>,
@@ -192,7 +192,7 @@ where
 
 impl<T, W> Journal<T, W>
 where
-    T: Rollback + Clone + Serialize,
+    T: Rollback<T> + Clone + Serialize,
     W: Write,
 {
     /// Rollback until the last commit. If the latest record is a commit, this returns an empty
@@ -219,7 +219,7 @@ where
 
 impl<'j, T, W> RollbackIter<'j, T, W>
 where
-    T: Rollback + Clone + Serialize,
+    T: Rollback<T> + Clone + Serialize,
     W: Write,
 {
     #[inline]
@@ -236,7 +236,7 @@ where
 
 impl<'j, T, W> Iterator for RollbackIter<'j, T, W>
 where
-    T: Rollback + Clone + Serialize,
+    T: Rollback<T> + Clone + Serialize,
     W: Write,
 {
     type Item = Result<T, JournalError>;

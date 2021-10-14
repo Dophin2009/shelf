@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Finish, Rollback};
+use super::{Finish, Op, Rollback};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LinkOp {
@@ -46,9 +46,9 @@ impl LinkOp {
     }
 }
 
-impl Rollback for LinkOp {
+impl<'lua> Rollback<Op<'lua>> for LinkOp {
     #[inline]
-    fn rollback(&self) -> Self {
+    fn rollback(&self) -> Op<'lua> {
         todo!()
     }
 }

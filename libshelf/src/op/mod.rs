@@ -67,17 +67,17 @@ op_from!(
     Function => FunctionOp<'lua>
 );
 
-impl<'lua> Rollback for Op<'lua> {
+impl<'lua> Rollback<Op<'lua>> for Op<'lua> {
     #[inline]
     fn rollback(&self) -> Self {
         match self {
-            Op::Link(op) => op.rollback().into(),
-            Op::Copy(op) => op.rollback().into(),
-            Op::Write(op) => op.rollback().into(),
-            Op::Mkdir(op) => op.rollback().into(),
-            Op::Rm(op) => op.rollback().into(),
-            Op::Command(op) => op.rollback().into(),
-            Op::Function(op) => op.rollback().into(),
+            Op::Link(op) => op.rollback(),
+            Op::Copy(op) => op.rollback(),
+            Op::Write(op) => op.rollback(),
+            Op::Mkdir(op) => op.rollback(),
+            Op::Rm(op) => op.rollback(),
+            Op::Command(op) => op.rollback(),
+            Op::Function(op) => op.rollback(),
         }
     }
 }
@@ -137,6 +137,7 @@ impl<'lua> Finish for Op<'lua> {
     type Output = OpOutput<'lua>;
     type Error = OpError;
 
+    #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let res = match self {
             Op::Link(op) => op.finish()?.into(),
