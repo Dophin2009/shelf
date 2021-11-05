@@ -534,6 +534,52 @@ mod test {
     }
 
     #[test]
+    fn test_iter_empty() -> Result<(), Box<dyn std::error::Error>> {
+        let mut writer = Vec::new();
+        let journal: Journal<Datum, _> = Journal::new(&mut writer);
+
+        assert_eq!(None, journal.iter().next());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_iter_forward() -> Result<(), Box<dyn std::error::Error>> {
+        let mut writer = Vec::new();
+        let mut journal: Journal<Datum, _> = Journal::new(&mut writer);
+
+        journal.append(FORWARD)?;
+        journal.append(BACKWARD)?;
+        journal.append(COMMIT)?;
+
+        let mut iter = journal.iter();
+        assert_eq!(Some(&FORWARD), iter.next());
+        assert_eq!(Some(&BACKWARD), iter.next());
+        assert_eq!(Some(&COMMIT), iter.next());
+        assert_eq!(None, iter.next());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_iter_backward() -> Result<(), Box<dyn std::error::Error>> {
+        let mut writer = Vec::new();
+        let mut journal: Journal<Datum, _> = Journal::new(&mut writer);
+
+        journal.append(FORWARD)?;
+        journal.append(BACKWARD)?;
+        journal.append(COMMIT)?;
+
+        let mut iter = journal.iter();
+        assert_eq!(Some(&COMMIT), iter.next_back());
+        assert_eq!(Some(&BACKWARD), iter.next_back());
+        assert_eq!(Some(&FORWARD), iter.next_back());
+        assert_eq!(None, iter.next_back());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_rollback_empty() -> Result<(), Box<dyn std::error::Error>> {
         let mut writer = Vec::new();
         let mut journal: Journal<Datum, _> = Journal::new(&mut writer);
