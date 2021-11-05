@@ -3,11 +3,11 @@ use stew::{Linker, Loader};
 use std::env;
 
 use anyhow::{anyhow, Context, Result};
-use clap::Clap;
+use clap::Parser;
 use log::info;
 use stderrlog::ColorChoice;
 
-#[derive(Clap, Debug)]
+#[derive(Parser, Debug)]
 #[clap(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
 struct Options {
     #[clap(short, long, parse(from_occurrences), about = "Message verbosity")]

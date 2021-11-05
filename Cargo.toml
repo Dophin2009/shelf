@@ -28,7 +28,7 @@ unsafe = []
 
 [dependencies]
 anyhow = "1.0"
-clap = "3.0.0-beta.1"
+clap = "3.0.0-beta.5"
 dyn-clone = "1.0.3"
 glob = "0.3.0"
 gtmpl = "0.5.7"
