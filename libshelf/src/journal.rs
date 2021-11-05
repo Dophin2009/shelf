@@ -78,6 +78,7 @@ where
         }
     }
 
+    /// Return true if the journal is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.records.is_empty()
@@ -100,6 +101,7 @@ where
         }
     }
 
+    /// Return an immutable slice to the records.
     #[inline]
     pub fn records(&self) -> &[Record<T>] {
         &self.records
