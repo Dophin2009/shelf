@@ -78,7 +78,14 @@ where
     /// Returns a [`RollbackIter`]. Callers should call [`Self::finish`] on outputted items.
     #[inline]
     pub fn rollback(&mut self) -> RollbackIter<'_, 'lua, W> {
-        RollbackIter::new(self)
+        let inner = self.inner.rollback();
+        RollbackIter::new(inner)
+    }
+
+    #[inline]
+    pub fn rollback_last(&mut self) -> Option<RollbackIter<'_, 'lua, W>> {
+        let inner = self.inner.rollback_last()?;
+        Some(RollbackIter::new(inner))
     }
 }
 
@@ -138,10 +145,8 @@ where
     W: Write,
 {
     #[inline]
-    pub fn new(journal: &'j mut OpJournal<'lua, W>) -> Self {
-        Self {
-            inner: journal.inner.rollback(),
-        }
+    fn new(inner: journal::RollbackIter<'j, Op<'lua>, W>) -> Self {
+        Self { inner }
     }
 }
 
