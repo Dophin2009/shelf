@@ -1,5 +1,3 @@
-#![feature(is_symlink)]
-
 pub mod graph;
 pub mod spec;
 
