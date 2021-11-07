@@ -51,15 +51,13 @@ mod test {
     use super::Journal;
 
     #[test]
-    fn test_iter_empty()  {
+    fn test_iter_empty() {
         let journal: Journal<Datum> = Journal::new();
         assert_eq!(None, journal.iter().next());
-
-
     }
 
     #[test]
-    fn test_iter_forward()  {
+    fn test_iter_forward() {
         let mut journal = Journal::new();
 
         journal.append(FORWARD);
@@ -71,12 +69,10 @@ mod test {
         assert_eq!(Some(&BACKWARD), iter.next());
         assert_eq!(Some(&COMMIT), iter.next());
         assert_eq!(None, iter.next());
-
-
     }
 
     #[test]
-    fn test_iter_backward()  {
+    fn test_iter_backward() {
         let mut journal = Journal::new();
 
         journal.append(FORWARD);
@@ -88,7 +84,5 @@ mod test {
         assert_eq!(Some(&BACKWARD), iter.next_back());
         assert_eq!(Some(&FORWARD), iter.next_back());
         assert_eq!(None, iter.next_back());
-
-
     }
 }

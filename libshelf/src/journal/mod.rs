@@ -103,7 +103,7 @@ mod test {
     pub const COMMIT: Record<Datum> = Record::Commit;
 
     #[test]
-    fn test_size()  {
+    fn test_size() {
         let mut journal = Journal::new();
         assert_eq!(0, journal.size());
 
@@ -115,12 +115,10 @@ mod test {
 
         journal.append(COMMIT);
         assert_eq!(3, journal.size());
-
-
     }
 
     #[test]
-    fn test_latest()  {
+    fn test_latest() {
         let mut journal = Journal::new();
         assert_eq!(None, journal.latest());
 
@@ -132,12 +130,10 @@ mod test {
 
         journal.append(COMMIT);
         assert_eq!(Some(&COMMIT), journal.latest());
-
-
     }
 
     #[test]
-    fn test_oldest()  {
+    fn test_oldest() {
         let mut journal = Journal::new();
         assert_eq!(None, journal.oldest());
 
@@ -149,12 +145,10 @@ mod test {
 
         journal.append(COMMIT);
         assert_eq!(Some(&FORWARD), journal.oldest());
-
-
     }
 
     #[test]
-    fn test_get()  {
+    fn test_get() {
         let mut journal = Journal::new();
         assert_eq!(None, journal.get(0));
 
@@ -166,12 +160,10 @@ mod test {
 
         journal.append(COMMIT);
         assert_eq!(Some(&COMMIT), journal.get(2));
-
-
     }
 
     #[test]
-    fn test_get_back()  {
+    fn test_get_back() {
         let mut journal = Journal::new();
         assert_eq!(None, journal.get_back(0));
 
@@ -187,12 +179,10 @@ mod test {
         assert_eq!(Some(&BACKWARD), journal.get_back(1));
         assert_eq!(Some(&FORWARD), journal.get_back(2));
         assert_eq!(None, journal.get_back(3));
-
-
     }
 
     #[test]
-    fn test_push()  {
+    fn test_push() {
         let mut journal = Journal::new();
         let mut records = Vec::new();
 
@@ -211,7 +201,5 @@ mod test {
         records.push(COMMIT);
         journal.append(COMMIT);
         assert_eq!(&records, journal.records());
-
-
     }
 }
