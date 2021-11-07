@@ -1,6 +1,7 @@
 pub mod iter;
 pub mod rollback;
 pub mod transaction;
+pub mod writer;
 
 pub use self::rollback::{Rollback, RollbackIter};
 pub use self::transaction::{CompletedTransaction, Transaction};
