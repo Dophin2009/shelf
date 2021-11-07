@@ -23,11 +23,6 @@ pub struct CompletedTransaction<'j, T> {
 }
 
 impl<'j, T> Transaction<'j, T> {
-    /// Start a new transaction on the given [`Journal`].
-    #[inline]
-    pub(super) fn new(journal: &'j mut Journal<T>) -> Self {
-        Self { journal }
-    }
 
     /// Returns a reference to the journal on which this transaction is operating.
     #[inline]
