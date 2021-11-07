@@ -72,13 +72,13 @@ where
 }
 
 #[inline]
-fn write_record<T, W>(record: &Record<T>, w: W) -> Result<(), WriteError>
+fn write_record<T, W>(record: &Record<T>, mut w: W) -> Result<(), WriteError>
 where
     T: Serialize,
     W: Write,
 {
-    let _ = serde_json::to_writer(w, record)?;
-    w.write_all(b"\n");
+    let _ = serde_json::to_writer(&mut w, record)?;
+    w.write_all(b"\n")?;
     Ok(())
 }
 
