@@ -23,7 +23,6 @@ pub struct CompletedTransaction<'j, T> {
 }
 
 impl<'j, T> Transaction<'j, T> {
-
     /// Returns a reference to the journal on which this transaction is operating.
     #[inline]
     pub fn journal(&self) -> &Journal<T> {
@@ -126,7 +125,7 @@ mod test {
     #[test]
     fn test_cancel_empty() {
         let mut journal: Journal<Datum> = Journal::new();
-        let mut t = journal.lock();
+        let t = journal.lock();
         let rb = t.cancel();
 
         assert!(rb.consume().is_empty());
