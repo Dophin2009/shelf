@@ -150,19 +150,17 @@ mod test {
     }
 
     #[test]
-    fn test_rollback_empty() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rollback_empty() {
         let mut journal: Journal<Datum> = Journal::new();
 
         // No records; rollback does nothing.
         let mut rollback = journal.rollback();
         assert!(rollback.next().is_none());
         assert!(journal.is_empty());
-
-        Ok(())
     }
 
     #[test]
-    fn test_rollback_commit_only() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rollback_commit_only() {
         let mut journal = Journal::new();
         journal.append(COMMIT);
 
@@ -171,12 +169,10 @@ mod test {
         // Rollback should do nothing.
         assert!(rollback.next().is_none());
         assert_eq!(&[COMMIT], journal.records());
-
-        Ok(())
     }
 
     #[test]
-    fn test_rollback_commit_double() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rollback_commit_double() {
         let mut journal = Journal::new();
 
         journal.append(COMMIT);
@@ -187,12 +183,10 @@ mod test {
         // Rollback should do nothing.
         assert!(rollback.next().is_none());
         assert_eq!(&[COMMIT, COMMIT], journal.records());
-
-        Ok(())
     }
 
     #[test]
-    fn test_rollback_no_commit() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rollback_no_commit() {
         let mut journal = Journal::new();
         let mut records = Vec::new();
 
@@ -215,12 +209,10 @@ mod test {
 
         // Assert that records are correct.
         assert_eq!(&records, journal.records());
-
-        Ok(())
     }
 
     #[test]
-    fn test_rollback_commit_last() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rollback_commit_last() {
         let mut journal = Journal::new();
 
         journal.append(FORWARD);
@@ -233,12 +225,10 @@ mod test {
 
         // Assert that records are correct.
         assert_eq!(&[FORWARD, COMMIT], journal.records());
-
-        Ok(())
     }
 
     #[test]
-    fn test_rollback_after_commit() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rollback_after_commit() {
         let mut journal = Journal::new();
         let mut records = vec![FORWARD, COMMIT, FORWARD, BACKWARD];
 
@@ -264,35 +254,29 @@ mod test {
 
         // Assert that records are correct.
         assert_eq!(&records, journal.records());
-
-        Ok(())
     }
 
     #[test]
-    fn test_rollback_last_empty() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rollback_last_empty() {
         let mut journal: Journal<Datum> = Journal::new();
 
         // No records; no rollback iter.
         let rollback = journal.rollback_last();
         assert!(rollback.is_none());
-
-        Ok(())
     }
 
     #[test]
-    fn test_rollback_last_non_commit() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rollback_last_non_commit() {
         let mut journal = Journal::new();
         journal.append(FORWARD);
 
         // Latest is not commit; no rollback iter.
         let rollback = journal.rollback_last();
         assert!(rollback.is_none());
-
-        Ok(())
     }
 
     #[test]
-    fn test_rollback_last_normal() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_rollback_last_normal() {
         let mut journal = Journal::new();
 
         let mut records = vec![FORWARD, COMMIT];
@@ -313,7 +297,5 @@ mod test {
 
         // Assert that records are correct.
         assert_eq!(&records, journal.records());
-
-        Ok(())
     }
 }

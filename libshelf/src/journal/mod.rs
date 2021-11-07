@@ -103,7 +103,7 @@ mod test {
     pub const COMMIT: Record<Datum> = Record::Commit;
 
     #[test]
-    fn test_size() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_size()  {
         let mut journal = Journal::new();
         assert_eq!(0, journal.size());
 
@@ -116,11 +116,11 @@ mod test {
         journal.append(COMMIT);
         assert_eq!(3, journal.size());
 
-        Ok(())
+
     }
 
     #[test]
-    fn test_latest() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_latest()  {
         let mut journal = Journal::new();
         assert_eq!(None, journal.latest());
 
@@ -133,11 +133,11 @@ mod test {
         journal.append(COMMIT);
         assert_eq!(Some(&COMMIT), journal.latest());
 
-        Ok(())
+
     }
 
     #[test]
-    fn test_oldest() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_oldest()  {
         let mut journal = Journal::new();
         assert_eq!(None, journal.oldest());
 
@@ -150,11 +150,11 @@ mod test {
         journal.append(COMMIT);
         assert_eq!(Some(&FORWARD), journal.oldest());
 
-        Ok(())
+
     }
 
     #[test]
-    fn test_get() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_get()  {
         let mut journal = Journal::new();
         assert_eq!(None, journal.get(0));
 
@@ -167,11 +167,11 @@ mod test {
         journal.append(COMMIT);
         assert_eq!(Some(&COMMIT), journal.get(2));
 
-        Ok(())
+
     }
 
     #[test]
-    fn test_get_back() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_get_back()  {
         let mut journal = Journal::new();
         assert_eq!(None, journal.get_back(0));
 
@@ -188,11 +188,11 @@ mod test {
         assert_eq!(Some(&FORWARD), journal.get_back(2));
         assert_eq!(None, journal.get_back(3));
 
-        Ok(())
+
     }
 
     #[test]
-    fn test_push() -> Result<(), Box<dyn std::error::Error>> {
+    fn test_push()  {
         let mut journal = Journal::new();
         let mut records = Vec::new();
 
@@ -212,6 +212,6 @@ mod test {
         journal.append(COMMIT);
         assert_eq!(&records, journal.records());
 
-        Ok(())
+
     }
 }
