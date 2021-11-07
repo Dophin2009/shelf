@@ -52,13 +52,6 @@ impl<'lua> OpJournal<'lua> {
         self.inner.oldest()
     }
 
-    /// Return true if the journal is currently in a pending transaction state (there are more
-    /// than zero records, and the latest record is a non-commit record).
-    #[inline]
-    pub fn in_transaction(&self) -> bool {
-        self.inner.in_transaction()
-    }
-
     /// Return true if the journal is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -180,7 +173,7 @@ impl<'j, 'lua> RollbackIter<'j, 'lua> {
 }
 
 impl<'j, 'lua> Iterator for RollbackIter<'j, 'lua> {
-    type Item = Op<'lua> ;
+    type Item = Op<'lua>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

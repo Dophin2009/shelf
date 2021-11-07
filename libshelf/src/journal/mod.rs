@@ -1,7 +1,9 @@
 pub mod iter;
 pub mod rollback;
+pub mod transaction;
 
 pub use self::rollback::{Rollback, RollbackIter};
+pub use self::transaction::{CompletedTransaction, Transaction};
 
 use serde::{Deserialize, Serialize};
 
@@ -45,16 +47,6 @@ impl<T> Journal<T> {
         self.records.first()
     }
 
-    /// Return true if the journal is currently in a pending transaction state (there are more
-    /// than zero records, and the latest record is a non-commit record).
-    #[inline]
-    pub fn in_transaction(&self) -> bool {
-        match self.latest().unwrap_or(&Record::Commit) {
-            Record::Action(_) => true,
-            Record::Commit => false,
-        }
-    }
-
     /// Return true if the journal is empty.
     #[inline]
     pub fn is_empty(&self) -> bool {
@@ -85,6 +77,8 @@ impl<T> Journal<T> {
     }
 
     /// Append a new record to the journal.
+    ///
+    /// This is for use by [`Transaction`] and [`RollbackIter`].
     #[inline]
     pub(self) fn append(&mut self, record: Record<T>) {
         // Push the record.
@@ -155,26 +149,6 @@ mod test {
 
         journal.append(COMMIT);
         assert_eq!(Some(&FORWARD), journal.oldest());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_in_transaction() -> Result<(), Box<dyn std::error::Error>> {
-        let mut journal = Journal::new();
-        assert!(!journal.in_transaction());
-
-        journal.append(FORWARD);
-        assert!(journal.in_transaction());
-
-        journal.append(BACKWARD);
-        assert!(journal.in_transaction());
-
-        journal.append(COMMIT);
-        assert!(!journal.in_transaction());
-
-        journal.append(BACKWARD);
-        assert!(journal.in_transaction());
 
         Ok(())
     }
