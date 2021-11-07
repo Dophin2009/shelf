@@ -1,57 +1,36 @@
-use std::io::{Read, Write};
-
-use crate::journal::{self, Journal, JournalError, Record};
+use crate::journal::{self, Journal, Record};
 
 use super::{Finish, Op, OpError, OpOutput};
 
 /// Write-ahead logging for [`Op`] that permits rollback.
 #[derive(Debug)]
-pub struct OpJournal<'lua, W>
-where
-    W: Write,
-{
+pub struct OpJournal<'lua> {
     /// This struct is just a wrapper on [`Journal`].
-    inner: Journal<Op<'lua>, W>,
+    inner: Journal<Op<'lua>>,
 }
 
 /// Error type for [`OpJournal`] operations that combines [`JournalError`] and [`OpError`].
 #[derive(Debug, thiserror::Error)]
 pub enum OpJournalError {
-    #[error("journal error")]
-    Journal(#[from] JournalError),
     #[error("op error")]
     Op(#[from] OpError),
 }
 
-impl<'lua, W> OpJournal<'lua, W>
-where
-    W: Write,
-{
+impl<'lua> OpJournal<'lua> {
     /// Create a new, empty journal.
     #[inline]
-    pub fn new(w: W) -> Self {
-        Self::new_parts(Journal::new(w))
+    pub fn new() -> Self {
+        Self::new_parts(Journal::new())
     }
 
     #[inline]
-    fn new_parts(inner: Journal<Op<'lua>, W>) -> Self {
+    fn new_parts(inner: Journal<Op<'lua>>) -> Self {
         Self { inner }
-    }
-
-    /// Load a journal from an existing reader.
-    #[inline]
-    pub fn load<R>(w: W, r: R) -> Result<Self, JournalError>
-    where
-        R: Read,
-    {
-        let inner = Journal::load(w, r)?;
-        let journal = Self::new_parts(inner);
-        Ok(journal)
     }
 
     /// Get the inner journal.
     #[inline]
-    pub fn journal(&self) -> &Journal<Op<'lua>, W> {
+    pub fn journal(&self) -> &Journal<Op<'lua>> {
         &self.inner
     }
 
@@ -105,22 +84,22 @@ where
     }
 
     /// Append a record (see [`Journal::append`]) and finish the op (see [`Journal::finish`]).
-    #[inline]
-    pub fn append_and_finish(&mut self, op: Op<'lua>) -> Result<OpOutput<'lua>, OpJournalError> {
-        // Append the record.
-        let record = Record::Action(op.clone());
-        self.inner.append(record)?;
+    // #[inline]
+    // pub fn append_and_finish(&mut self, op: Op<'lua>) -> Result<OpOutput<'lua>, OpJournalError> {
+    // // Append the record.
+    // let record = Record::Action(op.clone());
+    // self.inner.append(record)?;
 
-        // Finish the op.
-        self.finish(&op)
-    }
+    // // Finish the op.
+    // self.finish(&op)
+    // }
 
     /// Append a commit record.
-    #[inline]
-    pub fn commit(&mut self) -> Result<(), JournalError> {
-        self.inner.append(Record::Commit)?;
-        Ok(())
-    }
+    // #[inline]
+    // pub fn commit(&mut self) -> Result<(), JournalError> {
+    // self.inner.append(Record::Commit)?;
+    // Ok(())
+    // }
 
     /// Finish an op.
     #[inline]
@@ -132,7 +111,7 @@ where
     /// Return a [`RollbackIter`]. Callers should call [`Self::finish`] on outputted items. See
     /// [`journal::RollbackIter`]
     #[inline]
-    pub fn rollback(&mut self) -> RollbackIter<'_, 'lua, W> {
+    pub fn rollback(&mut self) -> RollbackIter<'_, 'lua> {
         let inner = self.inner.rollback();
         RollbackIter::new(inner)
     }
@@ -140,7 +119,7 @@ where
     /// Return a [`RollbackIter`] if the latest record is the a commit. See
     /// [`journal::RollbackIter`].
     #[inline]
-    pub fn rollback_last(&mut self) -> Option<RollbackIter<'_, 'lua, W>> {
+    pub fn rollback_last(&mut self) -> Option<RollbackIter<'_, 'lua>> {
         let inner = self.inner.rollback_last()?;
         Some(RollbackIter::new(inner))
     }
@@ -152,10 +131,7 @@ pub struct Iter<'j, 'lua> {
     inner: journal::iter::Iter<'j, Op<'lua>>,
 }
 
-impl<'lua, W> OpJournal<'lua, W>
-where
-    W: Write,
-{
+impl<'lua> OpJournal<'lua> {
     /// Return an iterator on the journal.
     #[inline]
     pub fn iter(&self) -> Iter<'_, 'lua> {
@@ -166,10 +142,7 @@ where
 impl<'j, 'lua> Iter<'j, 'lua> {
     /// Create a new iterator for the given journal.
     #[inline]
-    fn new<W>(journal: &'j OpJournal<'lua, W>) -> Self
-    where
-        W: Write,
-    {
+    fn new(journal: &'j OpJournal<'lua>) -> Self {
         Self {
             inner: journal.inner.iter(),
         }
@@ -195,28 +168,19 @@ impl<'j, 'lua> DoubleEndedIterator for Iter<'j, 'lua> {
 /// An iterator that performs rollback on a [`OpJournal`]. See [`OpJournal::rollback`] and
 /// [`OpJournal::rollback_last`].
 #[derive(Debug)]
-pub struct RollbackIter<'j, 'lua, W>
-where
-    W: Write,
-{
-    inner: journal::RollbackIter<'j, Op<'lua>, W>,
+pub struct RollbackIter<'j, 'lua> {
+    inner: journal::RollbackIter<'j, Op<'lua>>,
 }
 
-impl<'j, 'lua, W> RollbackIter<'j, 'lua, W>
-where
-    W: Write,
-{
+impl<'j, 'lua> RollbackIter<'j, 'lua> {
     #[inline]
-    fn new(inner: journal::RollbackIter<'j, Op<'lua>, W>) -> Self {
+    fn new(inner: journal::RollbackIter<'j, Op<'lua>>) -> Self {
         Self { inner }
     }
 }
 
-impl<'j, 'lua, W> Iterator for RollbackIter<'j, 'lua, W>
-where
-    W: Write,
-{
-    type Item = Result<Op<'lua>, JournalError>;
+impl<'j, 'lua> Iterator for RollbackIter<'j, 'lua> {
+    type Item = Op<'lua> ;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {

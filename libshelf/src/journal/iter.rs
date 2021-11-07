@@ -1,7 +1,4 @@
-use std::io::Write;
 use std::slice;
-
-use serde::Serialize;
 
 use super::{Journal, Record};
 
@@ -11,11 +8,7 @@ pub struct Iter<'j, T> {
     inner: slice::Iter<'j, Record<T>>,
 }
 
-impl<T, W> Journal<T, W>
-where
-    T: Serialize,
-    W: Write,
-{
+impl<T> Journal<T> {
     /// Create an iterator with immutable access on this journal. See [`Iter`].
     #[inline]
     pub fn iter(&self) -> Iter<'_, T> {
@@ -26,21 +19,14 @@ where
 impl<'j, T> Iter<'j, T> {
     /// Initialize a new iterator for the given journal.
     #[inline]
-    pub(super) fn new<W>(journal: &'j Journal<T, W>) -> Self
-    where
-        T: Serialize,
-        W: Write,
-    {
+    pub(super) fn new(journal: &'j Journal<T>) -> Self {
         Self {
             inner: journal.records.iter(),
         }
     }
 }
 
-impl<'j, T> Iterator for Iter<'j, T>
-where
-    T: Serialize,
-{
+impl<'j, T> Iterator for Iter<'j, T> {
     type Item = &'j Record<T>;
 
     /// Retrieve the next record from the journal, returning None if there are no more new records.
@@ -50,10 +36,7 @@ where
     }
 }
 
-impl<'j, T> DoubleEndedIterator for Iter<'j, T>
-where
-    T: Serialize,
-{
+impl<'j, T> DoubleEndedIterator for Iter<'j, T> {
     /// Retrieve the next (previous) record from the journal, returning None if the oldest record
     /// has already been returned.
     #[inline]
@@ -69,9 +52,7 @@ mod test {
 
     #[test]
     fn test_iter_empty() -> Result<(), Box<dyn std::error::Error>> {
-        let mut writer = Vec::new();
-        let journal: Journal<Datum, _> = Journal::new(&mut writer);
-
+        let journal: Journal<Datum> = Journal::new();
         assert_eq!(None, journal.iter().next());
 
         Ok(())
@@ -79,12 +60,11 @@ mod test {
 
     #[test]
     fn test_iter_forward() -> Result<(), Box<dyn std::error::Error>> {
-        let mut writer = Vec::new();
-        let mut journal: Journal<Datum, _> = Journal::new(&mut writer);
+        let mut journal = Journal::new();
 
-        journal.append(FORWARD)?;
-        journal.append(BACKWARD)?;
-        journal.append(COMMIT)?;
+        journal.append(FORWARD);
+        journal.append(BACKWARD);
+        journal.append(COMMIT);
 
         let mut iter = journal.iter();
         assert_eq!(Some(&FORWARD), iter.next());
@@ -97,12 +77,11 @@ mod test {
 
     #[test]
     fn test_iter_backward() -> Result<(), Box<dyn std::error::Error>> {
-        let mut writer = Vec::new();
-        let mut journal: Journal<Datum, _> = Journal::new(&mut writer);
+        let mut journal = Journal::new();
 
-        journal.append(FORWARD)?;
-        journal.append(BACKWARD)?;
-        journal.append(COMMIT)?;
+        journal.append(FORWARD);
+        journal.append(BACKWARD);
+        journal.append(COMMIT);
 
         let mut iter = journal.iter();
         assert_eq!(Some(&COMMIT), iter.next_back());
