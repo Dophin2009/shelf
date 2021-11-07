@@ -4,20 +4,18 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use super::Finish;
-use super::Op;
-use super::Rollback;
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct RmOp {
-    pub path: PathBuf,
-    pub dir: bool,
-}
+use super::{Finish, OpRollback};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RmOpError {
     #[error("i/o error")]
     Io(#[from] io::Error),
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RmOp {
+    pub path: PathBuf,
+    pub dir: bool,
 }
 
 impl Finish for RmOp {
@@ -37,9 +35,49 @@ impl Finish for RmOp {
     }
 }
 
-impl<'lua> Rollback<Op<'lua>> for RmOp {
+impl OpRollback for RmOp {
+    type Output = RmUndoOp;
+
     #[inline]
-    fn rollback(&self) -> Op<'lua> {
-        todo!()
+    fn op_rollback(&self) -> Self::Output {
+        let Self { path, dir } = self;
+
+        Self::Output {
+            path: path.clone(),
+            dir: *dir,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RmUndoOp {
+    pub path: PathBuf,
+    pub dir: bool,
+}
+
+impl Finish for RmUndoOp {
+    type Output = ();
+    type Error = RmOpError;
+
+    // FIXME: Pass in a saved directory and implement.
+    #[inline]
+    fn finish(&self) -> Result<Self::Output, Self::Error> {
+        let Self { path: _, dir: _ } = self;
+
+        unimplemented!();
+    }
+}
+
+impl OpRollback for RmUndoOp {
+    type Output = RmOp;
+
+    #[inline]
+    fn op_rollback(&self) -> Self::Output {
+        let Self { path, dir } = self;
+
+        Self::Output {
+            path: path.clone(),
+            dir: *dir,
+        }
     }
 }

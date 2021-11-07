@@ -31,19 +31,49 @@ trait Finish {
     fn finish(&self) -> Result<Self::Output, Self::Error>;
 }
 
+/// Wrapper trait for [`Rollback`] in case we ever want to add more parameters.
+pub trait OpRollback {
+    type Output;
+
+    /// Constructing the rollback operation should be deterministic and not perform any i/o
+    /// operations.
+    fn op_rollback(&self) -> Self::Output;
+}
+
+impl<R> Rollback for R
+where
+    R: OpRollback,
+{
+    type Output = R::Output;
+
+    #[inline]
+    fn rollback(&self) -> Self::Output {
+        self.op_rollback()
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Op<'lua> {
     Link(LinkOp),
+    LinkUndo(LinkUndoOp),
     Copy(CopyOp),
+    CopyUndo(CopyUndoOp),
     Create(CreateOp),
+    CreateUndo(CreateUndoOp),
     Write(WriteOp),
+    WriteUndo(WriteUndoOp),
     Mkdir(MkdirOp),
+    MkdirUndo(MkdirUndoOp),
     Rm(RmOp),
+    RmUndo(RmUndoOp),
     Command(CommandOp),
+    CommandUndo(CommandUndoOp),
 
     // FIXME: any ways around this?
     #[serde(skip)]
     Function(FunctionOp<'lua>),
+    #[serde(skip)]
+    FunctionUndo(FunctionUndoOp<'lua>),
 }
 
 macro_rules! op_from {
@@ -62,27 +92,45 @@ macro_rules! op_from {
 
 op_from!(
     Link => LinkOp,
+    LinkUndo => LinkUndoOp,
     Copy => CopyOp,
+    CopyUndo => CopyUndoOp,
     Create => CreateOp,
+    CreateUndo => CreateUndoOp,
     Write => WriteOp,
+    WriteUndo => WriteUndoOp,
     Mkdir => MkdirOp,
+    MkdirUndo => MkdirUndoOp,
     Rm => RmOp,
+    RmUndo => RmUndoOp,
     Command => CommandOp,
-    Function => FunctionOp<'lua>
+    CommandUndo => CommandUndoOp,
+    Function => FunctionOp<'lua>,
+    FunctionUndo => FunctionUndoOp<'lua>
 );
 
-impl<'lua> Rollback<Op<'lua>> for Op<'lua> {
+impl<'lua> OpRollback for Op<'lua> {
+    type Output = Op<'lua>;
+
     #[inline]
-    fn rollback(&self) -> Self {
+    fn op_rollback(&self) -> Self {
         match self {
-            Op::Link(op) => op.rollback(),
-            Op::Copy(op) => op.rollback(),
-            Op::Create(op) => op.rollback(),
-            Op::Write(op) => op.rollback(),
-            Op::Mkdir(op) => op.rollback(),
-            Op::Rm(op) => op.rollback(),
-            Op::Command(op) => op.rollback(),
-            Op::Function(op) => op.rollback(),
+            Op::Link(op) => op.op_rollback().into(),
+            Op::LinkUndo(op) => op.op_rollback().into(),
+            Op::Copy(op) => op.op_rollback().into(),
+            Op::CopyUndo(op) => op.op_rollback().into(),
+            Op::Create(op) => op.op_rollback().into(),
+            Op::CreateUndo(op) => op.op_rollback().into(),
+            Op::Write(op) => op.op_rollback().into(),
+            Op::WriteUndo(op) => op.op_rollback().into(),
+            Op::Mkdir(op) => op.op_rollback().into(),
+            Op::MkdirUndo(op) => op.op_rollback().into(),
+            Op::Rm(op) => op.op_rollback().into(),
+            Op::RmUndo(op) => op.op_rollback().into(),
+            Op::Command(op) => op.op_rollback().into(),
+            Op::CommandUndo(op) => op.op_rollback().into(),
+            Op::Function(op) => op.op_rollback().into(),
+            Op::FunctionUndo(op) => op.op_rollback().into(),
         }
     }
 }
@@ -148,13 +196,21 @@ impl<'lua> Finish for Op<'lua> {
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let res = match self {
             Op::Link(op) => op.finish()?.into(),
+            Op::LinkUndo(op) => op.finish()?.into(),
             Op::Copy(op) => op.finish()?.into(),
+            Op::CopyUndo(op) => op.finish()?.into(),
             Op::Create(op) => op.finish()?.into(),
+            Op::CreateUndo(op) => op.finish()?.into(),
             Op::Write(op) => op.finish()?.into(),
+            Op::WriteUndo(op) => op.finish()?.into(),
             Op::Mkdir(op) => op.finish()?.into(),
+            Op::MkdirUndo(op) => op.finish()?.into(),
             Op::Rm(op) => op.finish()?.into(),
+            Op::RmUndo(op) => op.finish()?.into(),
             Op::Command(op) => op.finish()?.into(),
+            Op::CommandUndo(op) => op.finish()?.into(),
             Op::Function(op) => op.finish()?.into(),
+            Op::FunctionUndo(op) => op.finish()?.into(),
         };
 
         Ok(res)

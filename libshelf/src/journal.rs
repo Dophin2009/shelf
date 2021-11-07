@@ -4,8 +4,10 @@ use std::slice;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
-pub trait Rollback<R> {
-    fn rollback(&self) -> R;
+pub trait Rollback {
+    type Output;
+
+    fn rollback(&self) -> Self::Output;
 }
 
 /// Record type to be recorded in a journal.
@@ -224,7 +226,7 @@ where
 #[derive(Debug)]
 pub struct RollbackIter<'j, T, W>
 where
-    T: Rollback<T> + Clone + Serialize,
+    T: Rollback<Output = T> + Clone + Serialize,
     W: Write,
 {
     journal: &'j mut Journal<T, W>,
@@ -239,7 +241,7 @@ where
 
 impl<T, W> Journal<T, W>
 where
-    T: Rollback<T> + Clone + Serialize,
+    T: Rollback<Output = T> + Clone + Serialize,
     W: Write,
 {
     /// Return a [`RollbackIter`] that rolls-back until the last commit.
@@ -269,7 +271,7 @@ where
 
 impl<'j, T, W> RollbackIter<'j, T, W>
 where
-    T: Rollback<T> + Clone + Serialize,
+    T: Rollback<Output = T> + Clone + Serialize,
     W: Write,
 {
     /// Create a new rollback iterator at the latest reverse position.
@@ -291,7 +293,7 @@ where
 
 impl<'j, T, W> Iterator for RollbackIter<'j, T, W>
 where
-    T: Rollback<T> + Clone + Serialize,
+    T: Rollback<Output = T> + Clone + Serialize,
     W: Write,
 {
     type Item = Result<T, JournalError>;
@@ -348,9 +350,11 @@ mod test {
         Backward,
     }
 
-    impl Rollback<Datum> for Datum {
+    impl Rollback for Datum {
+        type Output = Datum;
+
         #[inline]
-        fn rollback(&self) -> Self {
+        fn rollback(&self) -> Self::Output {
             match self {
                 Datum::Forward => Self::Backward,
                 Datum::Backward => Self::Forward,

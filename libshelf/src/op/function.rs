@@ -6,8 +6,13 @@ use std::path::PathBuf;
 
 use mlua::Function;
 
-use super::Op;
-use super::{Finish, Rollback};
+use super::{Finish, OpRollback};
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum FunctionOpError {
+    #[error("lua error")]
+    Lua(#[from] mlua::Error),
+}
 
 #[derive(Clone)]
 pub struct FunctionOp<'lua> {
@@ -25,12 +30,6 @@ impl<'lua> fmt::Debug for FunctionOp<'lua> {
             .field("nonzero_exit", &self.nonzero_exit)
             .finish()
     }
-}
-
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum FunctionOpError {
-    #[error("lua error")]
-    Lua(#[from] mlua::Error),
 }
 
 impl<'lua> Finish for FunctionOp<'lua> {
@@ -72,9 +71,69 @@ impl<'lua> FunctionOp<'lua> {
     }
 }
 
-impl<'lua> Rollback<Op<'lua>> for FunctionOp<'lua> {
+impl<'lua> OpRollback for FunctionOp<'lua> {
+    type Output = FunctionUndoOp<'lua>;
+
     #[inline]
-    fn rollback(&self) -> Op<'lua> {
+    fn op_rollback(&self) -> Self::Output {
+        let Self {
+            function,
+            start,
+            nonzero_exit,
+        } = self;
+
+        Self::Output {
+            function: function.clone(),
+            start: start.clone(),
+            nonzero_exit: *nonzero_exit,
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct FunctionUndoOp<'lua> {
+    pub function: Function<'lua>,
+    pub start: PathBuf,
+    pub nonzero_exit: NonZeroExitBehavior,
+}
+
+impl<'lua> fmt::Debug for FunctionUndoOp<'lua> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FunctionOp")
+            .field("function", &"<lua function>")
+            .field("start", &self.start)
+            .field("nonzero_exit", &self.nonzero_exit)
+            .finish()
+    }
+}
+
+impl<'lua> Finish for FunctionUndoOp<'lua> {
+    type Output = ();
+    type Error = FunctionOpError;
+
+    // FIXME: How to rollback a function call??
+    #[inline]
+    fn finish(&self) -> Result<Self::Output, Self::Error> {
         todo!()
+    }
+}
+
+impl<'lua> OpRollback for FunctionUndoOp<'lua> {
+    type Output = FunctionOp<'lua>;
+
+    #[inline]
+    fn op_rollback(&self) -> Self::Output {
+        let Self {
+            function,
+            start,
+            nonzero_exit,
+        } = self;
+
+        Self::Output {
+            function: function.clone(),
+            start: start.clone(),
+            nonzero_exit: *nonzero_exit,
+        }
     }
 }

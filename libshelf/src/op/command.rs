@@ -6,7 +6,13 @@ use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
 
-use super::{Finish, Op, Rollback};
+use super::{Finish, OpRollback};
+
+#[derive(Debug, thiserror::Error)]
+pub enum CommandOpError {
+    #[error("i/o error")]
+    Io(#[from] io::Error),
+}
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CommandOp {
@@ -22,12 +28,6 @@ pub struct CommandOp {
     pub env: EnvMap,
 
     pub nonzero_exit: NonZeroExitBehavior,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum CommandOpError {
-    #[error("i/o error")]
-    Io(#[from] io::Error),
 }
 
 impl Finish for CommandOp {
@@ -78,9 +78,87 @@ impl Finish for CommandOp {
     }
 }
 
-impl<'lua> Rollback<Op<'lua>> for CommandOp {
+impl OpRollback for CommandOp {
+    type Output = CommandUndoOp;
+
     #[inline]
-    fn rollback(&self) -> Op<'lua> {
+    fn op_rollback(&self) -> Self::Output {
+        let Self {
+            command,
+            start,
+            shell,
+            stdout,
+            stderr,
+            clean_env,
+            env,
+            nonzero_exit,
+        } = self;
+
+        Self::Output {
+            command: command.clone(),
+            start: start.clone(),
+            shell: shell.clone(),
+            stdout: *stdout,
+            stderr: *stderr,
+            clean_env: *clean_env,
+            env: env.clone(),
+            nonzero_exit: *nonzero_exit,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CommandUndoOp {
+    pub command: String,
+
+    pub start: PathBuf,
+    pub shell: String,
+
+    pub stdout: bool,
+    pub stderr: bool,
+
+    pub clean_env: bool,
+    pub env: EnvMap,
+
+    pub nonzero_exit: NonZeroExitBehavior,
+}
+
+impl Finish for CommandUndoOp {
+    type Output = ();
+    type Error = CommandOpError;
+
+    // FIXME: How to rollback a command execution??
+    #[inline]
+    fn finish(&self) -> Result<Self::Output, Self::Error> {
         todo!()
+    }
+}
+
+impl OpRollback for CommandUndoOp {
+    type Output = CommandOp;
+
+    #[inline]
+    fn op_rollback(&self) -> Self::Output {
+        let Self {
+            command,
+            start,
+            shell,
+            stdout,
+            stderr,
+            clean_env,
+            env,
+            nonzero_exit,
+        } = self;
+
+        Self::Output {
+            command: command.clone(),
+            start: start.clone(),
+            shell: shell.clone(),
+            stdout: *stdout,
+            stderr: *stderr,
+            clean_env: *clean_env,
+            env: env.clone(),
+            nonzero_exit: *nonzero_exit,
+        }
     }
 }
