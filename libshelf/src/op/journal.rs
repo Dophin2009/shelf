@@ -9,13 +9,6 @@ pub struct OpJournal<'lua> {
     inner: Journal<Op<'lua>>,
 }
 
-/// Error type for [`OpJournal`] operations that combines [`JournalError`] and [`OpError`].
-#[derive(Debug, thiserror::Error)]
-pub enum OpJournalError {
-    #[error("op error")]
-    Op(#[from] OpError),
-}
-
 impl<'lua> OpJournal<'lua> {
     /// Create a new, empty journal.
     #[inline]
@@ -75,47 +68,6 @@ impl<'lua> OpJournal<'lua> {
     pub fn records(&self) -> &[Record<Op<'lua>>] {
         self.inner.records()
     }
-
-    /// Append a record (see [`Journal::append`]) and finish the op (see [`Journal::finish`]).
-    // #[inline]
-    // pub fn append_and_finish(&mut self, op: Op<'lua>) -> Result<OpOutput<'lua>, OpJournalError> {
-    // // Append the record.
-    // let record = Record::Action(op.clone());
-    // self.inner.append(record)?;
-
-    // // Finish the op.
-    // self.finish(&op)
-    // }
-
-    /// Append a commit record.
-    // #[inline]
-    // pub fn commit(&mut self) -> Result<(), JournalError> {
-    // self.inner.append(Record::Commit)?;
-    // Ok(())
-    // }
-
-    /// Finish an op.
-    #[inline]
-    pub fn finish(&self, op: &Op<'lua>) -> Result<OpOutput<'lua>, OpJournalError> {
-        let ret = op.finish()?;
-        Ok(ret)
-    }
-
-    /// Return a [`RollbackIter`]. Callers should call [`Self::finish`] on outputted items. See
-    /// [`journal::RollbackIter`]
-    #[inline]
-    pub fn rollback(&mut self) -> RollbackIter<'_, 'lua> {
-        let inner = self.inner.rollback();
-        RollbackIter::new(inner)
-    }
-
-    /// Return a [`RollbackIter`] if the latest record is the a commit. See
-    /// [`journal::RollbackIter`].
-    #[inline]
-    pub fn rollback_last(&mut self) -> Option<RollbackIter<'_, 'lua>> {
-        let inner = self.inner.rollback_last()?;
-        Some(RollbackIter::new(inner))
-    }
 }
 
 /// Iterator on a journal.
@@ -165,6 +117,24 @@ pub struct RollbackIter<'j, 'lua> {
     inner: journal::RollbackIter<'j, Op<'lua>>,
 }
 
+impl<'lua> OpJournal<'lua> {
+    /// Return a [`RollbackIter`]. Callers should call [`Self::finish`] on outputted items. See
+    /// [`journal::RollbackIter`]
+    #[inline]
+    pub fn rollback(&mut self) -> RollbackIter<'_, 'lua> {
+        let inner = self.inner.rollback();
+        RollbackIter::new(inner)
+    }
+
+    /// Return a [`RollbackIter`] if the latest record is the a commit. See
+    /// [`journal::RollbackIter`].
+    #[inline]
+    pub fn rollback_last(&mut self) -> Option<RollbackIter<'_, 'lua>> {
+        let inner = self.inner.rollback_last()?;
+        Some(RollbackIter::new(inner))
+    }
+}
+
 impl<'j, 'lua> RollbackIter<'j, 'lua> {
     #[inline]
     fn new(inner: journal::RollbackIter<'j, Op<'lua>>) -> Self {
@@ -178,5 +148,70 @@ impl<'j, 'lua> Iterator for RollbackIter<'j, 'lua> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
+    }
+}
+
+/// A handle to a [`Journal`] that facilitate transactions.
+#[derive(Debug)]
+pub struct Transaction<'j, 'lua> {
+    inner: journal::Transaction<'j, Op<'lua>>,
+}
+
+/// The completed state of a transaction. This is returned by a successful [`Transaction::commit`]
+/// call.
+#[derive(Debug)]
+pub struct CompletedTransaction<'j, 'lua> {
+    inner: journal::CompletedTransaction<'j, Op<'lua>>,
+}
+
+impl<'lua> OpJournal<'lua> {
+    /// Start a transaction.
+    #[inline]
+    pub fn lock(&mut self) -> Transaction<'_, 'lua> {
+        Transaction {
+            inner: self.inner.lock(),
+        }
+    }
+}
+
+impl<'j, 'lua> Transaction<'j, 'lua> {
+    /// Append a new action record to the journal.
+    #[inline]
+    pub fn append_and_finish(&mut self, op: Op<'lua>) -> Result<OpOutput<'lua>, OpError> {
+        self.inner.append(op.clone());
+        self.finish(&op)
+    }
+
+    /// Finish an op.
+    #[inline]
+    fn finish(&self, op: &Op<'lua>) -> Result<OpOutput<'lua>, OpError> {
+        op.finish()
+    }
+
+    /// Commit the transaction by appending a commit record of the journal, returning a
+    /// [`CompletedTransaction`].
+    #[inline]
+    pub fn commit(self) -> CompletedTransaction<'j, 'lua> {
+        let inner = self.inner.commit();
+        CompletedTransaction { inner }
+    }
+}
+
+impl<'j, 'lua> Transaction<'j, 'lua> {
+    /// Return a [`RollbackIter`] to cancel the current transaction by rolling back any uncommitted
+    /// records.
+    #[inline]
+    pub fn cancel(self) -> RollbackIter<'j, 'lua> {
+        let inner = self.inner.cancel();
+        RollbackIter::new(inner)
+    }
+}
+
+impl<'j, 'lua> CompletedTransaction<'j, 'lua> {
+    /// Return a [`RollbackIter`] to rollback the just-completed transaction.
+    #[inline]
+    pub fn rollback(self) -> RollbackIter<'j, 'lua> {
+        let inner = self.inner.rollback();
+        RollbackIter::new(inner)
     }
 }
