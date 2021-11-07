@@ -149,7 +149,7 @@ where
 /// Iterator on a journal.
 #[derive(Debug)]
 pub struct Iter<'j, 'lua> {
-    inner: journal::Iter<'j, Op<'lua>>,
+    inner: journal::iter::Iter<'j, Op<'lua>>,
 }
 
 impl<'lua, W> OpJournal<'lua, W>
