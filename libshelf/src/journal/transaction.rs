@@ -5,7 +5,7 @@ impl<T> Journal<T> {
     /// Start a transaction.
     #[inline]
     pub fn lock(&mut self) -> Transaction<'_, T> {
-        TraTransaction { journal: self }
+        Transaction { journal: self }
     }
 }
 
@@ -31,7 +31,7 @@ impl<'j, T> Transaction<'j, T> {
 
     /// Returns a reference to the journal on which this transaction is operating.
     #[inline]
-    pub fn journal(&self) -> &'j Journal<T> {
+    pub fn journal(&self) -> &Journal<T> {
         self.journal
     }
 
@@ -68,6 +68,12 @@ impl<'j, T> CompletedTransaction<'j, T>
 where
     T: Rollback<Output = T> + Clone,
 {
+    /// Returns a reference to the journal on which this transaction is operating.
+    #[inline]
+    pub fn journal(&self) -> &Journal<T> {
+        self.journal
+    }
+
     /// Return a [`RollbackIter`] to rollback the just-completed transaction.
     #[inline]
     pub fn rollback(self) -> RollbackIter<'j, T> {
@@ -76,5 +82,77 @@ where
         self.journal
             .rollback_last()
             .unwrap_or_else(|| unimplemented!())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::super::test::{
+        Datum::{self, *},
+        BACKWARD, COMMIT, FORWARD,
+    };
+    use super::Journal;
+
+    #[test]
+    fn test_append() {
+        let mut journal = Journal::new();
+        let mut t = journal.lock();
+
+        t.append(Forward);
+        assert_eq!(&[FORWARD], t.journal().records());
+
+        t.append(Forward);
+        assert_eq!(&[FORWARD, FORWARD], t.journal().records());
+
+        t.commit();
+        assert_eq!(&[FORWARD, FORWARD, COMMIT], journal.records());
+    }
+
+    #[test]
+    fn test_cancel() {
+        let mut journal = Journal::new();
+        let mut t = journal.lock();
+
+        t.append(Forward);
+        assert_eq!(&[FORWARD], t.journal().records());
+
+        t.append(Forward);
+        assert_eq!(&[FORWARD, FORWARD], t.journal().records());
+
+        let rb = t.cancel();
+        assert_eq!(vec![Backward, Backward], rb.consume());
+
+        assert_eq!(
+            &[FORWARD, FORWARD, BACKWARD, BACKWARD, COMMIT],
+            journal.records()
+        );
+    }
+
+    #[test]
+    fn test_cancel_empty() {
+        let mut journal: Journal<Datum> = Journal::new();
+        let mut t = journal.lock();
+        let rb = t.cancel();
+
+        assert!(rb.consume().is_empty());
+        assert!(journal.is_empty());
+    }
+
+    #[test]
+    fn test_completed() {
+        let mut journal = Journal::new();
+        let mut t = journal.lock();
+
+        t.append(Forward);
+        t.append(Forward);
+
+        let t = t.commit();
+        let rb = t.rollback();
+
+        assert_eq!(vec![Backward, Backward], rb.consume());
+        assert_eq!(
+            &[FORWARD, FORWARD, COMMIT, BACKWARD, BACKWARD, COMMIT],
+            journal.records()
+        );
     }
 }

@@ -75,6 +75,12 @@ where
             done: false,
         }
     }
+
+    /// Perform all record rollbacks and return the action values in a `Vec`.
+    #[inline]
+    pub fn consume(self) -> Vec<T> {
+        self.collect()
+    }
 }
 
 impl<'j, T> Iterator for RollbackIter<'j, T>
