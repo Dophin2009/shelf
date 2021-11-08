@@ -32,7 +32,7 @@ impl<'lua> Resolve<'lua> for LinkAction {
     fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self {
             src,
-            dest: _,
+            dest,
             copy,
             optional,
         } = self;
