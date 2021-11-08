@@ -58,18 +58,18 @@ pub enum ResolutionError {
 
 #[derive(Debug)]
 pub enum Resolution<'lua> {
-    Done(DoneOutput<'lua>),
+    Done(Done<'lua>),
     Skip(SkipReason),
     Multiple(Vec<Resolution<'lua>>),
 }
 
 #[derive(Debug)]
-pub struct DoneOutput<'lua> {
+pub struct Done<'lua> {
     pub ops: Vec<Op<'lua>>,
     pub notices: Vec<Notice>,
 }
 
-impl<'lua> DoneOutput<'lua> {
+impl<'lua> Done<'lua> {
     #[inline]
     pub fn new(ops: Vec<Op<'lua>>, notices: Vec<Notice>) -> Self {
         Self { ops, notices }
@@ -81,7 +81,7 @@ impl<'lua> DoneOutput<'lua> {
     }
 }
 
-impl<'lua> Default for DoneOutput<'lua> {
+impl<'lua> Default for Done<'lua> {
     #[inline]
     fn default() -> Self {
         Self::empty()

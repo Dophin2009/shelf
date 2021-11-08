@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use crate::op::{CreateOp, Op, RmOp, WriteOp};
 
 use super::error::NoError;
-use super::{link, DoneOutput, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
+use super::{link, Done, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
 
 #[derive(Debug, Clone)]
 pub struct WriteAction {
@@ -21,7 +21,7 @@ impl<'lua> Resolve<'lua> for WriteAction {
     fn resolve(&self, _opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self { dest, contents } = self;
 
-        let mut output = DoneOutput::empty();
+        let mut output = Done::empty();
 
         // If the destination file already exists, check the filetype.
         match fs::symlink_metadata(dest) {

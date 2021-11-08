@@ -6,7 +6,7 @@ use crate::fsutil;
 use crate::op::{CopyOp, LinkOp, MkdirOp, Op, RmOp};
 
 use super::error::FileMissingError;
-use super::{DoneOutput, Notice, Resolution, Resolve, ResolveOpts, SkipReason, WarnNotice};
+use super::{Done, Notice, Resolution, Resolve, ResolveOpts, SkipReason, WarnNotice};
 
 #[derive(Debug, Clone)]
 pub struct LinkAction {
@@ -40,7 +40,7 @@ impl<'lua> Resolve<'lua> for LinkAction {
         // If src and dest are the same, do nothing.
         if src == dest {
             let notice = Notice::Warn(WarnNotice::SameSrcDest { path: src.clone() });
-            return Ok(Resolution::Done(DoneOutput {
+            return Ok(Resolution::Done(Done {
                 ops: vec![],
                 notices: vec![notice],
             }));
@@ -79,7 +79,7 @@ impl LinkAction {
     ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
-        let mut output = DoneOutput::empty();
+        let mut output = Done::empty();
 
         match fs::symlink_metadata(dest) {
             // For symlinks, check the target. If it's the same as src, then we should do nothing.
@@ -128,7 +128,7 @@ impl LinkAction {
     ) -> Result<Resolution<'lua>, <Self as Resolve>::Error> {
         let Self { src, dest, .. } = self;
 
-        let mut output = DoneOutput::empty();
+        let mut output = Done::empty();
 
         match fs::symlink_metadata(dest) {
             // FIXME: For files, check the contents. If they match, we should do nothing.

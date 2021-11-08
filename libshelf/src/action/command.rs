@@ -6,7 +6,7 @@ use crate::fsutil;
 use crate::op::{CommandOp, Op};
 
 use super::error::FileMissingError;
-use super::{DoneOutput, Resolution, Resolve, ResolveOpts};
+use super::{Done, Resolution, Resolve, ResolveOpts};
 
 #[derive(Debug, Clone)]
 pub struct CommandAction {
@@ -62,7 +62,7 @@ impl<'lua> Resolve<'lua> for CommandAction {
             env: env.clone(),
             nonzero_exit: *nonzero_exit,
         })];
-        Ok(Resolution::Done(DoneOutput {
+        Ok(Resolution::Done(Done {
             ops,
             notices: vec![],
         }))

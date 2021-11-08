@@ -5,7 +5,7 @@ use crate::action::SkipReason;
 use crate::op::{MkdirOp, Op, RmOp};
 
 use super::error::NoError;
-use super::{DoneOutput, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
+use super::{Done, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
 
 #[derive(Debug, Clone)]
 pub struct MkdirAction {
@@ -22,7 +22,7 @@ impl<'lua> Resolve<'lua> for MkdirAction {
     fn resolve(&self, _opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
         let Self { path, parents } = self;
 
-        let mut output = DoneOutput::empty();
+        let mut output = Done::empty();
 
         match fs::symlink_metadata(path) {
             // For directories, we should do nothing, as it already exists.

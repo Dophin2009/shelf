@@ -9,7 +9,7 @@ use crate::fsutil;
 use crate::op::{FunctionOp, Op};
 
 use super::error::FileMissingError;
-use super::{DoneOutput, Resolution, Resolve, ResolveOpts};
+use super::{Done, Resolution, Resolve, ResolveOpts};
 
 #[derive(Clone)]
 pub struct FunctionAction<'lua> {
@@ -59,7 +59,7 @@ impl<'lua> Resolve<'lua> for FunctionAction<'lua> {
             start: start.clone(),
             nonzero_exit: *nonzero_exit,
         })];
-        Ok(Resolution::Done(DoneOutput {
+        Ok(Resolution::Done(Done {
             ops,
             notices: vec![],
         }))
