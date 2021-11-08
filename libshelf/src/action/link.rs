@@ -37,6 +37,15 @@ impl<'lua> Resolve<'lua> for LinkAction {
             optional,
         } = self;
 
+        // If src and dest are the same, do nothing.
+        if src == dest {
+            let notice = Notice::Warn(WarnNotice::SameSrcDest { path: src.clone() });
+            return Ok(Resolution::Done(DoneOutput {
+                ops: vec![],
+                notices: vec![notice],
+            }));
+        }
+
         // If file does not exist and optional flag enabled, skip.
         // If optional flag disabled, error.
         match (optional, fsutil::exists(src)) {

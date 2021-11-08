@@ -101,6 +101,7 @@ pub enum InfoNotice {
 
 #[derive(Debug)]
 pub enum WarnNotice {
+    SameSrcDest { path: PathBuf },
     ManualChange { path: PathBuf },
     Overwrite { path: PathBuf },
 }
