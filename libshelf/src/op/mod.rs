@@ -100,6 +100,22 @@ macro_rules! Op_impls {
                 }
             }
         }
+
+        impl<'lua> Finish for Op<'lua> {
+            type Output = OpOutput<'lua>;
+            type Error = OpError;
+
+            #[inline]
+            fn finish(&self) -> Result<Self::Output, Self::Error> {
+                let res = match self {
+                    $(
+                        Op::$Variant(op) => op.finish()?.into(),
+                    )*
+                };
+
+                Ok(res)
+            }
+        }
     };
 }
 
@@ -172,33 +188,4 @@ pub enum OpError {
     Command(#[from] CommandOpError),
     #[error("function op error")]
     Function(#[from] FunctionOpError),
-}
-
-impl<'lua> Finish for Op<'lua> {
-    type Output = OpOutput<'lua>;
-    type Error = OpError;
-
-    #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
-        let res = match self {
-            Op::Link(op) => op.finish()?.into(),
-            Op::LinkUndo(op) => op.finish()?.into(),
-            Op::Copy(op) => op.finish()?.into(),
-            Op::CopyUndo(op) => op.finish()?.into(),
-            Op::Create(op) => op.finish()?.into(),
-            Op::CreateUndo(op) => op.finish()?.into(),
-            Op::Write(op) => op.finish()?.into(),
-            Op::WriteUndo(op) => op.finish()?.into(),
-            Op::Mkdir(op) => op.finish()?.into(),
-            Op::MkdirUndo(op) => op.finish()?.into(),
-            Op::Rm(op) => op.finish()?.into(),
-            Op::RmUndo(op) => op.finish()?.into(),
-            Op::Command(op) => op.finish()?.into(),
-            Op::CommandUndo(op) => op.finish()?.into(),
-            Op::Function(op) => op.finish()?.into(),
-            Op::FunctionUndo(op) => op.finish()?.into(),
-        };
-
-        Ok(res)
-    }
 }
