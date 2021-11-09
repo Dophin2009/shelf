@@ -76,7 +76,7 @@ where
         }
     }
 
-    /// Perform all record rollbacks and return the action values in a `Vec`.
+    /// Perform all record rollbacks and return the atom values in a `Vec`.
     #[inline]
     pub fn consume(self) -> Vec<T> {
         self.collect()
@@ -90,10 +90,11 @@ where
     type Item = T;
 
     /// Look at the next record and perform the following operations depending on the record type:
-    /// -   Action: append the record's rollback to the journal and return `Some` with the rollback
+    /// -   Atom:   append the record's rollback to the journal and return `Some` with the rollback
     ///             data.
     /// -   Commit or no record: if no rollback records have been appended yet, do nothing and
-    ///     return `None`; otherwise, append a commit record to the journal and return `None`.
+    ///             return `None`; otherwise, append a commit record to the journal and return
+    ///             `None`.
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.done {

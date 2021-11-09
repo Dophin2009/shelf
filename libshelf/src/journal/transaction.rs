@@ -29,10 +29,10 @@ impl<'j, T> Transaction<'j, T> {
         self.journal
     }
 
-    /// Append a new action record to the journal.
+    /// Append a new [`Record::Atom`] record to the journal.
     #[inline]
-    pub fn append(&mut self, action: T) {
-        self.journal.append(Record::Atom(action))
+    pub fn append(&mut self, datum: T) {
+        self.journal.append(Record::Atom(datum))
     }
 
     /// Commit the transaction by appending a commit record of the journal, returning a
