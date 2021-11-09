@@ -77,7 +77,7 @@ pub enum Op<'lua> {
 }
 
 /// Generate From, [`OpRollback`] implementations for [`Op`].
-macro_rules! op_impls {
+macro_rules! Op_impls {
     ($($Variant:ident => $SubOp:ty),*) => {
         $(
             impl<'lua> From<$SubOp> for Op<'lua> {
@@ -103,7 +103,7 @@ macro_rules! op_impls {
     };
 }
 
-op_impls!(
+Op_impls!(
     Link => LinkOp,
     LinkUndo => LinkUndoOp,
     Copy => CopyOp,
@@ -136,21 +136,20 @@ impl<'lua> From<()> for OpOutput<'lua> {
     }
 }
 
-macro_rules! op_output_from {
-    ($Variant:ident => $SubOp:ty) => {
-        impl<'lua> From<$SubOp> for OpOutput<'lua> {
-            #[inline]
-            fn from(v: $SubOp) -> Self {
-                Self::$Variant(v)
-            }
-        }
-    };
+macro_rules! OpOutput_impls {
     ($($Variant:ident => $SubOp:ty),*) => {
-        $(op_output_from!($Variant => $SubOp);)*
+        $(
+            impl<'lua> From<$SubOp> for OpOutput<'lua> {
+                #[inline]
+                fn from(v: $SubOp) -> Self {
+                    Self::$Variant(v)
+                }
+            }
+        )*
     };
 }
 
-op_output_from!(
+OpOutput_impls!(
     Command => Option<i32>,
     Function => Option<mlua::Value<'lua>>
 );
