@@ -18,9 +18,6 @@ thiserror = "1.0"
 toml = "0.5"
 uuid = { version = "0.8", features = ["v4"] }
 
-bunt = { version = "0.2", optional = true }
-bunt-logger = { version = "0.1", optional = true }
-
 [features]
 default = []
 lua51 = ["mlua/lua51"]
