@@ -76,21 +76,34 @@ pub enum Op<'lua> {
     FunctionUndo(FunctionUndoOp<'lua>),
 }
 
-macro_rules! op_from {
-    ($Variant:ident => $SubOp:ty) => {
-        impl<'lua> From<$SubOp> for Op<'lua> {
+/// Generate From, [`OpRollback`] implementations for [`Op`].
+macro_rules! op_impls {
+    ($($Variant:ident => $SubOp:ty),*) => {
+        $(
+            impl<'lua> From<$SubOp> for Op<'lua> {
+                #[inline]
+                fn from(op: $SubOp) -> Self {
+                    Self::$Variant(op)
+                }
+            }
+        )*
+
+        impl<'lua> OpRollback for Op<'lua> {
+            type Output = Op<'lua>;
+
             #[inline]
-            fn from(op: $SubOp) -> Self {
-                Self::$Variant(op)
+            fn op_rollback(&self) -> Self {
+                match self {
+                    $(
+                        Op::$Variant(op) => op.op_rollback().into(),
+                    )*
+                }
             }
         }
     };
-    ($($Variant:ident => $SubOp:ty),*) => {
-        $(op_from!($Variant => $SubOp);)*
-    };
 }
 
-op_from!(
+op_impls!(
     Link => LinkOp,
     LinkUndo => LinkUndoOp,
     Copy => CopyOp,
@@ -108,32 +121,6 @@ op_from!(
     Function => FunctionOp<'lua>,
     FunctionUndo => FunctionUndoOp<'lua>
 );
-
-impl<'lua> OpRollback for Op<'lua> {
-    type Output = Op<'lua>;
-
-    #[inline]
-    fn op_rollback(&self) -> Self {
-        match self {
-            Op::Link(op) => op.op_rollback().into(),
-            Op::LinkUndo(op) => op.op_rollback().into(),
-            Op::Copy(op) => op.op_rollback().into(),
-            Op::CopyUndo(op) => op.op_rollback().into(),
-            Op::Create(op) => op.op_rollback().into(),
-            Op::CreateUndo(op) => op.op_rollback().into(),
-            Op::Write(op) => op.op_rollback().into(),
-            Op::WriteUndo(op) => op.op_rollback().into(),
-            Op::Mkdir(op) => op.op_rollback().into(),
-            Op::MkdirUndo(op) => op.op_rollback().into(),
-            Op::Rm(op) => op.op_rollback().into(),
-            Op::RmUndo(op) => op.op_rollback().into(),
-            Op::Command(op) => op.op_rollback().into(),
-            Op::CommandUndo(op) => op.op_rollback().into(),
-            Op::Function(op) => op.op_rollback().into(),
-            Op::FunctionUndo(op) => op.op_rollback().into(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub enum OpOutput<'lua> {
