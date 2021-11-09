@@ -15,7 +15,7 @@ where
 {
     journal: &'j mut Journal<T>,
 
-    /// The current record index, where the oldest record has an index of 0.
+    /// The current record index, where the newest record has an index of 0.
     idx: usize,
 
     /// Flag that indicates whether or not any rollback records were appended.
