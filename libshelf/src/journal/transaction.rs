@@ -32,7 +32,7 @@ impl<'j, T> Transaction<'j, T> {
     /// Append a new action record to the journal.
     #[inline]
     pub fn append(&mut self, action: T) {
-        self.journal.append(Record::Action(action))
+        self.journal.append(Record::Atom(action))
     }
 
     /// Commit the transaction by appending a commit record of the journal, returning a

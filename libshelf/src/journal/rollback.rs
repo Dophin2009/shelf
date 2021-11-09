@@ -101,9 +101,9 @@ where
         };
 
         let (data, record) = match self.journal.get_back(self.idx) {
-            Some(Record::Action(data)) => {
+            Some(Record::Atom(data)) => {
                 let rdata = data.rollback();
-                (Some(rdata.clone()), Record::Action(rdata))
+                (Some(rdata.clone()), Record::Atom(rdata))
             }
             Some(Record::Commit) | None => {
                 if !self.appended {

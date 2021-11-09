@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 /// Record type to be recorded in a journal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
 pub enum Record<T> {
-    Action(T),
+    Atom(T),
     Commit,
 }
 
@@ -99,8 +99,8 @@ mod test {
         Backward,
     }
 
-    pub const FORWARD: Record<Datum> = Record::Action(Datum::Forward);
-    pub const BACKWARD: Record<Datum> = Record::Action(Datum::Backward);
+    pub const FORWARD: Record<Datum> = Record::Atom(Datum::Forward);
+    pub const BACKWARD: Record<Datum> = Record::Atom(Datum::Backward);
     pub const COMMIT: Record<Datum> = Record::Commit;
 
     #[test]
