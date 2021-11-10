@@ -46,10 +46,8 @@ impl<'lua> Resolve<'lua> for MkdirAction {
         };
 
         // Add op to mkdir.
-        output.ops.push(Op::Mkdir(MkdirOp {
-            path: path.clone(),
-            parents: *parents,
-        }));
+        // TODO: Ops for all nonexistent parent directories
+        output.ops.push(Op::Mkdir(MkdirOp { path: path.clone() }));
 
         Ok(Resolution::Done(output))
     }

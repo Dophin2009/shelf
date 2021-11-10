@@ -7,9 +7,9 @@ use std::path::PathBuf;
 use mlua::Function;
 use static_assertions as sa;
 
-use super::{Finish, OpRollback};
+use super::Finish;
 
-sa::assert_impl_all!(FunctionOp<'_>: Finish<Output = FunctionFinish<'_>, Error = FunctionOpError>);
+sa::assert_impl_all!(FunctionOp<'static>: Finish<Output = FunctionFinish<'static>, Error = FunctionOpError>);
 
 /// Error encountered when finishing [`FunctionOp`].
 #[derive(Debug, Clone, thiserror::Error)]
@@ -41,7 +41,6 @@ pub struct FunctionFinish<'lua> {
     /// See [`FunctionOp`].
     pub function: Function<'lua>,
     /// See [`FunctionOp`].
-    pub function: Function<'lua>,
     pub start: PathBuf,
 
     /// The return value from the function call.
@@ -54,7 +53,6 @@ impl<'lua> fmt::Debug for FunctionOp<'lua> {
         f.debug_struct("FunctionOp")
             .field("function", &"<lua function>")
             .field("start", &self.start)
-            .field("nonzero_exit", &self.nonzero_exit)
             .finish()
     }
 }
@@ -65,7 +63,7 @@ impl<'lua> Finish for FunctionOp<'lua> {
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
-        let Self { function: _, start } = self;
+        let Self { function, start } = self;
 
         // Change to the start directory.
         let cwd = env::current_dir().unwrap();
@@ -81,7 +79,7 @@ impl<'lua> Finish for FunctionOp<'lua> {
         Ok(Self::Output {
             function: function.clone(),
             start: start.clone(),
-            ret: ret?,
+            ret,
         })
     }
 }

@@ -77,7 +77,7 @@ impl<'lua> Resolve<'lua> for WriteAction {
 
         output.ops.push(Op::Write(WriteOp {
             path: dest.clone(),
-            contents: contents.clone(),
+            contents: contents.clone().into_bytes(),
         }));
 
         Ok(Resolution::Done(output))

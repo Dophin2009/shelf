@@ -1,7 +1,6 @@
 use std::fs::File;
-use std::io::{Read, Write};
-use std::path::PathBuf;
-use std::{fs, io};
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
@@ -85,6 +84,7 @@ impl OpRollback for WriteFinish {
         Self::Output {
             path: path.clone(),
             contents: contents.clone(),
+            overwritten: overwritten.clone(),
         }
     }
 }
@@ -150,7 +150,7 @@ impl OpRollback for WriteUndoFinish {
 /// Open the file at `path`, read the contents into `overwritten`, and write `contents` to the
 /// file.
 #[inline]
-fn read_write_swap<P>(path: P, contents: &[u8], ovewritten: &mut Vec<u8>) -> io::Result<()>
+fn read_write_swap<P>(path: P, contents: &[u8], overwritten: &mut Vec<u8>) -> io::Result<()>
 where
     P: AsRef<Path>,
 {

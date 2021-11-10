@@ -15,6 +15,7 @@ pub struct CommandAction {
     pub start: PathBuf,
     pub shell: String,
 
+    // TODO: Use these
     pub stdout: bool,
     pub stderr: bool,
 
@@ -39,11 +40,11 @@ impl<'lua> Resolve<'lua> for CommandAction {
             command,
             start,
             shell,
-            stdout,
-            stderr,
+            stdout: _,
+            stderr: _,
             clean_env,
             env,
-            nonzero_exit,
+            nonzero_exit: _,
         } = self;
 
         if !fsutil::exists(start) {
@@ -56,11 +57,8 @@ impl<'lua> Resolve<'lua> for CommandAction {
             command: command.clone(),
             start: start.clone(),
             shell: shell.clone(),
-            stdout: *stdout,
-            stderr: *stderr,
             clean_env: *clean_env,
             env: env.clone(),
-            nonzero_exit: *nonzero_exit,
         })];
         Ok(Resolution::Done(Done {
             ops,

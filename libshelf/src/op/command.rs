@@ -7,7 +7,7 @@ use std::process::{Command, Output, Stdio};
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-use super::{Finish, OpRollback};
+use super::Finish;
 
 sa::assert_impl_all!(CommandOp: Finish<Output = CommandFinish, Error = CommandOpError>);
 
@@ -60,6 +60,8 @@ pub struct CommandFinish {
     pub env: EnvMap,
 
     /// Output of the command.
+    // TODO: Handle this for serde
+    #[serde(skip)]
     pub output: Output,
 }
 
@@ -106,6 +108,7 @@ impl Finish for CommandOp {
             shell: shell.clone(),
             clean_env: *clean_env,
             env: env.clone(),
+            output,
         })
     }
 }

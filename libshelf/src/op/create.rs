@@ -5,8 +5,6 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-use crate::fsutil;
-
 use super::{Finish, OpRollback};
 
 sa::assert_impl_all!(CreateOp: Finish<Output = CreateFinish, Error = CreateOpError>);
@@ -98,7 +96,7 @@ impl Finish for CreateUndoOp {
     }
 }
 
-impl OpRollback for CreateUndoOp {
+impl OpRollback for CreateUndoFinish {
     type Output = CreateOp;
 
     #[inline]

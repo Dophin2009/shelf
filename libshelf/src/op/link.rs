@@ -57,6 +57,8 @@ impl Finish for LinkOp {
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
+        let Self { src, dest } = self;
+
         self.symlink()?;
         Ok(Self::Output {
             src: src.clone(),
@@ -121,7 +123,7 @@ impl Finish for LinkUndoOp {
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
-        let Self { src: _, dest } = self;
+        let Self { src, dest } = self;
 
         fs::remove_dir_all(dest)?;
         Ok(Self::Output {

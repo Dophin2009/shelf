@@ -16,6 +16,7 @@ pub struct FunctionAction<'lua> {
     pub function: Function<'lua>,
 
     pub start: PathBuf,
+    // TODO: Use this
     pub nonzero_exit: NonZeroExitBehavior,
 }
 
@@ -44,7 +45,7 @@ impl<'lua> Resolve<'lua> for FunctionAction<'lua> {
         let Self {
             function,
             start,
-            nonzero_exit,
+            nonzero_exit: _,
         } = self;
 
         // If the start directory doesn't exist, we should error.
@@ -57,7 +58,6 @@ impl<'lua> Resolve<'lua> for FunctionAction<'lua> {
         let ops = vec![Op::Function(FunctionOp {
             function: function.clone(),
             start: start.clone(),
-            nonzero_exit: *nonzero_exit,
         })];
         Ok(Resolution::Done(Done {
             ops,

@@ -185,7 +185,7 @@ impl LinkAction {
     }
 }
 
-// FIXME: consider rollback behavior for this action...
+// FIXME: Fix this, see Mkdir action
 #[inline]
 pub(super) fn mkparents_op<P>(path: P) -> Option<MkdirOp>
 where
@@ -194,7 +194,6 @@ where
     match path.as_ref().parent() {
         Some(parent) if !fsutil::exists(parent) => Some(MkdirOp {
             path: parent.to_path_buf(),
-            parents: true,
         }),
         _ => None,
     }

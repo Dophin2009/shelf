@@ -108,7 +108,7 @@ impl Finish for CopyUndoOp {
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
-        let Self { src: _, dest } = self;
+        let Self { src, dest } = self;
 
         // Remove copied file.
         let _ = fs::remove_dir_all(dest)?;
