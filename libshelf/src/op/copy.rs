@@ -3,35 +3,75 @@ use std::io;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use static_assertions as sa;
 
 use super::{Finish, OpRollback};
 
+sa::assert_impl_all!(CopyOp: Finish<Output = CopyFinish, Error = CopyOpError>);
+sa::assert_impl_all!(CopyFinish: OpRollback<Output = CopyUndoOp>);
+sa::assert_impl_all!(CopyUndoOp: Finish<Output = CopyUndoFinish, Error = CopyOpError>);
+sa::assert_impl_all!(CopyUndoFinish: OpRollback<Output = CopyOp>);
+
+/// Error encountered when finishing [`CopyOp`] or [`CopyUndoOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum CopyOpError {
     #[error("i/o error")]
     Io(#[from] io::Error),
 }
 
+/// Operation to copy a file from `src` to `dest`.
+///
+/// In the case that `src` and `dest` are the same path, the file will likely be truncated (see
+/// [`fs::copy`]).
+///
+/// # Errors
+///
+/// It is assumed that `src` points to an readable file, and that no file exists at `dest` (which
+/// must be writable). These premises are not checked, and the operation will error if they are not
+/// met.
+///
+/// # Undo
+///
+/// Undoing will delete the copied file. This set of operations functions in the following cycle:
+///
+/// [`CopyOp`] --> [`CopyFinish`] --> [`CopyUndoOp`] --> [`CopyUndoFinish`] --> [`CopyOp`] --> ...
+///
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CopyOp {
+    /// Path to file to copy.
     pub src: PathBuf,
+    /// Path to destination of copy.
+    pub dest: PathBuf,
+}
+
+/// The output of [`CopyOp`]. See its documentation for information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CopyFinish {
+    /// See [`CopyOp`].
+    pub src: PathBuf,
+    /// See [`CopyOp`].
     pub dest: PathBuf,
 }
 
 impl Finish for CopyOp {
-    type Output = ();
+    type Output = CopyFinish;
     type Error = CopyOpError;
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let Self { src, dest } = self;
 
+        // Perform copy.
         let _ = fs::copy(src, dest)?;
-        Ok(())
+
+        Ok(Self::Output {
+            src: src.clone(),
+            dest: dest.clone(),
+        })
     }
 }
 
-impl OpRollback for CopyOp {
+impl OpRollback for CopyFinish {
     type Output = CopyUndoOp;
 
     #[inline]
@@ -44,26 +84,43 @@ impl OpRollback for CopyOp {
     }
 }
 
+/// The undo of [`CopyOp`] (see its documentation), created by rolling back [`CopyFinish`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CopyUndoOp {
+    /// See [`CopyOp`].
     pub src: PathBuf,
+    /// See [`CopyOp`].
+    pub dest: PathBuf,
+}
+
+/// The output of [`CopyUndoOp`]. See its documentation for information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CopyUndoFinish {
+    /// See [`CopyOp`].
+    pub src: PathBuf,
+    /// See [`CopyOp`].
     pub dest: PathBuf,
 }
 
 impl Finish for CopyUndoOp {
-    type Output = ();
+    type Output = CopyUndoFinish;
     type Error = CopyOpError;
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
         let Self { src: _, dest } = self;
 
+        // Remove copied file.
         let _ = fs::remove_dir_all(dest)?;
-        Ok(())
+
+        Ok(Self::Output {
+            src: src.clone(),
+            dest: dest.clone(),
+        })
     }
 }
 
-impl OpRollback for CopyUndoOp {
+impl OpRollback for CopyUndoFinish {
     type Output = CopyOp;
 
     #[inline]

@@ -3,82 +3,105 @@ use std::io;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use static_assertions as sa;
 
 use super::{Finish, OpRollback};
 
+sa::assert_impl_all!(MkdirOp: Finish<Output = MkdirFinish, Error = MkdirOpError>);
+sa::assert_impl_all!(MkdirFinish: OpRollback<Output = MkdirUndoOp>);
+sa::assert_impl_all!(MkdirUndoOp: Finish<Output = MkdirUndoFinish, Error = MkdirOpError>);
+sa::assert_impl_all!(MkdirUndoFinish: OpRollback<Output = MkdirOp>);
+
+/// Error encountered when finishing [`MkdirOp`] or [`MkdirUndoOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum MkdirOpError {
     #[error("i/o error")]
     Io(#[from] io::Error),
 }
 
+/// Operation to create a directory at `path`.
+///
+/// # Errors
+///
+/// The operation will error if `path` points to an existing file or if `path` is not writable.
+///
+/// # Undo
+///
+/// Undoing will delete the directory, erroring if it is not empty. This set of operations
+/// functions in the following cycle:
+///
+/// [`MkdirOp`] --> [`MkdirFinish`] --> [`MkdirUndoOp`] --> [`MkdirUndoFinish`] --> [`MkdirOp`] --> ...
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MkdirOp {
+    /// Path at which the directory will be created.
     pub path: PathBuf,
-    pub parents: bool,
+}
+
+/// The output of [`MkdirOp`]. See its documentation for information.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MkdirFinish {
+    /// See [`MkdirOp`].
+    pub path: PathBuf,
 }
 
 impl Finish for MkdirOp {
-    type Output = ();
+    type Output = MkdirFinish;
     type Error = MkdirOpError;
 
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
-        let Self { path, parents } = self;
+        let Self { path } = self;
 
-        let res = if *parents {
-            fs::create_dir_all(path)
-        } else {
-            fs::create_dir(path)
-        };
-        Ok(res?)
+        fs::create_dir(path)?;
+        Ok(Self::Output { path: path.clone() })
     }
 }
 
-impl OpRollback for MkdirOp {
+impl OpRollback for MkdirFinish {
     type Output = MkdirUndoOp;
 
     #[inline]
     fn op_rollback(&self) -> Self::Output {
-        let Self { path, parents } = self;
+        let Self { path } = self;
 
-        Self::Output {
-            path: path.clone(),
-            parents: *parents,
-        }
+        Self::Output { path: path.clone() }
     }
 }
 
+/// The undo of [`MkdirOp`] (see its documentation), created by rolling back [`MkdirFinish`].
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct MkdirUndoOp {
+    /// See [`MkdirOp`].
     pub path: PathBuf,
-    pub parents: bool,
+}
+
+/// The output of [`MkdirUndoOp`]. See its documentation for information.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MkdirUndoFinish {
+    /// See [`MkdirOp`].
+    pub path: PathBuf,
 }
 
 impl Finish for MkdirUndoOp {
-    type Output = ();
+    type Output = MkdirUndoFinish;
     type Error = MkdirOpError;
 
-    // FIXME: Rollback create_dir_all??
     #[inline]
     fn finish(&self) -> Result<Self::Output, Self::Error> {
-        let Self { path, parents: _ } = self;
+        let Self { path } = self;
 
-        fs::remove_dir_all(path)?;
-        Ok(())
+        fs::remove_dir(path)?;
+        Ok(Self::Output { path: path.clone() })
     }
 }
 
-impl OpRollback for MkdirUndoOp {
+impl OpRollback for MkdirUndoFinish {
     type Output = MkdirOp;
 
     #[inline]
     fn op_rollback(&self) -> Self::Output {
-        let Self { path, parents } = self;
+        let Self { path } = self;
 
-        Self::Output {
-            path: path.clone(),
-            parents: *parents,
-        }
+        Self::Output { path: path.clone() }
     }
 }
