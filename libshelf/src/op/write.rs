@@ -123,8 +123,7 @@ impl Finish for WriteUndoOp {
             overwritten,
         } = self;
 
-        let mut overwritten = Vec::new();
-        read_write_swap(path, contents, &mut overwritten)?;
+        read_write_swap(path, overwritten, &mut Vec::new())?;
 
         Ok(Self::Output {
             path: path.clone(),
@@ -155,10 +154,10 @@ where
     P: AsRef<Path>,
 {
     // Open file.
-    let file = File::open(path)?;
+    let mut file = File::open(path)?;
 
     // Save overwritten contents.
-    file.read_to_end(&mut overwritten)?;
+    file.read_to_end(overwritten)?;
 
     // Ovewrite contents.
     file.write(contents)?;

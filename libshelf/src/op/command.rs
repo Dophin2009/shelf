@@ -44,7 +44,8 @@ pub struct CommandOp {
 }
 
 /// The output of [`CommandOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+// TODO: Serde?
+#[derive(Debug, Clone)]
 pub struct CommandFinish {
     /// Shell command to run.
     pub command: String,
@@ -60,8 +61,6 @@ pub struct CommandFinish {
     pub env: EnvMap,
 
     /// Output of the command.
-    // TODO: Handle this for serde
-    #[serde(skip)]
     pub output: Output,
 }
 

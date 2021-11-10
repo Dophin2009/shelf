@@ -57,6 +57,17 @@ impl<'lua> fmt::Debug for FunctionOp<'lua> {
     }
 }
 
+impl<'lua> fmt::Debug for FunctionFinish<'lua> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("FunctionFinish")
+            .field("function", &"<lua function>")
+            .field("start", &self.start)
+            .field("ret", &"<lua value>")
+            .finish()
+    }
+}
+
 impl<'lua> Finish for FunctionOp<'lua> {
     type Output = FunctionFinish<'lua>;
     type Error = FunctionOpError;
