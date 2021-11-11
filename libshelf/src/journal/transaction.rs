@@ -1,5 +1,4 @@
-use super::rollback::Rollback;
-use super::{Journal, Record, RollbackIter};
+use super::{Journal, Record, Rollback, RollbackIter};
 
 impl<T> Journal<T> {
     /// Start a transaction.
@@ -48,7 +47,7 @@ impl<'j, T> Transaction<'j, T> {
 
 impl<'j, T> Transaction<'j, T>
 where
-    T: Rollback<Output = T> + Clone,
+    T: Rollback<Output = T>,
 {
     /// Return a [`RollbackIter`] to cancel the current transaction by rolling back any uncommitted
     /// records.
@@ -60,7 +59,7 @@ where
 
 impl<'j, T> CompletedTransaction<'j, T>
 where
-    T: Rollback<Output = T> + Clone,
+    T: Rollback<Output = T>,
 {
     /// Returns a reference to the journal on which this transaction is operating.
     #[inline]
@@ -113,8 +112,10 @@ mod test {
         t.append(Forward);
         assert_eq!(&[FORWARD, FORWARD], t.journal().records());
 
-        let rb = t.cancel();
-        assert_eq!(vec![Backward, Backward], rb.consume());
+        let mut rb = t.cancel();
+        assert_eq!(Some(&Backward), rb.next());
+        assert_eq!(Some(&Backward), rb.next());
+        assert!(rb.next().is_none());
 
         assert_eq!(
             &[FORWARD, FORWARD, BACKWARD, BACKWARD, COMMIT],
@@ -126,9 +127,9 @@ mod test {
     fn test_cancel_empty() {
         let mut journal: Journal<Datum> = Journal::new();
         let t = journal.lock();
-        let rb = t.cancel();
+        let mut rb = t.cancel();
 
-        assert!(rb.consume().is_empty());
+        assert!(rb.next().is_none());
         assert!(journal.is_empty());
     }
 
@@ -141,9 +142,11 @@ mod test {
         t.append(Forward);
 
         let t = t.commit();
-        let rb = t.rollback();
+        let mut rb = t.rollback();
 
-        assert_eq!(vec![Backward, Backward], rb.consume());
+        assert_eq!(Some(&Backward), rb.next());
+        assert_eq!(Some(&Backward), rb.next());
+        assert_eq!(None, rb.next());
         assert_eq!(
             &[FORWARD, FORWARD, COMMIT, BACKWARD, BACKWARD, COMMIT],
             journal.records()

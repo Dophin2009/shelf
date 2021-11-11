@@ -11,7 +11,7 @@ pub trait Rollback {
 #[derive(Debug)]
 pub struct RollbackIter<'j, T>
 where
-    T: Rollback<Output = T> + Clone,
+    T: Rollback<Output = T>,
 {
     journal: &'j mut Journal<T>,
 
@@ -28,7 +28,7 @@ where
 
 impl<T> Journal<T>
 where
-    T: Rollback<Output = T> + Clone,
+    T: Rollback<Output = T>,
 {
     /// Return a [`RollbackIter`] that rolls-back until the last commit.
     ///
@@ -57,7 +57,7 @@ where
 
 impl<'j, T> RollbackIter<'j, T>
 where
-    T: Rollback<Output = T> + Clone,
+    T: Rollback<Output = T>,
 {
     /// Create a new rollback iterator at the latest reverse position.
     #[inline]
@@ -75,28 +75,19 @@ where
             done: false,
         }
     }
-
-    /// Perform all record rollbacks and return the atom values in a `Vec`.
-    #[inline]
-    pub fn consume(self) -> Vec<T> {
-        self.collect()
-    }
 }
 
-impl<'j, T> Iterator for RollbackIter<'j, T>
+/// Look at the next record and perform the following operations depending on the record type:
+/// -   Atom:   append the record's rollback to the journal and return `Some` with the rollback
+///             data.
+/// -   Commit or no record: if no rollback records have been appended yet, do nothing and return
+///             `None`; otherwise, append a commit record to the journal and return `None`.
+impl<'j, T> RollbackIter<'j, T>
 where
-    T: Rollback<Output = T> + Clone,
+    T: Rollback<Output = T>,
 {
-    type Item = T;
-
-    /// Look at the next record and perform the following operations depending on the record type:
-    /// -   Atom:   append the record's rollback to the journal and return `Some` with the rollback
-    ///             data.
-    /// -   Commit or no record: if no rollback records have been appended yet, do nothing and
-    ///             return `None`; otherwise, append a commit record to the journal and return
-    ///             `None`.
     #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
+    pub fn next(&mut self) -> Option<&'_ T> {
         if self.done {
             return None;
         };
@@ -104,13 +95,13 @@ where
         let (data, record) = match self.journal.get_back(self.idx) {
             Some(Record::Atom(data)) => {
                 let rdata = data.rollback();
-                (Some(rdata.clone()), Record::Atom(rdata))
+                (true, Record::Atom(rdata))
             }
             Some(Record::Commit) | None => {
                 if !self.appended {
                     return None;
                 } else {
-                    (None, Record::Commit)
+                    (false, Record::Commit)
                 }
             }
         };
@@ -120,15 +111,17 @@ where
         // Append the record to the journal.
         self.journal.append(record);
         self.idx += 1;
-        match data {
-            Some(data) => {
-                self.appended = true;
-                Some(data)
+
+        if data {
+            self.appended = true;
+            // Return a reference to the record we just appended.
+            match self.journal.latest().unwrap() {
+                Record::Atom(atom) => Some(atom),
+                Record::Commit => unreachable!(),
             }
-            None => {
-                self.done = true;
-                None
-            }
+        } else {
+            self.done = true;
+            None
         }
     }
 }
@@ -197,7 +190,7 @@ mod test {
         let mut rollback = journal.rollback();
 
         // Rollback should push a BACKWARD record to the journal on next.
-        assert_eq!(Some(Datum::Backward), rollback.next());
+        assert_eq!(Some(&Datum::Backward), rollback.next());
         records.push(BACKWARD);
 
         // No more rollback to be done; None.
@@ -241,11 +234,11 @@ mod test {
         let mut rollback = journal.rollback();
 
         // Rollback should push a FOWARD record to the journal on next.
-        assert_eq!(Some(Datum::Forward), rollback.next());
+        assert_eq!(Some(&Datum::Forward), rollback.next());
         records.push(FORWARD);
 
         // Rollback should push a BACKWARD record to the journal on next.
-        assert_eq!(Some(Datum::Backward), rollback.next());
+        assert_eq!(Some(&Datum::Backward), rollback.next());
         records.push(BACKWARD);
 
         // No more rollback to be done; None.
@@ -288,7 +281,7 @@ mod test {
         let mut rollback = journal.rollback_last().unwrap();
 
         // Rollback should push a BACKWARD record to the journal on next.
-        assert_eq!(Some(Datum::Backward), rollback.next());
+        assert_eq!(Some(&Datum::Backward), rollback.next());
         records.push(BACKWARD);
 
         // End of transaction; rollback should return none.
