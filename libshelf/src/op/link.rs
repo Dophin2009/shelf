@@ -5,12 +5,13 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-use super::{Finish, OpRollback};
+use super::ctx::FinishCtx;
+use super::{Finish, Rollback};
 
 sa::assert_impl_all!(LinkOp: Finish<Output = LinkFinish, Error = LinkOpError>);
-sa::assert_impl_all!(LinkFinish: OpRollback<Output = LinkUndoOp>);
+sa::assert_impl_all!(LinkFinish: Rollback<Output = LinkUndoOp>);
 sa::assert_impl_all!(LinkUndoOp: Finish<Output = LinkUndoFinish, Error = LinkOpError>);
-sa::assert_impl_all!(LinkUndoFinish: OpRollback<Output = LinkOp>);
+sa::assert_impl_all!(LinkUndoFinish: Rollback<Output = LinkOp>);
 
 /// Error encountered when finishing [`LinkOp`] or [`LinkUndoOp`].
 #[derive(Debug, thiserror::Error)]
@@ -56,7 +57,7 @@ impl Finish for LinkOp {
     type Error = LinkOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { src, dest } = self;
 
         self.symlink()?;
@@ -85,11 +86,11 @@ impl LinkOp {
     }
 }
 
-impl OpRollback for LinkFinish {
+impl Rollback for LinkFinish {
     type Output = LinkUndoOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { src, dest } = self;
 
         Self::Output {
@@ -122,7 +123,7 @@ impl Finish for LinkUndoOp {
     type Error = LinkOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { src, dest } = self;
 
         fs::remove_dir_all(dest)?;
@@ -133,11 +134,11 @@ impl Finish for LinkUndoOp {
     }
 }
 
-impl OpRollback for LinkUndoFinish {
+impl Rollback for LinkUndoFinish {
     type Output = LinkOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { src, dest } = self;
 
         Self::Output {

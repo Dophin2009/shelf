@@ -5,12 +5,13 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-use super::{Finish, OpRollback};
+use super::ctx::FinishCtx;
+use super::{Finish, Rollback};
 
 sa::assert_impl_all!(MkdirOp: Finish<Output = MkdirFinish, Error = MkdirOpError>);
-sa::assert_impl_all!(MkdirFinish: OpRollback<Output = MkdirUndoOp>);
+sa::assert_impl_all!(MkdirFinish: Rollback<Output = MkdirUndoOp>);
 sa::assert_impl_all!(MkdirUndoOp: Finish<Output = MkdirUndoFinish, Error = MkdirOpError>);
-sa::assert_impl_all!(MkdirUndoFinish: OpRollback<Output = MkdirOp>);
+sa::assert_impl_all!(MkdirUndoFinish: Rollback<Output = MkdirOp>);
 
 /// Error encountered when finishing [`MkdirOp`] or [`MkdirUndoOp`].
 #[derive(Debug, thiserror::Error)]
@@ -49,7 +50,7 @@ impl Finish for MkdirOp {
     type Error = MkdirOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path } = self;
 
         fs::create_dir(path)?;
@@ -57,11 +58,11 @@ impl Finish for MkdirOp {
     }
 }
 
-impl OpRollback for MkdirFinish {
+impl Rollback for MkdirFinish {
     type Output = MkdirUndoOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { path } = self;
 
         Self::Output { path: path.clone() }
@@ -87,7 +88,7 @@ impl Finish for MkdirUndoOp {
     type Error = MkdirOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path } = self;
 
         fs::remove_dir(path)?;
@@ -95,11 +96,11 @@ impl Finish for MkdirUndoOp {
     }
 }
 
-impl OpRollback for MkdirUndoFinish {
+impl Rollback for MkdirUndoFinish {
     type Output = MkdirOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { path } = self;
 
         Self::Output { path: path.clone() }

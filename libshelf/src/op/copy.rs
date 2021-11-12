@@ -5,12 +5,13 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-use super::{Finish, OpRollback};
+use super::ctx::FinishCtx;
+use super::{Finish, Rollback};
 
 sa::assert_impl_all!(CopyOp: Finish<Output = CopyFinish, Error = CopyOpError>);
-sa::assert_impl_all!(CopyFinish: OpRollback<Output = CopyUndoOp>);
+sa::assert_impl_all!(CopyFinish: Rollback<Output = CopyUndoOp>);
 sa::assert_impl_all!(CopyUndoOp: Finish<Output = CopyUndoFinish, Error = CopyOpError>);
-sa::assert_impl_all!(CopyUndoFinish: OpRollback<Output = CopyOp>);
+sa::assert_impl_all!(CopyUndoFinish: Rollback<Output = CopyOp>);
 
 /// Error encountered when finishing [`CopyOp`] or [`CopyUndoOp`].
 #[derive(Debug, thiserror::Error)]
@@ -58,7 +59,7 @@ impl Finish for CopyOp {
     type Error = CopyOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { src, dest } = self;
 
         // Perform copy.
@@ -71,12 +72,13 @@ impl Finish for CopyOp {
     }
 }
 
-impl OpRollback for CopyFinish {
+impl Rollback for CopyFinish {
     type Output = CopyUndoOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { src, dest } = self;
+
         Self::Output {
             src: src.clone(),
             dest: dest.clone(),
@@ -107,7 +109,7 @@ impl Finish for CopyUndoOp {
     type Error = CopyOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { src, dest } = self;
 
         // Remove copied file.
@@ -120,11 +122,11 @@ impl Finish for CopyUndoOp {
     }
 }
 
-impl OpRollback for CopyUndoFinish {
+impl Rollback for CopyUndoFinish {
     type Output = CopyOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { src, dest } = self;
 
         Self::Output {

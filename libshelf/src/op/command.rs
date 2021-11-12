@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
 use super::Finish;
+use super::ctx::FinishCtx;
 
 sa::assert_impl_all!(CommandOp: Finish<Output = CommandFinish, Error = CommandOpError>);
 
@@ -70,7 +71,7 @@ impl Finish for CommandOp {
     type Error = CommandOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self {
             command,
             start,

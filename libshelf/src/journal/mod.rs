@@ -4,7 +4,7 @@ pub mod transaction;
 pub mod writer;
 
 pub use self::rollback::{Rollback, RollbackIter};
-pub use self::transaction::{CompletedTransaction, Transaction};
+pub use self::transaction::Transaction;
 
 use serde::{Deserialize, Serialize};
 
@@ -78,8 +78,6 @@ impl<T> Journal<T> {
     }
 
     /// Append a new record to the journal.
-    ///
-    /// This is for use by [`Transaction`] and [`RollbackIter`].
     #[inline]
     pub(self) fn append(&mut self, record: Record<T>) {
         // Push the record.

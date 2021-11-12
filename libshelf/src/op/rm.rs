@@ -5,12 +5,13 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-use super::{Finish, OpRollback};
+use super::ctx::FinishCtx;
+use super::{Finish, Rollback};
 
 sa::assert_impl_all!(RmOp: Finish<Output = RmFinish, Error = RmOpError>);
-sa::assert_impl_all!(RmFinish: OpRollback<Output = RmUndoOp>);
+sa::assert_impl_all!(RmFinish: Rollback<Output = RmUndoOp>);
 sa::assert_impl_all!(RmUndoOp: Finish<Output = RmUndoFinish, Error = RmOpError>);
-sa::assert_impl_all!(RmUndoFinish: OpRollback<Output = RmOp>);
+sa::assert_impl_all!(RmUndoFinish: Rollback<Output = RmOp>);
 
 /// Error encountered when finishing [`RmOp`] or [`RmUndoOp`].
 #[derive(Debug, thiserror::Error)]
@@ -56,8 +57,9 @@ impl Finish for RmOp {
     type Output = RmFinish;
     type Error = RmOpError;
 
+    // TODO: Move file to file safe
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path, dir } = self;
         if *dir {
             fs::remove_dir_all(path)?;
@@ -72,11 +74,11 @@ impl Finish for RmOp {
     }
 }
 
-impl OpRollback for RmFinish {
+impl Rollback for RmFinish {
     type Output = RmUndoOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { path, dir } = self;
 
         Self::Output {
@@ -110,18 +112,18 @@ impl Finish for RmUndoOp {
 
     // FIXME: Pass in a saved directory and implement.
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path: _, dir: _ } = self;
 
         unimplemented!();
     }
 }
 
-impl OpRollback for RmUndoFinish {
+impl Rollback for RmUndoFinish {
     type Output = RmOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { path, dir } = self;
 
         Self::Output {

@@ -5,12 +5,13 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-use super::{Finish, OpRollback};
+use super::ctx::FinishCtx;
+use super::{Finish, Rollback};
 
 sa::assert_impl_all!(WriteOp: Finish<Output = WriteFinish, Error = WriteOpError>);
-sa::assert_impl_all!(WriteFinish: OpRollback<Output = WriteUndoOp>);
+sa::assert_impl_all!(WriteFinish: Rollback<Output = WriteUndoOp>);
 sa::assert_impl_all!(WriteUndoOp: Finish<Output = WriteUndoFinish, Error = WriteOpError>);
-sa::assert_impl_all!(WriteUndoFinish: OpRollback<Output = WriteOp>);
+sa::assert_impl_all!(WriteUndoFinish: Rollback<Output = WriteOp>);
 
 /// Error encountered when finishing [`WriteOp`] or [`WriteUndoOp`].
 #[derive(Debug, thiserror::Error)]
@@ -56,7 +57,7 @@ impl Finish for WriteOp {
     type Error = WriteOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path, contents } = self;
 
         let mut overwritten = Vec::new();
@@ -70,11 +71,11 @@ impl Finish for WriteOp {
     }
 }
 
-impl OpRollback for WriteFinish {
+impl Rollback for WriteFinish {
     type Output = WriteUndoOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self {
             path,
             contents,
@@ -116,7 +117,7 @@ impl Finish for WriteUndoOp {
 
     // FIXME: We need a parameter that allows access to the original file contents.
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self {
             path,
             contents,
@@ -132,11 +133,11 @@ impl Finish for WriteUndoOp {
     }
 }
 
-impl OpRollback for WriteUndoFinish {
+impl Rollback for WriteUndoFinish {
     type Output = WriteOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { path, contents } = self;
 
         Self::Output {

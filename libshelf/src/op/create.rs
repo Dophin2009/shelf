@@ -5,12 +5,13 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-use super::{Finish, OpRollback};
+use super::ctx::FinishCtx;
+use super::{Finish, Rollback};
 
 sa::assert_impl_all!(CreateOp: Finish<Output = CreateFinish, Error = CreateOpError>);
-sa::assert_impl_all!(CreateFinish: OpRollback<Output = CreateUndoOp>);
+sa::assert_impl_all!(CreateFinish: Rollback<Output = CreateUndoOp>);
 sa::assert_impl_all!(CreateUndoOp: Finish<Output = CreateUndoFinish, Error = CreateOpError>);
-sa::assert_impl_all!(CreateUndoFinish: OpRollback<Output = CreateOp>);
+sa::assert_impl_all!(CreateUndoFinish: Rollback<Output = CreateOp>);
 
 /// Error encountered when finishing [`CreateOp`] or [`CreateUndoOp`].
 #[derive(Debug, thiserror::Error)]
@@ -49,7 +50,7 @@ impl Finish for CreateOp {
     type Error = CreateOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path } = self;
 
         // Create the file.
@@ -58,11 +59,11 @@ impl Finish for CreateOp {
     }
 }
 
-impl OpRollback for CreateFinish {
+impl Rollback for CreateFinish {
     type Output = CreateUndoOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { path } = self;
 
         Self::Output { path: path.clone() }
@@ -88,7 +89,7 @@ impl Finish for CreateUndoOp {
     type Error = CreateOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path } = self;
 
         fs::remove_dir(&path)?;
@@ -96,11 +97,11 @@ impl Finish for CreateUndoOp {
     }
 }
 
-impl OpRollback for CreateUndoFinish {
+impl Rollback for CreateUndoFinish {
     type Output = CreateOp;
 
     #[inline]
-    fn op_rollback(&self) -> Self::Output {
+    fn rollback(&self) -> Self::Output {
         let Self { path } = self;
 
         Self::Output { path: path.clone() }

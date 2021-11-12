@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use mlua::Function;
 use static_assertions as sa;
 
+use super::ctx::FinishCtx;
 use super::Finish;
 
 sa::assert_impl_all!(FunctionOp<'static>: Finish<Output = FunctionFinish<'static>, Error = FunctionOpError>);
@@ -73,7 +74,7 @@ impl<'lua> Finish for FunctionOp<'lua> {
     type Error = FunctionOpError;
 
     #[inline]
-    fn finish(&self) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { function, start } = self;
 
         // Change to the start directory.

@@ -9,10 +9,7 @@ pub trait Rollback {
 /// An iterator that performs rollback on a [`Journal`]. See [`Journal::rollback`] and
 /// [`Journal::rollback_last`].
 #[derive(Debug)]
-pub struct RollbackIter<'j, T>
-where
-    T: Rollback<Output = T>,
-{
+pub struct RollbackIter<'j, T> {
     journal: &'j mut Journal<T>,
 
     /// The current record index, where the newest record has an index of 0.
@@ -28,7 +25,7 @@ where
 
 impl<T> Journal<T>
 where
-    T: Rollback<Output = T>,
+    T: Rollback,
 {
     /// Return a [`RollbackIter`] that rolls-back until the last commit.
     ///
@@ -57,7 +54,7 @@ where
 
 impl<'j, T> RollbackIter<'j, T>
 where
-    T: Rollback<Output = T>,
+    T: Rollback,
 {
     /// Create a new rollback iterator at the latest reverse position.
     #[inline]
@@ -77,52 +74,74 @@ where
     }
 }
 
-/// Look at the next record and perform the following operations depending on the record type:
-/// -   Atom:   append the record's rollback to the journal and return `Some` with the rollback
-///             data.
-/// -   Commit or no record: if no rollback records have been appended yet, do nothing and return
-///             `None`; otherwise, append a commit record to the journal and return `None`.
 impl<'j, T> RollbackIter<'j, T>
 where
-    T: Rollback<Output = T>,
+    T: Rollback,
 {
+    /// Get a immutable reference to the journal this rollback is operating on.
     #[inline]
-    pub fn next(&mut self) -> Option<&'_ T> {
+    pub fn journal(&'j mut self) -> &'j Journal<T> {
+        self.journal
+    }
+
+    /// Look at the next record and perform the following operations depending on the record type:
+    ///
+    /// -   Atom:   get the record's rollback return it. The caller should process the return value
+    ///             and then call [`Self::next_append`] with a datum value.
+    ///
+    /// -   Commit or no record: if no rollback records have been appended yet, do nothing and
+    ///             return `None`; otherwise, append a commit record to the journal and return
+    ///             `None`.
+    #[inline]
+    pub fn next_get(&mut self) -> Option<<T as Rollback>::Output> {
         if self.done {
             return None;
         };
 
-        let (data, record) = match self.journal.get_back(self.idx) {
-            Some(Record::Atom(data)) => {
-                let rdata = data.rollback();
-                (true, Record::Atom(rdata))
+        match self.journal.get_back(self.idx) {
+            Some(Record::Atom(datum)) => {
+                self.idx += 1;
+                let rdata = datum.rollback();
+                Some(rdata)
             }
+            // If reached commit or end, push new commit.
             Some(Record::Commit) | None => {
-                if !self.appended {
-                    return None;
-                } else {
-                    (false, Record::Commit)
+                if self.appended {
+                    self.journal.append(Record::Commit);
+                    self.done = true;
                 }
+                None
             }
-        };
-
-        self.idx += 1;
-
-        // Append the record to the journal.
-        self.journal.append(record);
-        self.idx += 1;
-
-        if data {
-            self.appended = true;
-            // Return a reference to the record we just appended.
-            match self.journal.latest().unwrap() {
-                Record::Atom(atom) => Some(atom),
-                Record::Commit => unreachable!(),
-            }
-        } else {
-            self.done = true;
-            None
         }
+    }
+
+    /// Append the `datum` to the journal. This should be called after [`Self::next_get`] (see its
+    /// documentation for details).
+    #[inline]
+    pub fn next_append(&mut self, datum: T) -> Option<&T> {
+        // Append the record to the journal.
+        self.journal.append(Record::Atom(datum));
+
+        self.idx += 1;
+        self.appended = true;
+
+        match self.journal.latest().unwrap_or_else(|| unreachable!()) {
+            Record::Atom(datum) => Some(datum),
+            Record::Commit => unreachable!(),
+        }
+    }
+}
+
+impl<'j, T> RollbackIter<'j, T>
+where
+    T: Rollback<Output = T>,
+{
+    /// Convenience function to call [`Self::next_get`] and [`Self::next_append`] in succession by
+    /// passing the rollback datum directly to be appended.
+    #[inline]
+    pub fn next(&mut self) -> Option<&T> {
+        let rb = self.next_get()?;
+        self.next_append(rb)
     }
 }
 
