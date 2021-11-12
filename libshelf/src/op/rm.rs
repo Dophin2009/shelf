@@ -33,8 +33,6 @@ pub enum RmOpError {
 /// in the following cycle:
 ///
 /// [`RmOp`] --> [`RmFinish`] --> [`RmUndoOp`] --> [`RmUndoFinish`] --> [`RmOp`] --> ...
-
-// TODO: Undoing directory and contents deletion?
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RmOp {
     /// Path at which the file or directory will be removed.
@@ -57,15 +55,14 @@ impl Finish for RmOp {
     type Output = RmFinish;
     type Error = RmOpError;
 
-    // TODO: Move file to file safe
+    // TODO: What about directories? Calling `fs::create_dir` would make this two operations aaaahh
+    // this whole design sucks
     #[inline]
-    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
+    fn finish(&self, ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path, dir } = self;
-        if *dir {
-            fs::remove_dir_all(path)?;
-        } else {
-            fs::remove_file(path)?;
-        };
+
+        let new_path = ctx.file_safe.resolve(path);
+        fs::rename(path, new_path)?;
 
         Ok(Self::Output {
             path: path.clone(),
@@ -110,12 +107,17 @@ impl Finish for RmUndoOp {
     type Output = RmUndoFinish;
     type Error = RmOpError;
 
-    // FIXME: Pass in a saved directory and implement.
     #[inline]
-    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
-        let Self { path: _, dir: _ } = self;
+    fn finish(&self, ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
+        let Self { path, dir } = self;
 
-        unimplemented!();
+        let old_path = ctx.file_safe.resolve(path);
+        fs::rename(old_path, path)?;
+
+        Ok(Self::Output {
+            path: path.clone(),
+            dir: *dir,
+        })
     }
 }
 
