@@ -1,5 +1,6 @@
-pub use crate::spec::{EnvMap, NonZeroExitBehavior};
+pub use crate::spec::NonZeroExitBehavior;
 
+use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
@@ -7,8 +8,8 @@ use std::process::{Command, Output, Stdio};
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
-use super::Finish;
 use super::ctx::FinishCtx;
+use super::Finish;
 
 sa::assert_impl_all!(CommandOp: Finish<Output = CommandFinish, Error = CommandOpError>);
 
@@ -18,6 +19,9 @@ pub enum CommandOpError {
     #[error("i/o error")]
     Io(#[from] io::Error),
 }
+
+/// Map of environment variables and values.
+pub type EnvMap = HashMap<String, String>;
 
 /// Operation to run a shell command.
 ///
@@ -40,12 +44,10 @@ pub struct CommandOp {
     /// If true, all environment variables will be cleared before execution.
     pub clean_env: bool,
     /// Map of extra environment variables to set.
-    // TODO: Move this type into this module
     pub env: EnvMap,
 }
 
 /// The output of [`CommandOp`]. See its documentation for information.
-// TODO: Serde?
 #[derive(Debug, Clone)]
 pub struct CommandFinish {
     /// Shell command to run.
@@ -58,7 +60,6 @@ pub struct CommandFinish {
     /// If true, all environment variables will be cleared before execution.
     pub clean_env: bool,
     /// Map of extra environment variables to set.
-    // TODO: Move this type into this module
     pub env: EnvMap,
 
     /// Output of the command.
