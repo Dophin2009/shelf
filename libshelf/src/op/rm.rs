@@ -152,18 +152,14 @@ impl Rollback for RmUndoFinish {
 
 #[cfg(test)]
 mod test {
-    use std::fs::File;
-
-    use super::super::test;
-    use super::{Finish, Rollback};
     use crate::fsutil;
 
-    use super::RmOp;
+    use super::super::test;
+    use super::{Finish, RmOp, Rollback};
 
     // TODO: We need to test:
     //  - Inside directory with insufficient permissions
     //  - Nonexistent file
-    //  - Regular file
     //  - Regular file, insufficient permissions
     //  - Symlink, insufficient permissions
     //  - Symlink to regular file
@@ -177,32 +173,23 @@ mod test {
 
     /// Test regular file.
     #[test]
-    fn test_regular_file() -> test::Result {
+    fn test_regular_file() -> test::Result<()> {
         test::with_tempdir(|dir, ctx| {
-            // Create a new file.
-            let path = dir.join("a");
-            File::create(&path)?;
+            let path = test::new_file(dir, "a")?;
 
-            // Execute the remove.
             let op = RmOp {
                 path: path.clone(),
                 dir: false,
             };
 
             let opf = op.finish(&ctx)?;
-
-            // Check the file was successfully moved.
-            let new_path = ctx.filesafe.resolve(&path);
             assert!(!fsutil::exists(&path));
-            assert!(fsutil::exists(&new_path));
+            assert!(fsutil::exists(&opf.safepath));
 
-            // Now test rollback.
             let undo = opf.rollback();
             let undof = undo.finish(ctx)?;
-
-            // Check the file was successfully moved back.
             assert!(fsutil::exists(&path));
-            assert!(!fsutil::exists(&new_path));
+            assert!(!fsutil::exists(&opf.safepath));
 
             Ok(())
         })

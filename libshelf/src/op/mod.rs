@@ -113,24 +113,36 @@ pub enum Op<'lua> {
 /// Some test utilities.
 #[cfg(test)]
 mod test {
-    use std::io;
-    use std::path::Path;
+    use std::fs::{File};
+    use std::path::{Path, PathBuf};
 
     use tempfile::TempDir;
 
     use super::ctx::{FileSafe, FinishCtx};
 
-    pub type Result = std::result::Result<(), Box<dyn std::error::Error>>;
+    pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-    pub fn with_tempdir<F>(f: F) -> Result
+    // Create a new file and return the path.
+    pub fn new_file<P, Q>(dir: P, path: Q) -> Result<PathBuf>
     where
-        F: Fn(&Path, &FinishCtx) -> Result,
+        P: AsRef<Path>,
+        Q: AsRef<Path>,
+    {
+        let path = dir.as_ref().join(path);
+        File::create(&path)?;
+
+        Ok(path)
+    }
+
+    pub fn with_tempdir<F>(f: F) -> Result<()>
+    where
+        F: Fn(&Path, &FinishCtx) -> Result<()>,
     {
         let (dir, ctx, _safedir) = ctx()?;
         f(dir.path(), &ctx)
     }
 
-    fn ctx() -> std::result::Result<(TempDir, FinishCtx, TempDir), io::Error> {
+    fn ctx() -> Result<(TempDir, FinishCtx, TempDir)> {
         let dir = tempfile::tempdir()?;
         let safedir = tempfile::tempdir()?;
 
