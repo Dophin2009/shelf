@@ -1,3 +1,6 @@
+use std::collections::hash_map::DefaultHasher;
+use std::ffi::OsStr;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -5,7 +8,7 @@ use serde::{Deserialize, Serialize};
 /// Context object passed into [`super::Finish::finish`].
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct FinishCtx {
-    pub file_safe: FileSafe,
+    pub filesafe: FileSafe,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -15,8 +18,8 @@ pub struct FileSafe {
 
 impl FinishCtx {
     #[inline]
-    pub fn new(file_safe: FileSafe) -> Self {
-        Self { file_safe }
+    pub fn new(filesafe: FileSafe) -> Self {
+        Self { filesafe }
     }
 }
 
@@ -26,7 +29,14 @@ impl FileSafe {
     where
         P: AsRef<Path>,
     {
-        Self { path: path.as_ref().to_path_buf() }
+        Self {
+            path: path.as_ref().to_path_buf(),
+        }
+    }
+
+    #[inline]
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     #[inline]
@@ -34,6 +44,10 @@ impl FileSafe {
     where
         P: AsRef<Path>,
     {
-        self.path.join(path)
+        let mut hasher = DefaultHasher::new();
+        path.as_ref().hash(&mut hasher);
+        let hash = hasher.finish();
+
+        self.path.join(hash.to_string())
     }
 }

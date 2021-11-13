@@ -49,6 +49,9 @@ pub struct RmFinish {
     pub path: PathBuf,
     /// See [`RmOp`].
     pub dir: bool,
+
+    /// Path at which the file was backed-up.
+    pub safepath: PathBuf,
 }
 
 impl Finish for RmOp {
@@ -61,12 +64,13 @@ impl Finish for RmOp {
     fn finish(&self, ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path, dir } = self;
 
-        let new_path = ctx.file_safe.resolve(path);
-        fs::rename(path, new_path)?;
+        let safepath = ctx.filesafe.resolve(path);
+        fs::rename(path, &safepath)?;
 
         Ok(Self::Output {
             path: path.clone(),
             dir: *dir,
+            safepath,
         })
     }
 }
@@ -76,11 +80,16 @@ impl Rollback for RmFinish {
 
     #[inline]
     fn rollback(&self) -> Self::Output {
-        let Self { path, dir } = self;
+        let Self {
+            path,
+            dir,
+            safepath,
+        } = self;
 
         Self::Output {
             path: path.clone(),
             dir: *dir,
+            safepath: safepath.clone(),
         }
     }
 }
@@ -92,6 +101,9 @@ pub struct RmUndoOp {
     pub path: PathBuf,
     /// See [`RmOp`].
     pub dir: bool,
+
+    /// See [`RmFinish`].
+    pub safepath: PathBuf,
 }
 
 /// The output of [`RmUndoOp`]. See its documentation for information.
@@ -108,11 +120,14 @@ impl Finish for RmUndoOp {
     type Error = RmOpError;
 
     #[inline]
-    fn finish(&self, ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
-        let Self { path, dir } = self;
+    fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
+        let Self {
+            path,
+            dir,
+            safepath,
+        } = self;
 
-        let old_path = ctx.file_safe.resolve(path);
-        fs::rename(old_path, path)?;
+        fs::rename(safepath, path)?;
 
         Ok(Self::Output {
             path: path.clone(),
@@ -132,5 +147,64 @@ impl Rollback for RmUndoFinish {
             path: path.clone(),
             dir: *dir,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::fs::File;
+
+    use super::super::test;
+    use super::{Finish, Rollback};
+    use crate::fsutil;
+
+    use super::RmOp;
+
+    // TODO: We need to test:
+    //  - Inside directory with insufficient permissions
+    //  - Nonexistent file
+    //  - Regular file
+    //  - Regular file, insufficient permissions
+    //  - Symlink, insufficient permissions
+    //  - Symlink to regular file
+    //  - Symlink to directory
+    //  - Symlink to symlink to regular file
+    //  - Symlink to symlink to regular directory
+    //  - Directory, insufficient permissions
+    //  - Directory, empty
+    //  - Directory, with regular files
+    //  - Directory, with other directories
+
+    /// Test regular file.
+    #[test]
+    fn test_regular_file() -> test::Result {
+        test::with_tempdir(|dir, ctx| {
+            // Create a new file.
+            let path = dir.join("a");
+            File::create(&path)?;
+
+            // Execute the remove.
+            let op = RmOp {
+                path: path.clone(),
+                dir: false,
+            };
+
+            let opf = op.finish(&ctx)?;
+
+            // Check the file was successfully moved.
+            let new_path = ctx.filesafe.resolve(&path);
+            assert!(!fsutil::exists(&path));
+            assert!(fsutil::exists(&new_path));
+
+            // Now test rollback.
+            let undo = opf.rollback();
+            let undof = undo.finish(ctx)?;
+
+            // Check the file was successfully moved back.
+            assert!(fsutil::exists(&path));
+            assert!(!fsutil::exists(&new_path));
+
+            Ok(())
+        })
     }
 }

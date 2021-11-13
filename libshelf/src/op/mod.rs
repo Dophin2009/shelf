@@ -109,3 +109,35 @@ pub enum Op<'lua> {
     Command(CommandOp),
     Function(FunctionOp<'lua>),
 }
+
+/// Some test utilities.
+#[cfg(test)]
+mod test {
+    use std::io;
+    use std::path::Path;
+
+    use tempfile::TempDir;
+
+    use super::ctx::{FileSafe, FinishCtx};
+
+    pub type Result = std::result::Result<(), Box<dyn std::error::Error>>;
+
+    pub fn with_tempdir<F>(f: F) -> Result
+    where
+        F: Fn(&Path, &FinishCtx) -> Result,
+    {
+        let (dir, ctx, _safedir) = ctx()?;
+        f(dir.path(), &ctx)
+    }
+
+    fn ctx() -> std::result::Result<(TempDir, FinishCtx, TempDir), io::Error> {
+        let dir = tempfile::tempdir()?;
+        let safedir = tempfile::tempdir()?;
+
+        let ctx = FinishCtx {
+            filesafe: FileSafe::new(safedir.path()),
+        };
+
+        Ok((dir, ctx, safedir))
+    }
+}
