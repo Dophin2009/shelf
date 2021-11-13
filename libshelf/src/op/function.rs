@@ -1,7 +1,6 @@
 pub use crate::spec::NonZeroExitBehavior;
 
 use std::env;
-use std::fmt;
 use std::path::PathBuf;
 
 use mlua::Function;
@@ -28,7 +27,7 @@ pub enum FunctionOpError {
 /// # Undo
 ///
 /// This operation is not undo-able.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FunctionOp<'lua> {
     /// Handle to the Lua function to call.
     pub function: Function<'lua>,
@@ -37,7 +36,7 @@ pub struct FunctionOp<'lua> {
 }
 
 /// The output of [`FunctionOp`]. See its documentation for information.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FunctionFinish<'lua> {
     /// See [`FunctionOp`].
     pub function: Function<'lua>,
@@ -46,27 +45,6 @@ pub struct FunctionFinish<'lua> {
 
     /// The return value from the function call.
     pub ret: Option<mlua::Value<'lua>>,
-}
-
-impl<'lua> fmt::Debug for FunctionOp<'lua> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FunctionOp")
-            .field("function", &"<lua function>")
-            .field("start", &self.start)
-            .finish()
-    }
-}
-
-impl<'lua> fmt::Debug for FunctionFinish<'lua> {
-    #[inline]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("FunctionFinish")
-            .field("function", &"<lua function>")
-            .field("start", &self.start)
-            .field("ret", &"<lua value>")
-            .finish()
-    }
 }
 
 impl<'lua> Finish for FunctionOp<'lua> {

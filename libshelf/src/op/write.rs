@@ -37,7 +37,7 @@ pub enum WriteOpError {
 /// cycle:
 ///
 /// [`WriteOp`] --> [`WriteFinish`] --> [`WriteUndoOp`] --> [`WriteUndoFinish`] --> [`WriteOp`] --> ...
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WriteOp {
     /// Path of the file.
     pub path: PathBuf,
@@ -46,7 +46,7 @@ pub struct WriteOp {
 }
 
 /// The output of [`WriteOp`]. See its documentation for information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WriteFinish {
     /// See [`WriteOp`].
     pub path: PathBuf,
@@ -96,7 +96,7 @@ impl Rollback for WriteFinish {
 }
 
 /// The undo of [`WriteOp`] (see its documentation), created by rolling back [`WriteFinish`].
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WriteUndoOp {
     /// See [`WriteOp`].
     pub path: PathBuf,
@@ -108,7 +108,7 @@ pub struct WriteUndoOp {
 }
 
 /// The output of [`WriteUndoOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WriteUndoFinish {
     /// See [`WriteOp`].
     pub path: PathBuf,

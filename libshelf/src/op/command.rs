@@ -33,7 +33,7 @@ pub type EnvMap = HashMap<String, String>;
 /// # Undo
 ///
 /// This operation is not undo-able.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, )]
 pub struct CommandOp {
     /// Shell command to run.
     pub command: String,
@@ -49,7 +49,7 @@ pub struct CommandOp {
 }
 
 /// The output of [`CommandOp`]. See its documentation for information.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CommandFinish {
     /// Shell command to run.
     pub command: String,

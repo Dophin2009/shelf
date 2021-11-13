@@ -39,7 +39,7 @@ pub enum CopyOpError {
 ///
 /// [`CopyOp`] --> [`CopyFinish`] --> [`CopyUndoOp`] --> [`CopyUndoFinish`] --> [`CopyOp`] --> ...
 ///
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CopyOp {
     /// Path to file to copy.
     pub src: PathBuf,
@@ -48,7 +48,7 @@ pub struct CopyOp {
 }
 
 /// The output of [`CopyOp`]. See its documentation for information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CopyFinish {
     /// See [`CopyOp`].
     pub src: PathBuf,
@@ -93,7 +93,7 @@ impl Rollback for CopyFinish {
 }
 
 /// The undo of [`CopyOp`] (see its documentation), created by rolling back [`CopyFinish`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CopyUndoOp {
     /// See [`CopyOp`].
     pub src: PathBuf,
@@ -102,7 +102,7 @@ pub struct CopyUndoOp {
 }
 
 /// The output of [`CopyUndoOp`]. See its documentation for information.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CopyUndoFinish {
     /// See [`CopyOp`].
     pub src: PathBuf,

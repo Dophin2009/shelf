@@ -35,14 +35,14 @@ pub enum MkdirOpError {
 /// functions in the following cycle:
 ///
 /// [`MkdirOp`] --> [`MkdirFinish`] --> [`MkdirUndoOp`] --> [`MkdirUndoFinish`] --> [`MkdirOp`] --> ...
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MkdirOp {
     /// Path at which the directory will be created.
     pub path: PathBuf,
 }
 
 /// The output of [`MkdirOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MkdirFinish {
     /// See [`MkdirOp`].
     pub path: PathBuf,
@@ -76,14 +76,14 @@ impl Rollback for MkdirFinish {
 }
 
 /// The undo of [`MkdirOp`] (see its documentation), created by rolling back [`MkdirFinish`].
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MkdirUndoOp {
     /// See [`MkdirOp`].
     pub path: PathBuf,
 }
 
 /// The output of [`MkdirUndoOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MkdirUndoFinish {
     /// See [`MkdirOp`].
     pub path: PathBuf,

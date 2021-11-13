@@ -34,14 +34,14 @@ pub enum CreateOpError {
 /// Undoing will remove the created file. This set of operations functions in the following cycle:
 ///
 /// [`CreateOp`] --> [`CreateFinish`] --> [`CreateUndoOp`] --> [`CreateUndoFinish`] --> [`CreateOp`] --> ...
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CreateOp {
     /// Path of the file to be created.
     pub path: PathBuf,
 }
 
 /// The output of [`CreateOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CreateFinish {
     /// See [`CreateOp`].
     pub path: PathBuf,
@@ -77,14 +77,14 @@ impl Rollback for CreateFinish {
 }
 
 /// The undo of [`CreateOp`] (see its documentation), created by rolling back [`CreateFinish`].
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CreateUndoOp {
     /// See [`CreateOp`].
     pub path: PathBuf,
 }
 
 /// The output of [`CreateUndoOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CreateUndoFinish {
     /// See [`CreateOp`].
     pub path: PathBuf,

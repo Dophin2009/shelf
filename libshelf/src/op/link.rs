@@ -37,7 +37,7 @@ pub enum LinkOpError {
 ///
 /// [`LinkOp`] --> [`LinkFinish`] --> [`LinkUndoOp`] --> [`LinkUndoFinish`] --> [`LinkOp`] --> ...
 ///
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LinkOp {
     /// Path to file to link.
     pub src: PathBuf,
@@ -46,7 +46,7 @@ pub struct LinkOp {
 }
 
 /// The output of [`LinkOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LinkFinish {
     /// See [`LinkOp`].
     pub src: PathBuf,
@@ -110,7 +110,7 @@ impl Rollback for LinkFinish {
 }
 
 /// The undo of [`LinkOp`] (see its documentation), created by rolling back [`LinkFinish`].
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LinkUndoOp {
     /// See [`LinkOp`].
     pub src: PathBuf,
@@ -119,7 +119,7 @@ pub struct LinkUndoOp {
 }
 
 /// The output of [`LinkUndoOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LinkUndoFinish {
     /// See [`LinkOp`].
     pub src: PathBuf,
