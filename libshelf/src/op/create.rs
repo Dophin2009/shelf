@@ -1,11 +1,11 @@
 use std::fs::{self, File};
-use std::io;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
 use super::ctx::FinishCtx;
+use super::error::{CreateError, RemoveError};
 use super::{Finish, Rollback};
 
 sa::assert_impl_all!(CreateOp: Finish<Output = CreateFinish, Error = CreateOpError>);
@@ -16,15 +16,17 @@ sa::assert_impl_all!(CreateUndoFinish: Rollback<Output = CreateOp>);
 /// Error encountered when finishing [`CreateOp`] or [`CreateUndoOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum CreateOpError {
-    #[error("i/o error")]
-    Io(#[from] io::Error),
+    #[error("create error")]
+    Create(#[from] CreateError),
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
 }
 
 /// Operation to create a regular file at `path`.
 ///
 /// # Errors
 ///
-/// The operation will error or truncate existing data if `path` points to an existing file or if
+/// The operation will truncate existing data if `path` points to an existing file or error if
 /// `path` is not writable.
 ///
 /// # Undo
@@ -54,7 +56,11 @@ impl Finish for CreateOp {
         let Self { path } = self;
 
         // Create the file.
-        let _ = File::create(path)?;
+        let _ = File::create(path).map_err(|inner| CreateError {
+            path: path.clone(),
+            inner,
+        })?;
+
         Ok(Self::Output { path: path.clone() })
     }
 }
@@ -92,7 +98,12 @@ impl Finish for CreateUndoOp {
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path } = self;
 
-        fs::remove_dir(&path)?;
+        // Remove the created file.
+        fs::remove_file(&path).map_err(|inner| RemoveError {
+            path: path.clone(),
+            inner,
+        })?;
+
         Ok(Self::Output { path: path.clone() })
     }
 }
