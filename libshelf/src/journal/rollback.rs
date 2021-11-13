@@ -139,6 +139,7 @@ where
     /// Convenience function to call [`Self::next_get`] and [`Self::next_append`] in succession by
     /// passing the rollback datum directly to be appended.
     #[inline]
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<&T> {
         let rb = self.next_get()?;
         self.next_append(rb)

@@ -161,7 +161,7 @@ where
     file.read_to_end(overwritten)?;
 
     // Ovewrite contents.
-    file.write(contents)?;
+    file.write_all(contents)?;
 
     Ok(())
 }

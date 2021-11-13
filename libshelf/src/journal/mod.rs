@@ -24,6 +24,7 @@ pub struct Journal<T> {
 impl<T> Journal<T> {
     /// Create a new, empty journal.
     #[inline]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             records: Vec::new(),

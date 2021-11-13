@@ -1,4 +1,3 @@
-
 use serde::{Deserialize, Serialize};
 
 use crate::journal::{self, Journal, Record, Rollback};
@@ -175,6 +174,7 @@ pub struct OpJournal {
 impl OpJournal {
     /// Create a new, empty journal.
     #[inline]
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self::new_parts(Journal::new())
     }
@@ -294,6 +294,7 @@ impl<'j> RollbackIter<'j> {
 
 impl<'j> RollbackIter<'j> {
     #[inline]
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<Result<&'_ JournalOpFinish, JournalOpError>> {
         match self.inner.next_get()? {
             Ok(datum) => self.inner.next_append(datum).map(|datum| &datum.op).map(Ok),
@@ -346,14 +347,14 @@ impl<'j> Transaction<'j> {
     fn finish(&self, op: &JournalOp, ctx: &FinishCtx) -> Result<JournalOpAtom, JournalOpError> {
         let opf = op.finish(ctx)?;
         Ok(JournalOpAtom {
-            op: opf.into(),
+            op: opf,
             ctx: ctx.clone(),
         })
     }
 }
 
 #[inline]
-fn map_record<'r>(record: &'r Record<JournalOpAtom>) -> Record<&'r JournalOpFinish> {
+fn map_record(record: &Record<JournalOpAtom>) -> Record<&JournalOpFinish> {
     match record {
         Record::Atom(datum) => Record::Atom(&datum.op),
         Record::Commit => todo!(),
