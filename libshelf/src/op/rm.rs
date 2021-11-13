@@ -33,7 +33,7 @@ pub enum RmOpError {
 /// in the following cycle:
 ///
 /// [`RmOp`] --> [`RmFinish`] --> [`RmUndoOp`] --> [`RmUndoFinish`] --> [`RmOp`] --> ...
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RmOp {
     /// Path at which the file or directory will be removed.
     pub path: PathBuf,
@@ -43,7 +43,7 @@ pub struct RmOp {
 }
 
 /// The output of [`RmOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RmFinish {
     /// See [`RmOp`].
     pub path: PathBuf,
@@ -95,7 +95,7 @@ impl Rollback for RmFinish {
 }
 
 /// The undo of [`RmOp`] (see its documentation), created by rolling back [`RmFinish`].
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RmUndoOp {
     /// See [`RmOp`].
     pub path: PathBuf,
@@ -107,7 +107,7 @@ pub struct RmUndoOp {
 }
 
 /// The output of [`RmUndoOp`]. See its documentation for information.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RmUndoFinish {
     /// See [`RmOp`].
     pub path: PathBuf,
@@ -190,6 +190,9 @@ mod test {
             let undof = undo.finish(ctx)?;
             assert!(fsutil::exists(&path));
             assert!(!fsutil::exists(&opf.safepath));
+
+            let op2 = undof.rollback();
+            assert_eq!(op, op2);
 
             Ok(())
         })
