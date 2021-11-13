@@ -1,11 +1,11 @@
 use std::fs;
-use std::io;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
 use super::ctx::FinishCtx;
+use super::error::{CopyError, RemoveError};
 use super::{Finish, Rollback};
 
 sa::assert_impl_all!(CopyOp: Finish<Output = CopyFinish, Error = CopyOpError>);
@@ -16,8 +16,10 @@ sa::assert_impl_all!(CopyUndoFinish: Rollback<Output = CopyOp>);
 /// Error encountered when finishing [`CopyOp`] or [`CopyUndoOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum CopyOpError {
-    #[error("i/o error")]
-    Io(#[from] io::Error),
+    #[error("copy error")]
+    Copy(#[from] CopyError),
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
 }
 
 /// Operation to copy a file from `src` to `dest`.
@@ -27,9 +29,9 @@ pub enum CopyOpError {
 ///
 /// # Errors
 ///
-/// It is assumed that `src` points to an readable file, and that no file exists at `dest` (which
-/// must be writable). These premises are not checked, and the operation will error if they are not
-/// met.
+/// It is assumed that `src` points to an readable regular file and symlink, and that no file
+/// exists at `dest` (which must be writable). These premises are not checked, and the operation
+/// will error if they are not met.
 ///
 /// # Undo
 ///
@@ -63,7 +65,11 @@ impl Finish for CopyOp {
         let Self { src, dest } = self;
 
         // Perform copy.
-        let _ = fs::copy(src, dest)?;
+        let _ = fs::copy(src, dest).map_err(|inner| CopyError {
+            src: src.clone(),
+            dest: dest.clone(),
+            inner,
+        })?;
 
         Ok(Self::Output {
             src: src.clone(),
@@ -113,7 +119,10 @@ impl Finish for CopyUndoOp {
         let Self { src, dest } = self;
 
         // Remove copied file.
-        let _ = fs::remove_dir_all(dest)?;
+        let _ = fs::remove_file(dest).map_err(|inner| RemoveError {
+            path: dest.clone(),
+            inner,
+        })?;
 
         Ok(Self::Output {
             src: src.clone(),

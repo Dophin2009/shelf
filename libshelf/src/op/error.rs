@@ -19,6 +19,26 @@ pub struct CreateError {
     pub inner: io::Error,
 }
 
+/// Error encountered when symlinking a file.
+#[derive(Debug, thiserror::Error)]
+#[error("i/o create error")]
+pub struct SymlinkError {
+    pub src: PathBuf,
+    pub dest: PathBuf,
+    #[source]
+    pub inner: io::Error,
+}
+
+/// Error encountered when symlinking a file.
+#[derive(Debug, thiserror::Error)]
+#[error("i/o copy error")]
+pub struct CopyError {
+    pub src: PathBuf,
+    pub dest: PathBuf,
+    #[source]
+    pub inner: io::Error,
+}
+
 /// Error encountered when reading a file.
 #[derive(Debug, thiserror::Error)]
 #[error("i/o read error")]

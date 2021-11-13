@@ -1,11 +1,11 @@
 use std::fs;
-use std::io;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
 use super::ctx::FinishCtx;
+use super::error::{RemoveError, SymlinkError};
 use super::{Finish, Rollback};
 
 sa::assert_impl_all!(LinkOp: Finish<Output = LinkFinish, Error = LinkOpError>);
@@ -16,8 +16,10 @@ sa::assert_impl_all!(LinkUndoFinish: Rollback<Output = LinkOp>);
 /// Error encountered when finishing [`LinkOp`] or [`LinkUndoOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum LinkOpError {
-    #[error("i/o error")]
-    Io(#[from] io::Error),
+    #[error("symlink error")]
+    Symlink(#[from] SymlinkError),
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
 }
 
 /// Operation to link a file from `src` to `dest`. It roughly corresponds to
@@ -60,7 +62,9 @@ impl Finish for LinkOp {
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { src, dest } = self;
 
+        // Perform symlink.
         self.symlink()?;
+
         Ok(Self::Output {
             src: src.clone(),
             dest: dest.clone(),
@@ -71,16 +75,21 @@ impl Finish for LinkOp {
 impl LinkOp {
     #[cfg(unix)]
     #[inline]
-    fn symlink(&self) -> io::Result<()> {
+    fn symlink(&self) -> Result<(), SymlinkError> {
         use std::os::unix;
 
         let Self { src, dest } = self;
-        unix::fs::symlink(src, dest)
+
+        unix::fs::symlink(src, dest).map_err(|inner| SymlinkError {
+            src: src.clone(),
+            dest: dest.clone(),
+            inner,
+        })
     }
 
     #[cfg(windows)]
     #[inline]
-    fn symlink(&self) -> io::Result<()> {
+    fn symlink(&self) -> Result<(), SymlinkError> {
         // FIXME: Look into Windows API behavior
         unimplemented!()
     }
@@ -126,7 +135,12 @@ impl Finish for LinkUndoOp {
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { src, dest } = self;
 
-        fs::remove_dir_all(dest)?;
+        // Remove symlink.
+        fs::remove_file(dest).map_err(|inner| RemoveError {
+            path: dest.clone(),
+            inner,
+        })?;
+
         Ok(Self::Output {
             src: src.clone(),
             dest: dest.clone(),
