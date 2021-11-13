@@ -1,11 +1,12 @@
 use std::fs::File;
-use std::io::{self, Read, Write};
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
 use super::ctx::FinishCtx;
+use super::error::{OpenError, ReadError, WriteError};
 use super::{Finish, Rollback};
 
 sa::assert_impl_all!(WriteOp: Finish<Output = WriteFinish, Error = WriteOpError>);
@@ -16,8 +17,12 @@ sa::assert_impl_all!(WriteUndoFinish: Rollback<Output = WriteOp>);
 /// Error encountered when finishing [`WriteOp`] or [`WriteUndoOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum WriteOpError {
-    #[error("i/o error")]
-    Io(#[from] io::Error),
+    #[error("open error")]
+    Open(#[from] OpenError),
+    #[error("read error")]
+    Read(#[from] ReadError),
+    #[error("write error")]
+    Write(#[from] WriteError),
 }
 
 /// Operation to overwite the contents of `path` with `contents`.
@@ -150,18 +155,31 @@ impl Rollback for WriteUndoFinish {
 /// Open the file at `path`, read the contents into `overwritten`, and write `contents` to the
 /// file.
 #[inline]
-fn read_write_swap<P>(path: P, contents: &[u8], overwritten: &mut Vec<u8>) -> io::Result<()>
+fn read_write_swap<P>(
+    path: P,
+    contents: &[u8],
+    overwritten: &mut Vec<u8>,
+) -> Result<(), WriteOpError>
 where
     P: AsRef<Path>,
 {
     // Open file.
-    let mut file = File::open(path)?;
+    let mut file = File::open(&path).map_err(|inner| OpenError {
+        path: path.as_ref().to_path_buf(),
+        inner,
+    })?;
 
     // Save overwritten contents.
-    file.read_to_end(overwritten)?;
+    file.read_to_end(overwritten).map_err(|inner| ReadError {
+        path: path.as_ref().to_path_buf(),
+        inner,
+    })?;
 
     // Ovewrite contents.
-    file.write_all(contents)?;
+    file.write_all(contents).map_err(|inner| WriteError {
+        path: path.as_ref().to_path_buf(),
+        inner,
+    })?;
 
     Ok(())
 }

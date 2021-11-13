@@ -1,6 +1,8 @@
 pub mod ctx;
 pub mod journal;
 
+pub mod error;
+
 pub mod command;
 pub mod copy;
 pub mod create;
