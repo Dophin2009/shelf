@@ -115,7 +115,7 @@ pub enum Op<'lua> {
 /// Some test utilities.
 #[cfg(test)]
 mod test {
-    use std::fs::{File};
+    use std::fs::File;
     use std::path::{Path, PathBuf};
 
     use tempfile::TempDir;

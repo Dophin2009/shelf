@@ -1,11 +1,12 @@
 use std::fs;
-use std::io;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
 use super::ctx::FinishCtx;
+use super::error::MkdirError;
+use super::error::RemoveError;
 use super::{Finish, Rollback};
 
 sa::assert_impl_all!(MkdirOp: Finish<Output = MkdirFinish, Error = MkdirOpError>);
@@ -16,8 +17,10 @@ sa::assert_impl_all!(MkdirUndoFinish: Rollback<Output = MkdirOp>);
 /// Error encountered when finishing [`MkdirOp`] or [`MkdirUndoOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum MkdirOpError {
-    #[error("i/o error")]
-    Io(#[from] io::Error),
+    #[error("mkdir error")]
+    Mkdir(#[from] MkdirError),
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
 }
 
 /// Operation to create a directory at `path`.
@@ -53,7 +56,10 @@ impl Finish for MkdirOp {
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path } = self;
 
-        fs::create_dir(path)?;
+        fs::create_dir(path).map_err(|inner| MkdirError {
+            path: path.clone(),
+            inner,
+        })?;
         Ok(Self::Output { path: path.clone() })
     }
 }
@@ -91,7 +97,10 @@ impl Finish for MkdirUndoOp {
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path } = self;
 
-        fs::remove_dir(path)?;
+        fs::remove_dir(path).map_err(|inner| RemoveError {
+            path: path.clone(),
+            inner,
+        })?;
         Ok(Self::Output { path: path.clone() })
     }
 }

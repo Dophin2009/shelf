@@ -1,11 +1,11 @@
 use std::fs;
-use std::io;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
 use super::ctx::FinishCtx;
+use super::error::RenameError;
 use super::{Finish, Rollback};
 
 sa::assert_impl_all!(RmOp: Finish<Output = RmFinish, Error = RmOpError>);
@@ -16,8 +16,8 @@ sa::assert_impl_all!(RmUndoFinish: Rollback<Output = RmOp>);
 /// Error encountered when finishing [`RmOp`] or [`RmUndoOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum RmOpError {
-    #[error("i/o error")]
-    Io(#[from] io::Error),
+    #[error("rename error")]
+    Rename(#[from] RenameError),
 }
 
 /// Operation to remove a file or directory at `path`.
@@ -65,7 +65,11 @@ impl Finish for RmOp {
         let Self { path, dir } = self;
 
         let safepath = ctx.filesafe.resolve(path);
-        fs::rename(path, &safepath)?;
+        fs::rename(path, &safepath).map_err(|inner| RenameError {
+            src: path.clone(),
+            dest: safepath.clone(),
+            inner,
+        })?;
 
         Ok(Self::Output {
             path: path.clone(),
@@ -127,7 +131,11 @@ impl Finish for RmUndoOp {
             safepath,
         } = self;
 
-        fs::rename(safepath, path)?;
+        fs::rename(safepath, path).map_err(|inner| RenameError {
+            src: safepath.clone(),
+            dest: path.clone(),
+            inner,
+        })?;
 
         Ok(Self::Output {
             path: path.clone(),

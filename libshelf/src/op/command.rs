@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
 use super::ctx::FinishCtx;
+use super::error::SpawnError;
 use super::Finish;
 
 sa::assert_impl_all!(CommandOp: Finish<Output = CommandFinish, Error = CommandOpError>);
@@ -16,8 +17,8 @@ sa::assert_impl_all!(CommandOp: Finish<Output = CommandFinish, Error = CommandOp
 /// Error encountered when finishing [`CommandOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum CommandOpError {
-    #[error("i/o error")]
-    Io(#[from] io::Error),
+    #[error("spawn error")]
+    Spawn(#[from] SpawnError),
 }
 
 /// Map of environment variables and values.
@@ -99,9 +100,12 @@ impl Finish for CommandOp {
             }
         }
 
-        // Execute the command and wait for it to finish.
-        let child = cmd.spawn()?;
-        let output = child.wait_with_output()?;
+        let output = self.spawn_output(cmd).map_err(|inner| SpawnError {
+            command: command.clone(),
+            shell: shell.clone(),
+            start: start.clone(),
+            inner,
+        })?;
 
         Ok(Self::Output {
             command: command.clone(),
@@ -111,5 +115,14 @@ impl Finish for CommandOp {
             env: env.clone(),
             output,
         })
+    }
+}
+
+impl CommandOp {
+    /// Execute a command and wait for it to finish.
+    #[inline]
+    fn spawn_output(&self, mut cmd: Command) -> Result<Output, io::Error> {
+        let child = cmd.spawn()?;
+        child.wait_with_output()
     }
 }
