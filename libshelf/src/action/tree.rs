@@ -9,7 +9,7 @@ use glob::{GlobError, PatternError};
 use crate::fsutil;
 
 use super::error::FileMissingError;
-use super::{LinkAction, LinkActionError, Resolution, Resolve, ResolveOpts, SkipReason};
+use super::{Error, LinkAction, Res, Resolve, ResolveOpts, SkipReason};
 
 #[derive(Debug, Clone)]
 pub struct TreeAction {
@@ -31,14 +31,14 @@ pub enum TreeActionError {
     #[error("file missing")]
     FileMissing(#[from] FileMissingError),
     #[error("link action error")]
-    Link(#[from] LinkActionError),
+    Link(#[from] Error),
 }
 
 impl<'lua> Resolve<'lua> for TreeAction {
     type Error = TreeActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
         let Self {
             src,
             dest,
@@ -52,9 +52,7 @@ impl<'lua> Resolve<'lua> for TreeAction {
         // If optional flag disabled, error.
         match (optional, fsutil::exists(src)) {
             (true, false) => {
-                return Ok(Resolution::Skip(SkipReason::OptionalFileMissing {
-                    path: src.clone(),
-                }));
+                return Ok(Res::Skip(SkipReason::OptionalMissing { path: src.clone() }));
             }
             (false, false) => {
                 return Err(TreeActionError::FileMissing(FileMissingError {
@@ -91,7 +89,7 @@ impl<'lua> Resolve<'lua> for TreeAction {
         let resolutions: Vec<_> = it
             .map(|action| action.resolve(opts))
             .collect::<Result<_, _>>()?;
-        Ok(Resolution::Multiple(resolutions))
+        Ok(Res::Multiple(resolutions))
     }
 }
 

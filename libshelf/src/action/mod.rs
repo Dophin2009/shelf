@@ -1,4 +1,5 @@
 pub mod error;
+pub mod resolve;
 
 mod command;
 mod function;
@@ -19,101 +20,13 @@ pub use self::template::*;
 pub use self::tree::*;
 pub use self::write::*;
 
+pub use self::resolve::Resolve;
+
 use std::path::PathBuf;
 
 use crate::op::Op;
 
 #[derive(Debug, Clone)]
-pub struct ResolveOpts {}
-
-pub trait Resolve<'lua> {
-    type Error;
-
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error>;
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum ResolutionError {
-    #[error("link action resolution error")]
-    Link(#[from] LinkActionError),
-    #[error("write action resolution error")]
-    Write(#[from] WriteActionError),
-    #[error("tree action resolution error")]
-    Tree(#[from] TreeActionError),
-    #[error("handlebars action resolution error")]
-    Handlebars(#[from] HandlebarsActionError),
-    #[error("liquid action resolution error")]
-    Liquid(#[from] LiquidActionError),
-    #[error("yaml action resolution error")]
-    Yaml(#[from] YamlActionError),
-    #[error("toml action resolution error")]
-    Toml(#[from] TomlActionError),
-    #[error("json action resolution error")]
-    Json(#[from] JsonActionError),
-    #[error("command action resolution error")]
-    Command(#[from] CommandActionError),
-    #[error("function action resolution error")]
-    Function(#[from] FunctionActionError),
-}
-
-#[derive(Debug)]
-pub enum Resolution<'lua> {
-    Done(Done<'lua>),
-    Skip(SkipReason),
-    Multiple(Vec<Resolution<'lua>>),
-}
-
-#[derive(Debug)]
-pub struct Done<'lua> {
-    pub ops: Vec<Op<'lua>>,
-    pub notices: Vec<Notice>,
-}
-
-impl<'lua> Done<'lua> {
-    #[inline]
-    pub fn new(ops: Vec<Op<'lua>>, notices: Vec<Notice>) -> Self {
-        Self { ops, notices }
-    }
-
-    #[inline]
-    pub fn empty() -> Self {
-        Self::new(Vec::new(), Vec::new())
-    }
-}
-
-impl<'lua> Default for Done<'lua> {
-    #[inline]
-    fn default() -> Self {
-        Self::empty()
-    }
-}
-
-#[derive(Debug)]
-pub enum Notice {
-    Info(InfoNotice),
-    Warn(WarnNotice),
-}
-
-#[derive(Debug)]
-pub enum InfoNotice {
-    ExistingSymlink { path: PathBuf, target: PathBuf },
-}
-
-#[derive(Debug)]
-pub enum WarnNotice {
-    SameSrcDest { path: PathBuf },
-    ManualChange { path: PathBuf },
-    Overwrite { path: PathBuf },
-}
-
-// TODO: split up as with ResolutionError?
-#[derive(Debug)]
-pub enum SkipReason {
-    OptionalFileMissing { path: PathBuf },
-    DestinationExists { path: PathBuf },
-}
-
-#[derive(Debug)]
 pub enum Action<'lua> {
     Link(LinkAction),
     Write(WriteAction),
@@ -132,8 +45,8 @@ impl<'lua> Resolve<'lua> for Action<'lua> {
     type Error = ResolutionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
-        let res: Resolution<'lua> = match self {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
+        let res: Res<'lua> = match self {
             Self::Link(a) => a.resolve(opts)?,
             Self::Write(a) => a.resolve(opts)?,
             Self::Tree(a) => a.resolve(opts)?,
@@ -148,4 +61,28 @@ impl<'lua> Resolve<'lua> for Action<'lua> {
         };
         Ok(res)
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ResolutionError {
+    #[error("link action resolution error")]
+    Link(#[from] Error),
+    #[error("write action resolution error")]
+    Write(#[from] WriteActionError),
+    #[error("tree action resolution error")]
+    Tree(#[from] TreeActionError),
+    #[error("handlebars action resolution error")]
+    Handlebars(#[from] HandlebarsActionError),
+    #[error("liquid action resolution error")]
+    Liquid(#[from] LiquidActionError),
+    #[error("yaml action resolution error")]
+    Yaml(#[from] YamlActionError),
+    #[error("toml action resolution error")]
+    Toml(#[from] TomlActionError),
+    #[error("json action resolution error")]
+    Json(#[from] JsonActionError),
+    #[error("command action resolution error")]
+    Command(#[from] CommandActionError),
+    #[error("function action resolution error")]
+    Function(#[from] FunctionActionError),
 }

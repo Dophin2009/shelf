@@ -6,7 +6,7 @@ use crate::fsutil;
 use crate::op::{CommandOp, Op};
 
 use super::error::FileMissingError;
-use super::{Done, Resolution, Resolve, ResolveOpts};
+use super::{Done, Res, Resolve, ResolveOpts};
 
 #[derive(Debug, Clone)]
 pub struct CommandAction {
@@ -35,7 +35,7 @@ impl<'lua> Resolve<'lua> for CommandAction {
     type Error = CommandActionError;
 
     #[inline]
-    fn resolve(&self, _opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, _opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
         let Self {
             command,
             start,
@@ -60,7 +60,7 @@ impl<'lua> Resolve<'lua> for CommandAction {
             clean_env: *clean_env,
             env: env.clone(),
         })];
-        Ok(Resolution::Done(Done {
+        Ok(Res::Done(Done {
             ops,
             notices: vec![],
         }))

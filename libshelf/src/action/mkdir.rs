@@ -1,54 +1,98 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::action::SkipReason;
 use crate::op::{MkdirOp, Op, RmOp};
 
-use super::error::NoError;
-use super::{Done, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
+use super::{Res, Resolve};
 
 #[derive(Debug, Clone)]
 pub struct MkdirAction {
+    /// Path at which to create directories.
     pub path: PathBuf,
+    /// Missing parrents should also be created.
     pub parents: bool,
 }
 
-pub type MkdirActionError = NoError;
+#[derive(Debug, Clone)]
+pub enum Res {
+    Normal(Vec<Op>),
+    /// The destination file or directory will be overwritten.
+    Overwrite(Vec<Op>),
+    /// The action is skipped.
+    Skip(Skip),
+}
 
-impl<'lua> Resolve<'lua> for MkdirAction {
-    type Error = MkdirActionError;
+#[derive(Debug, Clone)]
+pub enum Op {
+    /// Remove operation.
+    Rm(RmOp),
+    /// Mkdir operation.
+    Mkdir(MkdirOp),
+}
 
+/// Reason for skipping [`LinkAction`].
+#[derive(Debug, Clone)]
+pub enum Skip {
+    /// Optional `src` does not exist.
+    OptMissing(PathBuf),
+    /// Destination link already exists.
+    DestExists(PathBuf),
+}
+
+impl Resolve for MkdirAction {
     #[inline]
-    fn resolve(&self, _opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self) -> Res {
         let Self { path, parents } = self;
 
-        let mut output = Done::empty();
-
-        match fs::symlink_metadata(path) {
+        let (overwrite, is_dir) = match fs::symlink_metadata(path) {
             // For directories, we should do nothing, as it already exists.
             Ok(meta) if meta.is_dir() => {
-                return Ok(Resolution::Skip(SkipReason::DestinationExists {
-                    path: path.clone(),
-                }));
+                return Res::Skip(Skip::DestExists(path.clone()));
             }
+
             // For files and symlinks, warn about an overwrite, remove the file, and then link.
-            Ok(meta) if meta.is_file() || meta.is_symlink() => {
-                output
-                    .notices
-                    .push(Notice::Warn(WarnNotice::Overwrite { path: path.clone() }));
-                output.ops.push(Op::Rm(RmOp {
-                    path: path.clone(),
-                    dir: false,
-                }));
-            }
+            Ok(meta) => (true, false),
+
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
-            Ok(_) | Err(_) => {}
+            Err(_) => (false, false),
         };
 
-        // Add op to mkdir.
-        // TODO: Ops for all nonexistent parent directories
-        output.ops.push(Op::Mkdir(MkdirOp { path: path.clone() }));
+        if overwrite {
+            Res::Overwrite(vec![Op::Rm(RmOp {
+                path: path.clone(),
+                dir: is_dir,
+            })])
+        } else {
+            let mut ops = if parents {
+                let mut ops = Vec::new();
+                mkdir_parents_ops(path, &mut ops);
+                ops.into_iter().map(Op::Mkdir).collect()
+            } else {
+                Vec::new()
+            };
 
-        Ok(Resolution::Done(output))
+            ops.push(Op::Mkdir(MkdirOp { path: path.clone() }));
+
+            Res::Normal(ops)
+        }
+    }
+}
+
+#[inline]
+pub fn mkdir_parents_ops<P>(path: P, ops: &mut Vec<MkdirOp>)
+where
+    P: AsRef<Path>,
+{
+    let mut parent_opt = Some(path.as_ref());
+
+    while let Some(parent) = parent_opt.as_ref() {
+        // Add mkdir ops for all nonexisting parents.
+        if !fsutil::exists(parent) {
+            ops.push(MkdirOp {
+                path: parent.to_path_buf(),
+            });
+        }
+
+        parent_opt = parent.parent();
     }
 }

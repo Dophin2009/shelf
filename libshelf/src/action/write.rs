@@ -3,83 +3,114 @@ use std::path::PathBuf;
 
 use crate::op::{CreateOp, Op, RmOp, WriteOp};
 
-use super::error::NoError;
-use super::{link, Done, Notice, Resolution, Resolve, ResolveOpts, WarnNotice};
+use super::{mkdir, Res, Resolve};
 
+/// Action to write `contents` to a file at `dest`.
 #[derive(Debug, Clone)]
 pub struct WriteAction {
+    /// Path of the write destination.
     pub dest: PathBuf,
-    pub contents: String,
+    /// Contents to be written.
+    // TODO: AsRef<[u8]> instead?
+    pub contents: Vec<u8>,
 }
 
-pub type WriteActionError = NoError;
+#[derive(Debug, Clone)]
+pub enum Res {
+    Normal(Vec<Op>),
+    /// The existing destination file's contents will be overwritten.
+    OverwriteContents(Vec<Op>),
+    /// The existing destination file will be replaced.
+    OverwriteFile(Vec<Op>),
+    /// The action is skipped.
+    Skip(Skip),
+}
 
-impl<'lua> Resolve<'lua> for WriteAction {
-    type Error = WriteActionError;
+#[derive(Debug, Clone)]
+pub enum Op {
+    /// Remove operation.
+    Rm(RmOp),
+    /// Create operation.
+    Create(CreatOp),
+    /// Write operation.
+    Write(WriteOp),
+}
+
+/// Reason for skipping [`LinkAction`].
+#[derive(Debug, Clone)]
+pub enum Skip {
+    /// `src` and `dest` are the same path.
+    SameSrcDest(PathBuf),
+    /// Optional `src` does not exist.
+    OptMissing(PathBuf),
+    /// Destination link already exists.
+    DestExists(PathBuf),
+}
+
+impl Resolve for WriteAction {
+    type Output = Res;
 
     #[inline]
-    fn resolve(&self, _opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self) -> Self::Output {
         let Self { dest, contents } = self;
-
-        let mut output = Done::empty();
 
         // If the destination file already exists, check the filetype.
         match fs::symlink_metadata(dest) {
-            Ok(meta) if meta.is_file() => {
-                output
-                    .notices
-                    .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
-                output.ops.push(Op::Rm(RmOp {
-                    path: dest.clone(),
-                    dir: false,
-                }));
+            // For files, check the contents. If they match, we should do nothing.
+            // Otherwise, warn about an overwrite and write.
+            Ok(meta) if meta.is_file() => match fs::read(dest) {
+                // Check for content same.
+                Ok(dest_contents) if dest_contents == contents => {
+                    Res::Skip(Skip::DestExists(path.clone()))
+                }
+                // If error, just assume content is different.
+                Ok(_) | Err(_) => {
+                    let ops = vec![self.as_op()];
+                    Res::OverwriteContents(ops)
+                }
+            },
 
-                // FIXME: For files, check the contents. If they match, we should do nothing.
-                // let content_same = match fs::read_to_string(dest) {
-                // Ok(dest_contents) => dest_contents == contents,
-                // // If error, just assume content is different
-                // Err(_) => false,
-                // };
-
-                // if content_same {
-                // return Ok(Resolution::Skip(SkipReason::DestinationExists {
-                // path: path.clone(),
-                // }));
-                // }
-            }
-            // For directories, warn about an overwrite, remove the directory, and then
-            // link.
-            //
-            // FIXME: https://github.com/rust-lang/rust/pull/89677
+            // For other kinds of files, warn about an overwrite, remove the directory, create a
+            // file, and then write.
             Ok(meta) if meta.is_dir() | meta.is_symlink() => {
-                output
-                    .notices
-                    .push(Notice::Warn(WarnNotice::Overwrite { path: dest.clone() }));
-
                 let dir = meta.is_dir();
-                output.ops.push(Op::Rm(RmOp {
-                    path: dest.clone(),
-                    dir,
-                }));
+                let ops = vec![
+                    Op::Rm(RmOp {
+                        path: dest.clone(),
+                        dir,
+                    }),
+                    Op::Create(CreateOp { path: dest.clone() }),
+                    self.as_op(),
+                ];
+                Res::OverwriteFile(ops)
             }
+
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
             Ok(_) | Err(_) => {
+                let mut ops = Vec::new();
+                mkdir::mkdir_parents_ops(dest, &mut ops);
+                let mut ops: Vec<_> = ops
+                    .into_iter()
+                    .map(|mkdir_op| Op::Mkdir(mkdir_op))
+                    .collect();
+
                 // We need to first create a file before writing to it.
-                output.ops.push(Op::Create(CreateOp { path: dest.clone() }));
+                ops.push(Op::Create(CreateOp { path: dest.clone() }));
+                // Add write operation.
+                ops.push(self.as_op());
+
+                Res::Normal(ops)
             }
-        };
-
-        // Check for existence of parent directories and add op to make parent directories if
-        // they don't exist.
-        if let Some(mkparents_op) = link::mkparents_op(dest) {
-            output.ops.push(Op::Mkdir(mkparents_op));
         }
+    }
+}
 
-        output.ops.push(Op::Write(WriteOp {
-            path: dest.clone(),
-            contents: contents.clone().into_bytes(),
-        }));
-
-        Ok(Resolution::Done(output))
+impl WriteAction {
+    #[inline]
+    fn as_op(&self) -> Op {
+        Op::Write(WriteOp {
+            path: path.clone(),
+            contents: contents.clone(),
+        })
     }
 }

@@ -9,7 +9,7 @@ use crate::fsutil;
 use crate::op::{FunctionOp, Op};
 
 use super::error::FileMissingError;
-use super::{Done, Resolution, Resolve, ResolveOpts};
+use super::{Done, Res, Resolve, ResolveOpts};
 
 #[derive(Clone)]
 pub struct FunctionAction<'lua> {
@@ -41,7 +41,7 @@ impl<'lua> Resolve<'lua> for FunctionAction<'lua> {
     type Error = FunctionActionError;
 
     #[inline]
-    fn resolve(&self, _opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, _opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
         let Self {
             function,
             start,
@@ -59,7 +59,7 @@ impl<'lua> Resolve<'lua> for FunctionAction<'lua> {
             function: function.clone(),
             start: start.clone(),
         })];
-        Ok(Resolution::Done(Done {
+        Ok(Res::Done(Done {
             ops,
             notices: vec![],
         }))

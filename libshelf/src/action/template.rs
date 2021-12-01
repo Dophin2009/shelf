@@ -8,7 +8,7 @@ use crate::fsutil;
 
 use super::error::FileMissingError;
 use super::SkipReason;
-use super::{Resolution, Resolve, ResolveOpts, WriteAction, WriteActionError};
+use super::{Res, Resolve, ResolveOpts, WriteAction, WriteActionError};
 
 #[derive(Debug, Clone)]
 pub struct HandlebarsAction {
@@ -47,7 +47,7 @@ impl<'lua> Resolve<'lua> for HandlebarsAction {
     type Error = HandlebarsActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
         let Self {
             src,
             dest,
@@ -60,7 +60,7 @@ impl<'lua> Resolve<'lua> for HandlebarsAction {
         // If optional flag disabled, error.
         match (optional, fsutil::exists(src)) {
             (true, false) => {
-                return Ok(Resolution::Skip(SkipReason::OptionalFileMissing {
+                return Ok(Res::Skip(SkipReason::OptionalMissing {
                     path: src.clone(),
                 }));
             }
@@ -119,7 +119,7 @@ impl<'lua> Resolve<'lua> for LiquidAction {
     type Error = LiquidActionError;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Resolution<'lua>, Self::Error> {
+    fn resolve(&self, opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
         let Self {
             src,
             dest,
@@ -131,7 +131,7 @@ impl<'lua> Resolve<'lua> for LiquidAction {
         // If optional flag disabled, error.
         match (optional, fsutil::exists(src)) {
             (true, false) => {
-                return Ok(Resolution::Skip(SkipReason::OptionalFileMissing {
+                return Ok(Res::Skip(SkipReason::OptionalMissing {
                     path: src.clone(),
                 }));
             }
