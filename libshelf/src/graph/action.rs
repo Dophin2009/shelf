@@ -1,4 +1,3 @@
-// TODO: rename this module
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::slice;

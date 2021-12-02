@@ -1,3 +1,5 @@
+mod action;
+
 use std::collections::{
     hash_map::{self, DefaultHasher},
     HashMap,
@@ -14,6 +16,8 @@ use petgraph::{
 };
 
 use crate::spec::Spec;
+
+pub use self::action::ActionIter;
 
 pub struct PackageData {
     /// Absolute path of the package.
