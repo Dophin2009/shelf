@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::fsutil;
+use crate::fse;
 use crate::op::{CopyOp, LinkOp, MkdirOp, RmOp};
 
 use super::error::FileMissingError;
@@ -80,7 +80,7 @@ impl Resolve for LinkAction {
 
         // If file does not exist and optional flag enabled, skip.
         // If optional flag disabled, error.
-        match (optional, fsutil::symlink_exists(src)) {
+        match (optional, fse::symlink_exists(src)) {
             (true, false) => {
                 return Ok(Res::Skip(Skip::OptMissing(src.clone())));
             }

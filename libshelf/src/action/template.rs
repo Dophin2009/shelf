@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::fsutil;
+use crate::fse;
 
 use super::error::FileMissingError;
 use super::write::{Res as WriteActionRes, WriteAction};
@@ -206,7 +206,7 @@ where
         return Ok(Res::Skip(Skip::SameSrcDest(src.clone())));
     }
 
-    match (optional, fsutil::symlink_exists(src)) {
+    match (optional, fse::symlink_exists(src)) {
         // `src` is optional and does not exist, skip.
         (true, false) => Ok(Res::Skip(Skip::OptMissing(src.clone()))),
         // `src` is not optional but does not exist, error.

@@ -160,7 +160,7 @@ impl Rollback for RmUndoFinish {
 
 #[cfg(test)]
 mod test {
-    use crate::fsutil;
+    use crate::fse;
 
     use super::super::test;
     use super::{Finish, RmOp, Rollback};
@@ -191,13 +191,13 @@ mod test {
             };
 
             let opf = op.finish(&ctx)?;
-            assert!(!fsutil::symlink_exists(&path));
-            assert!(fsutil::symlink_exists(&opf.safepath));
+            assert!(!fse::symlink_exists(&path));
+            assert!(fse::symlink_exists(&opf.safepath));
 
             let undo = opf.rollback();
             let undof = undo.finish(ctx)?;
-            assert!(fsutil::symlink_exists(&path));
-            assert!(!fsutil::symlink_exists(&opf.safepath));
+            assert!(fse::symlink_exists(&path));
+            assert!(!fse::symlink_exists(&opf.safepath));
 
             let op2 = undof.rollback();
             assert_eq!(op, op2);

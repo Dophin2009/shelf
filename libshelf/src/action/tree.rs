@@ -4,7 +4,7 @@ use std::{env, fs};
 
 use glob::{GlobError, PatternError};
 
-use crate::fsutil;
+use crate::fse;
 
 use super::link::Res as LinkActionRes;
 use super::{LinkAction, Resolve};
@@ -66,7 +66,7 @@ impl Resolve for TreeAction {
             optional,
         } = self;
 
-        match (optional, fsutil::symlink_exists(src)) {
+        match (optional, fse::symlink_exists(src)) {
             // `src` is optional and does not exist; skip.
             (true, false) => {
                 return Ok(Res::Skip(Skip::OptMissing));

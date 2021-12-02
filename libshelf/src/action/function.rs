@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use mlua::Function;
 
-use crate::fsutil;
+use crate::fse;
 use crate::op::FunctionOp;
 
 use super::error::FileMissingError;
@@ -40,7 +40,7 @@ impl<'lua> Resolve for FunctionAction<'lua> {
         let Self { function, start } = self;
 
         // If the start directory doesn't exist, we should error.
-        if fsutil::symlink_exists(start) {
+        if fse::symlink_exists(start) {
             let ops = vec![Op::Function(FunctionOp {
                 function: function.clone(),
                 start: start.clone(),

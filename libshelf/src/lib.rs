@@ -11,4 +11,4 @@ pub mod journal;
 
 pub mod object;
 
-mod fsutil;
+mod fse;

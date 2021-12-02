@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::fsutil;
+use crate::fse;
 use crate::op::CommandOp;
 
 use super::error::FileMissingError;
@@ -50,7 +50,7 @@ impl Resolve for CommandAction {
             env,
         } = self;
 
-        if fsutil::symlink_exists(start) {
+        if fse::symlink_exists(start) {
             let ops = vec![Op::Command(CommandOp {
                 command: command.clone(),
                 start: start.clone(),

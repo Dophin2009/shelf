@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::fsutil;
+use crate::fse;
 use crate::op::{MkdirOp, RmOp};
 
 use super::Resolve;
@@ -90,7 +90,7 @@ where
 
     while let Some(parent) = parent_opt.as_ref() {
         // Add mkdir ops for all nonexisting parents.
-        if !fsutil::symlink_exists(parent) {
+        if !fse::symlink_exists(parent) {
             ops.push(MkdirOp {
                 path: parent.to_path_buf(),
             });
