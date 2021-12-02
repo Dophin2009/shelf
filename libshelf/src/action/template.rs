@@ -3,15 +3,40 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use super::error::FileMissingError;
-use super::write::WriteAction;
+use super::write::{Res as WriteActionRes, WriteAction};
 use super::Resolve;
 
 // Re-export action types.
 pub use self::{hbs::HandlebarsAction, liquid::LiquidAction};
-// Re-export shared Res type.
-pub use super::write::Res;
 // Re-export shared Object type.
 pub use crate::object::Object;
+
+#[derive(Debug, Clone)]
+pub enum Res {
+    Normal(Vec<Op>),
+    /// The existing destination file's contents will be overwritten.
+    OverwriteContents(Vec<Op>),
+    /// The existing destination file will be replaced.
+    OverwriteFile(Vec<Op>),
+    /// The action is skipped.
+    Skip(Skip),
+}
+
+impl Res {
+    #[inline]
+    fn from_write_action_res(res: WriteActionRes) -> Self {
+        use super::write::Skip as WriteActionSkip;
+
+        match res {
+            WriteActionRes::Normal(ops) => Self::Normal(ops),
+            WriteActionRes::OverwriteContents(ops) => Self::OverwriteContents(ops),
+            WriteActionRes::OverwriteFile(ops) => Self::OverwriteFile(ops),
+            WriteActionRes::Skip(skip) => Self::Skip(match skip {
+                WriteActionSkip::DestExists(path) => Skip::DestExists(path),
+            }),
+        }
+    }
+}
 
 /// Reason for skipping [`HandlebarsAction`] or [`LiquidAction`].
 #[derive(Debug, Clone)]
@@ -33,7 +58,7 @@ pub mod hbs {
 
     use crate::fsutil;
 
-    use super::{FileMissingError, Res, Resolve, Skip, WriteAction};
+    use super::{FileMissingError, Object, Res, Resolve};
 
     // Re-export handlebars error types.
     pub use handlebars::{RenderError, TemplateError};
@@ -52,8 +77,8 @@ pub mod hbs {
 
     #[derive(Debug, thiserror::Error)]
     pub enum Error {
-        #[error("file missing")]
-        FileMissing(#[from] FileMissingError),
+        #[error("src missing")]
+        SrcMissing(#[from] FileMissingError),
         #[error("i/o error")]
         Io(#[from] io::Error),
         #[error("handlebars template error")]
@@ -75,28 +100,8 @@ pub mod hbs {
                 partials,
             } = self;
 
-            match (optional, fsutil::exists(src)) {
-                // `src` is optional and does not exist, skip.
-                (true, false) => {
-                    Ok(Res::Skip(Skip::OptMissing(src.clone())));
-                }
-                // `src` is not optional but does not exist, error.
-                (false, false) => {
-                    Err(Error::FileMissing(FileMissingError { path: src.clone() }));
-                }
-                // Otherwise, `src` exists.
-                _ => {
-                    // Render contents.
-                    let contents = render(src, vars, partials)?;
-
-                    // Write the contents.
-                    let wa = WriteAction {
-                        dest: dest.clone(),
-                        contents,
-                    };
-                    Ok(wa.resolve())
-                }
-            }
+            let render = |src, _dest, vars| render(src, vars, partials);
+            super::resolve_impl(src, dest, vars, optional, render)
         }
     }
 
@@ -126,7 +131,7 @@ mod liquid {
     use liquid::ParserBuilder;
     use serde::Serialize;
 
-    use super::{FileMissingError, Res, Resolve, Skip, WriteAction};
+    use super::{FileMissingError, Object, Res, Resolve};
 
     // Re-export liquid error type.
     pub use liquid::Error as LiquidError;
@@ -142,8 +147,8 @@ mod liquid {
 
     #[derive(Debug, thiserror::Error)]
     pub enum Error {
-        #[error("file missing")]
-        FileMissing(#[from] FileMissingError),
+        #[error("src missing")]
+        SrcMissing(#[from] FileMissingError),
         #[error("i/o error")]
         Io(#[from] io::Error),
         #[error("liquid error")]
@@ -162,28 +167,8 @@ mod liquid {
                 optional,
             } = self;
 
-            match (optional, fsutil::exists(src)) {
-                // `src` is optional and does not exist, skip.
-                (true, false) => {
-                    Ok(Res::Skip(Skip::OptMissing(src.clone())));
-                }
-                // `src` is not optional but does not exist, error.
-                (false, false) => {
-                    Err(Error::FileMissing(FileMissingError { path: src.clone() }));
-                }
-                // Otherwise, `src` exists.
-                _ => {
-                    // Render contents.
-                    let contents = render(src, vars)?;
-
-                    // Write contents.
-                    let wa = WriteAction {
-                        dest: dest.clone(),
-                        contents,
-                    };
-                    Ok(wa.resolve())
-                }
-            }
+            let render = |src, _dest, vars| render(src, vars);
+            super::resolve_impl(src, dest, vars, optional, render)
         }
     }
 
@@ -197,6 +182,48 @@ mod liquid {
 
         let res = parser.render(&object)?;
         Ok(res)
+    }
+}
+
+#[inline]
+fn resolve_impl<E, RF>(
+    src: &PathBuf,
+    dest: &PathBuf,
+    vars: &Object,
+    optional: &bool,
+    render: RF,
+) -> Result<Res, E>
+where
+    E: From<FileMissingError>,
+    RF: Fn(&PathBuf, &PathBuf, &Object) -> Result<String, E>,
+{
+    if src == dest {
+        return Res::Skip(Skip::SameSrcDest(src.clone()));
+    }
+
+    match (optional, fsutil::exists(src)) {
+        // `src` is optional and does not exist, skip.
+        (true, false) => {
+            Ok(Res::Skip(Skip::OptMissing(src.clone())));
+        }
+        // `src` is not optional but does not exist, error.
+        (false, false) => {
+            Err(FileMissingError { path: src.clone() }.into());
+        }
+        // Otherwise, `src` exists.
+        _ => {
+            // Render contents.
+            let contents = render(src, dest, vars, optional)?;
+
+            // Write the contents.
+            let wa = WriteAction {
+                dest: dest.clone(),
+                contents,
+            };
+            let res = wa.resolve();
+
+            Ok(Res::from_write_action_res(res))
+        }
     }
 }
 

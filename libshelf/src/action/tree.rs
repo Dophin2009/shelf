@@ -1,15 +1,17 @@
-pub use crate::spec::Patterns;
-
 use std::collections::HashSet;
-use std::env;
 use std::path::{Path, PathBuf};
+use std::{env, fs};
 
 use glob::{GlobError, PatternError};
 
 use crate::fsutil;
 
 use super::error::FileMissingError;
-use super::{Error, LinkAction, Res, Resolve, ResolveOpts, SkipReason};
+use super::link::Res as LinkActionRes;
+use super::{LinkAction, Resolve};
+
+pub type Patterns = Vec<Pattern>;
+pub type Pattern = String;
 
 #[derive(Debug, Clone)]
 pub struct TreeAction {
@@ -22,23 +24,40 @@ pub struct TreeAction {
     pub optional: bool,
 }
 
+#[derive(Debug, Clone)]
+pub enum Res {
+    // TODO: Better API than this?
+    Normal(Vec<LinkActionRes>),
+    /// The action is skipped.
+    Skip(Skip),
+}
+
+/// Reason for skipping [`TreeAction`].
+#[derive(Debug, Clone)]
+pub enum Skip {
+    /// `src` and `dest` are the same path.
+    SameSrcDest,
+    /// Optional `src` does not exist.
+    OptMissing,
+    /// Destination link already exists.
+    DestExists,
+}
+
 #[derive(Debug, thiserror::Error)]
-pub enum TreeActionError {
+pub enum Error {
+    #[error("src missing")]
+    SrcMissing,
     #[error("glob error")]
     Glob(#[from] GlobError),
     #[error("pattern error")]
     Pattern(#[from] PatternError),
-    #[error("file missing")]
-    FileMissing(#[from] FileMissingError),
-    #[error("link action error")]
-    Link(#[from] Error),
 }
 
-impl<'lua> Resolve<'lua> for TreeAction {
-    type Error = TreeActionError;
+impl Resolve for TreeAction {
+    type Output = Result<Res, Error>;
 
     #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
+    fn resolve(&self) -> Self::Output {
         let Self {
             src,
             dest,
@@ -48,24 +67,23 @@ impl<'lua> Resolve<'lua> for TreeAction {
             optional,
         } = self;
 
-        // If file does not exist and optional flag enabled, skip.
-        // If optional flag disabled, error.
         match (optional, fsutil::exists(src)) {
+            // `src` is optional and does not exist; skip.
             (true, false) => {
-                return Ok(Res::Skip(SkipReason::OptionalMissing { path: src.clone() }));
+                return Ok(Res::Skip(Skip::OptMissing));
             }
+            // `src` is not optional but does not exist; skip.
             (false, false) => {
-                return Err(TreeActionError::FileMissing(FileMissingError {
-                    path: src.clone(),
-                }));
+                return Err(Error::SrcMissing);
             }
+            // Otherwise, `src` exists; continue.
             _ => {}
-        }
+        };
 
         // Glob to get file paths.
-        let mut paths = Self::glob_tree(&src, globs)?;
+        let mut paths = glob_tree(&src, globs)?;
         // Glob to get ignored paths.
-        let ignore_paths = Self::glob_tree(&src, ignore)?;
+        let ignore_paths = glob_tree(&src, ignore)?;
 
         // Remove all the ignored paths from the globbed paths.
         for path in ignore_paths {
@@ -86,41 +104,48 @@ impl<'lua> Resolve<'lua> for TreeAction {
                 optional: false,
             });
 
-        let resolutions: Vec<_> = it
-            .map(|action| action.resolve(opts))
-            .collect::<Result<_, _>>()?;
-        Ok(Res::Multiple(resolutions))
+        // SAFETY: Should be fine since all these files should exist?
+        let resvec: Vec<_> = it.map(|action| action.resolve(opts).unwrap());
+        Ok(Res::Normal(resvec))
     }
 }
 
-impl TreeAction {
-    // FIXME: handle absolute path globs
-    #[inline]
-    fn glob_tree<P>(src: P, pats: &[String]) -> Result<HashSet<PathBuf>, TreeActionError>
-    where
-        P: AsRef<Path>,
-    {
-        let cwd = env::current_dir().unwrap();
-        env::set_current_dir(&src).unwrap();
+#[inline]
+fn glob_tree<P>(src: P, pats: &[String]) -> Result<HashSet<PathBuf>, Error>
+where
+    P: AsRef<Path>,
+{
+    // TODO: Better way to do this than chdir?
+    let cwd = env::current_dir().unwrap();
+    env::set_current_dir(&src).unwrap();
 
-        let matches: Vec<glob::Paths> = pats
-            .iter()
-            .map(|pat| glob::glob(pat))
-            .collect::<Result<_, _>>()?;
+    let matches: Vec<glob::Paths> = pats
+        .iter()
+        .map(|pat| glob::glob(pat))
+        .collect::<Result<_, _>>()?;
 
-        let res = matches
-            .into_iter()
-            .flatten()
-            .filter_map(|r| match r {
-                // FIXME: ??
-                Ok(path) if path.is_file() => Some(Ok(path)),
-                Ok(_) => None,
-                Err(err) => Some(Err(err)),
-            })
-            .collect::<Result<_, _>>()?;
+    let res = matches
+        .into_iter()
+        .flatten()
+        .filter_map(|r| match r {
+            Ok(path) => Some(path).filter(keep_globbed),
+            Err(err) => Some(Err(err)),
+        })
+        .collect::<Result<_, _>>()?;
 
-        env::set_current_dir(&cwd).unwrap();
+    env::set_current_dir(&cwd).unwrap();
 
-        Ok(res)
+    Ok(res)
+}
+
+#[inline]
+fn keep_globbed<P>(path: P) -> bool
+where
+    P: AsRef<Path>,
+{
+    match fs::symlink_metadata(path) {
+        Ok(meta) => meta.is_file(),
+        // In case of error, just don't keep.
+        Err(_) => false,
     }
 }

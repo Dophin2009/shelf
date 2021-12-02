@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-pub use crate::action::template::hbs::HandlebarsPartials;
+pub use crate::action::{template::hbs::HandlebarsPartials, tree::Patterns};
 pub use crate::object::Object;
 pub use crate::op::command::EnvMap;
 
@@ -62,9 +62,6 @@ pub struct TreeFile {
     pub link_type: LinkType,
     pub optional: bool,
 }
-
-pub type Patterns = Vec<Pattern>;
-pub type Pattern = String;
 
 #[derive(Debug, Clone)]
 pub enum LinkType {
