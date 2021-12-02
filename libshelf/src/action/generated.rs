@@ -8,7 +8,7 @@ pub use self::{json::JsonAction, toml::TomlAction, yaml::YamlAction};
 // Re-export shared Res type.
 pub use super::write::Res;
 // Re-export shared Object type.
-pub use crate::object::Object;
+pub use super::object::Object;
 
 pub mod yaml {
     use std::path::PathBuf;

@@ -4,8 +4,11 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-pub use crate::action::{template::hbs::HandlebarsPartials, tree::Patterns};
-pub use crate::object::{Object, Value as ObjectValue};
+pub use crate::action::{
+    object::{Object, Value as ObjectValue},
+    template::hbs::HandlebarsPartials,
+    tree::Patterns,
+};
 pub use crate::op::command::EnvMap;
 
 #[derive(Debug, Clone)]

@@ -13,7 +13,7 @@ pub use self::{hbs::HandlebarsAction, liquid::LiquidAction};
 // Re-export Res types.
 pub use super::write::Op;
 // Re-export shared Object type.
-pub use crate::object::Object;
+pub use super::object::Object;
 
 #[derive(Debug, Clone)]
 pub enum Res {

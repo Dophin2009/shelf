@@ -1,6 +1,8 @@
 pub mod error;
 pub mod resolve;
 
+pub mod object;
+
 pub mod command;
 pub mod function;
 pub mod generated;
