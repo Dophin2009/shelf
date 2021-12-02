@@ -1,4 +1,6 @@
 -- name 'test'
+
+-- selene: allow(unused_variable)
 function name(value)
 	pkg:name(value)
 end
@@ -7,6 +9,8 @@ end
 -- dep {'path', ...}
 -- dep 'path1' 'path2' ...
 -- dep {'path1', 'path2', ...} { ... } ...
+
+-- selene: allow(unused_variable)
 function dep(...)
 	pkg:dep(...)
 	return dep
@@ -18,6 +22,8 @@ end
 -- file {'e.txt', 'f.txt', type = 'copy'}
 -- file {'g.txt', type = 'copy'}
 -- file {'h.txt', optional = true}
+
+-- selene: allow(unused_variable)
 function file(arg)
 	local src, dest, link_type, optional
 	if type(arg) == "string" then
@@ -37,6 +43,7 @@ function file(arg)
 	pkg:file(src, dest, link_type, optional)
 end
 
+-- selene: allow(unused_variable)
 function link(arg)
 	if type(arg) == "table" then
 		arg.link_type = "link"
@@ -44,6 +51,7 @@ function link(arg)
 	file(arg)
 end
 
+-- selene: allow(unused_variable)
 function copy(arg)
 	if type(arg) == "table" then
 		arg.link_type = "copy"
@@ -60,6 +68,8 @@ end
 -- tree {'tree', '.config', ignore = '**/*.log'}
 -- tree {'tree', '.config', type = 'copy', ignore = '**/*.log'}
 -- tree {'tree', optional = true}
+
+-- selene: allow(unused_variable)
 function tree(arg)
 	local src, dest, link_type, globs, ignore, optional
 	if type(arg) == "string" then
@@ -93,6 +103,8 @@ end
 -- template {'d.hbs', 'j.txt', engine = 'handlebars', vars = {}}
 -- template {'d.tmpl', 'k.txt', engine = 'liquid', vars = {}}
 -- template {'d.hbs', 'j.txt', engine = 'hbs', vars = {}, optional = true}
+
+-- selene: allow(unused_variable)
 function template(arg)
 	if type(arg) == "table" then
 		local engine = arg.engine or error("template engine was not provided")
@@ -110,6 +122,8 @@ end
 
 -- hbs {'b.hbs', 'h.txt', vars = {}}
 -- hbs {'b.hbs', 'h.txt', vars = {}, optional = true}
+
+-- selene: allow(unused_variable)
 function hbs(arg)
 	local src = arg[1] or error("template src was not provided")
 	local dest = arg[2] or error("template dest was not provided")
@@ -122,6 +136,8 @@ end
 
 -- liquid {'b.tmpl', 'i.txt', vars = {}}
 -- liquid {'b.tmpl', 'i.txt', vars = {}, optional = true}
+
+-- selene: allow(unused_variable)
 function liquid(arg)
 	local src = arg[1] or error("template src was not provided")
 	local dest = arg[2] or error("template dest was not provided")
@@ -133,6 +149,8 @@ end
 
 -- empty 'l.txt'
 -- empty {'m.txt'}
+
+-- selene: allow(unused_variable)
 function empty(arg)
 	if type(arg) == "string" then
 		pkg:empty(arg)
@@ -145,6 +163,8 @@ function empty(arg)
 end
 
 -- string {'n.txt', 'contents'}
+
+-- selene: allow(unused_variable)
 function str(arg)
 	if type(arg) == "table" then
 		local dest = arg[1] or error("str dest was not provided")
@@ -157,6 +177,8 @@ end
 
 -- yaml {'o.txt', {}}
 -- yaml {'p.txt', {}, header = '# header'}
+
+-- selene: allow(unused_variable)
 function yaml(arg)
 	if type(arg) == "table" then
 		local dest = arg[1] or error("yaml dest was not provided")
@@ -170,6 +192,8 @@ end
 
 -- toml {'q.txt', {}}
 -- toml {'r.txt', {}, header = '# header'}
+
+-- selene: allow(unused_variable)
 function toml(arg)
 	if type(arg) == "table" then
 		local dest = arg[1] or error("toml dest was not provided")
@@ -182,6 +206,8 @@ function toml(arg)
 end
 
 -- json {'s.txt', {}}
+
+-- selene: allow(unused_variable)
 function json(arg)
 	if type(arg) == "table" then
 		local dest = arg[1] or error("toml dest was not provided")
@@ -194,6 +220,8 @@ end
 
 -- mkdir 'd'
 -- mkdir {'d'}
+
+-- selene: allow(unused_variable)
 function mkdir(arg)
 	if type(arg) == "table" then
 		local dest = arg[1] or error("mkdir dest was not provided")
@@ -213,6 +241,8 @@ end
 -- cmd {[[echo "a"]], quiet = true, shell = "zsh"}
 -- cmd {[[echo "a"]], start = "tree", shell = "zsh"}
 -- cmd {[[echo "a"]], quiet = true, start = "tree", shell = "zsh"}
+
+-- selene: allow(unused_variable)
 function cmd(arg)
 	local command, start, shell, stdout, stderr, clean_env, env, nonzero_exit
 	if type(arg) == "string" then
@@ -243,6 +273,8 @@ end
 -- fn(function() print("a") end)
 -- fn {function() print("a") end}
 -- fn {function() print("a") end, error_exit = "error"}
+
+-- selene: allow(unused_variable)
 function fn(arg)
 	local fun, start, error_exit
 	if type(arg) == "function" then

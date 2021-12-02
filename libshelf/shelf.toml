@@ -1,0 +1,114 @@
+[selene]
+base = "lua51"
+
+[selene.structs.pkg.name]
+method = true
+args = [{ type = "string", required = true }]
+
+[selene.structs.pkg.dep]
+method = true
+args = [{ type = "string", required = true }, { type = "..." }]
+
+[selene.structs.pkg.file]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "string", required = true },
+  { type = "string", required = true },
+  { type = "bool", required = true },
+]
+
+[selene.structs.pkg.tree]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "string", required = true },
+  { type = "string", required = true },
+  { type = "table", required = true },
+  { type = "table", required = true },
+  { type = "bool", required = true },
+]
+
+[selene.structs.pkg.hbs]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "string", required = true },
+  { type = "table", required = true },
+  { type = "table", required = true },
+  { type = "bool", required = true },
+]
+
+[selene.structs.pkg.liquid]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "string", required = true },
+  { type = "table", required = true },
+  { type = "bool", required = true },
+]
+
+[selene.structs.pkg.empty]
+method = true
+args = [{ type = "string", required = true }]
+
+[selene.structs.pkg.str]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "string", required = true },
+]
+
+[selene.structs.pkg.yaml]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "table", required = true },
+  { type = "string", required = true },
+]
+
+[selene.structs.pkg.toml]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "table", required = true },
+  { type = "string", required = true },
+]
+
+[selene.structs.pkg.json]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "table", required = true },
+]
+
+[selene.structs.pkg.mkdir]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "bool", required = true },
+]
+
+[selene.structs.pkg.cmd]
+method = true
+args = [
+  { type = "string", required = true },
+  { type = "string", required = true },
+  { type = "string", required = true },
+  { type = "bool", required = true },
+  { type = "bool", required = true },
+  { type = "bool", required = true },
+  { type = "string", required = true },
+  { type = "string", required = true },
+]
+
+[selene.structs.pkg.fn]
+method = true
+args = [
+  { type = "function", required = true },
+  { type = "string", required = true },
+  { type = "string", required = true },
+]
+
+[pkg]
+struct = "pkg"
