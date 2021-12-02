@@ -41,7 +41,7 @@ pub mod yaml {
             } = self;
 
             // Render contents.
-            let mut contents = serde_yaml::to_string(&values)?;
+            let contents = serde_yaml::to_string(&values)?;
             Ok(super::write_resolve(dest, contents, header))
         }
     }
@@ -78,7 +78,7 @@ pub mod toml {
             } = self;
 
             // Render contents.
-            let mut contents = toml::to_string_pretty(&values)?;
+            let contents = toml::to_string_pretty(&values)?;
             Ok(super::write_resolve(dest, contents, header))
         }
     }
@@ -116,7 +116,7 @@ pub mod json {
 }
 
 #[inline]
-fn write_resolve(dest: &PathBuf, contents: String, header: &Option<String>) -> Res {
+fn write_resolve(dest: &PathBuf, mut contents: String, header: &Option<String>) -> Res {
     if let Some(header) = header.as_ref() {
         contents.insert_str(0, header);
         contents.insert(0, '\n');

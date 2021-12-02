@@ -54,7 +54,7 @@ impl Resolve for MkdirAction {
             }
 
             // For files and symlinks, warn about an overwrite, remove the file, and then link.
-            Ok(meta) => (true, false),
+            Ok(_) => (true, false),
 
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
             Err(_) => (false, false),
