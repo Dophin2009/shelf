@@ -9,4 +9,6 @@ pub mod op;
 
 pub mod journal;
 
+pub mod object;
+
 mod fsutil;

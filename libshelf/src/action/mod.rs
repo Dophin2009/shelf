@@ -10,21 +10,21 @@ mod template;
 mod tree;
 mod write;
 
-// FIXME: re-export errors in separate mod
-pub use self::command::*;
-pub use self::function::*;
-pub use self::generated::*;
-pub use self::link::*;
-pub use self::mkdir::*;
-pub use self::template::*;
-pub use self::tree::*;
-pub use self::write::*;
-
-pub use self::resolve::Resolve;
-
 use std::path::PathBuf;
 
 use crate::op::Op;
+
+// Re-export main trait.
+pub use self::resolve::Resolve;
+// Re-export action types.
+pub use self::command::CommandAction;
+pub use self::function::FunctionAction;
+pub use self::generated::{JsonAction, TomlAction, YamlAction};
+pub use self::link::LinkAction;
+pub use self::mkdir::MkdirAction;
+pub use self::template::{HandlebarsAction, LiquidAction};
+pub use self::tree::TreeAction;
+pub use self::write::WriteAction;
 
 #[derive(Debug, Clone)]
 pub enum Action<'lua> {
@@ -39,28 +39,6 @@ pub enum Action<'lua> {
     Mkdir(MkdirAction),
     Command(CommandAction),
     Function(FunctionAction<'lua>),
-}
-
-impl<'lua> Resolve<'lua> for Action<'lua> {
-    type Error = ResolutionError;
-
-    #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
-        let res: Res<'lua> = match self {
-            Self::Link(a) => a.resolve(opts)?,
-            Self::Write(a) => a.resolve(opts)?,
-            Self::Tree(a) => a.resolve(opts)?,
-            Self::Handlebars(a) => a.resolve(opts)?,
-            Self::Liquid(a) => a.resolve(opts)?,
-            Self::Yaml(a) => a.resolve(opts)?,
-            Self::Toml(a) => a.resolve(opts)?,
-            Self::Json(a) => a.resolve(opts)?,
-            Self::Mkdir(a) => a.resolve(opts)?,
-            Self::Command(a) => a.resolve(opts)?,
-            Self::Function(a) => a.resolve(opts)?,
-        };
-        Ok(res)
-    }
 }
 
 #[derive(Debug, thiserror::Error)]

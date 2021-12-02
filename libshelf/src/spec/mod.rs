@@ -1,14 +1,13 @@
 mod lua;
-mod tree;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+pub use crate::action::template::hbs::HandlebarsPartials;
+pub use crate::object::Object;
 pub use crate::op::command::EnvMap;
-
-pub use self::tree::Tree;
 
 #[derive(Debug, Clone)]
 pub struct Spec {
@@ -99,8 +98,6 @@ pub struct HandlebarsTemplatedFile {
     pub partials: HandlebarsPartials,
 }
 
-pub type HandlebarsPartials = HashMap<String, PathBuf>;
-
 // FIXME partials & filters support
 #[derive(Debug, Clone)]
 pub struct LiquidTemplatedFile {}
@@ -166,9 +163,6 @@ pub struct CmdHook {
 
     pub start: Option<PathBuf>,
     pub shell: Option<String>,
-
-    pub stdout: Option<bool>,
-    pub stderr: Option<bool>,
 
     pub clean_env: Option<bool>,
     pub env: Option<EnvMap>,

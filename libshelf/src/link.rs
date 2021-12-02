@@ -302,11 +302,13 @@ impl<'g> ActionIter<'g> {
             command,
             start,
             shell,
-            stdout,
-            stderr,
             clean_env,
             env,
-            nonzero_exit,
+
+            // TODO: How to use these?
+            stdout: _,
+            stderr: _,
+            nonzero_exit: _,
         } = cmd;
 
         // idx_debug!(
@@ -325,21 +327,15 @@ impl<'g> ActionIter<'g> {
         let command = command.clone();
         // Use sh as default shell.
         let shell = shell.clone().unwrap_or_else(|| "sh".to_string());
-        let stdout = *stdout.as_ref().unwrap_or(&true);
-        let stderr = *stderr.as_ref().unwrap_or(&true);
         let clean_env = *clean_env.as_ref().unwrap_or(&false);
         let env = env.clone().unwrap_or_else(EnvMap::new);
-        let nonzero_exit = (*nonzero_exit).unwrap_or(NonZeroExitBehavior::Ignore);
 
         Action::Command(CommandAction {
             command,
             start,
             shell,
-            stdout,
-            stderr,
             clean_env,
             env,
-            nonzero_exit,
         })
     }
 
@@ -348,7 +344,7 @@ impl<'g> ActionIter<'g> {
         let FunHook {
             name,
             start,
-            nonzero_exit,
+            nonzero_exit: _,
         } = fun;
 
         // idx_debug!(
@@ -364,11 +360,7 @@ impl<'g> ActionIter<'g> {
             .map(|start| self.join_package(start))
             .unwrap_or_else(|| self.path.to_path_buf());
 
-        Action::Function(FunctionAction {
-            function,
-            start,
-            nonzero_exit: (*nonzero_exit).unwrap_or(NonZeroExitBehavior::Ignore),
-        })
+        Action::Function(FunctionAction { function, start })
     }
 
     #[inline]

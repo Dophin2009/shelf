@@ -1,5 +1,3 @@
-pub use crate::spec::NonZeroExitBehavior;
-
 use std::collections::HashMap;
 use std::io;
 use std::path::PathBuf;

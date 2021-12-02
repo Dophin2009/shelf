@@ -1,186 +1,107 @@
-pub use crate::spec::{HandlebarsPartials, Tree};
-
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::fsutil;
-
 use super::error::FileMissingError;
-use super::SkipReason;
-use super::{Res, Resolve, ResolveOpts, WriteAction, WriteActionError};
+use super::write::WriteAction;
+use super::Resolve;
 
+// Re-export action types.
+pub use self::{hbs::HandlebarsAction, liquid::LiquidAction};
+// Re-export shared Res type.
+pub use super::write::Res;
+// Re-export shared Object type.
+pub use crate::object::Object;
+
+/// Reason for skipping [`HandlebarsAction`] or [`LiquidAction`].
 #[derive(Debug, Clone)]
-pub struct HandlebarsAction {
-    pub src: PathBuf,
-    pub dest: PathBuf,
-    pub vars: Tree,
-
-    pub optional: bool,
-    pub partials: HandlebarsPartials,
+pub enum Skip {
+    /// `src` and `dest` are the same path.
+    SameSrcDest(PathBuf),
+    /// Optional `src` does not exist.
+    OptMissing(PathBuf),
+    /// Destination link already exists.
+    DestExists(PathBuf),
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum HandlebarsActionError {
-    #[error("file missing")]
-    FileMissing(#[from] FileMissingError),
-    #[error("i/o error")]
-    Io(#[from] io::Error),
-    #[error("handlebars template error")]
-    Template(#[from] handlebars::TemplateError),
-    #[error("handlebars render error")]
-    Render(#[from] handlebars::RenderError),
-}
-
-impl From<hbst::Error> for HandlebarsActionError {
-    #[inline]
-    fn from(err: hbst::Error) -> Self {
-        match err {
-            hbst::Error::Io(err) => err.into(),
-            hbst::Error::Template(err) => err.into(),
-            hbst::Error::Render(err) => err.into(),
-        }
-    }
-}
-
-impl<'lua> Resolve<'lua> for HandlebarsAction {
-    type Error = HandlebarsActionError;
-
-    #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
-        let Self {
-            src,
-            dest,
-            vars,
-            optional,
-            partials,
-        } = self;
-
-        // If file does not exist and optional flag enabled, skip.
-        // If optional flag disabled, error.
-        match (optional, fsutil::exists(src)) {
-            (true, false) => {
-                return Ok(Res::Skip(SkipReason::OptionalMissing {
-                    path: src.clone(),
-                }));
-            }
-            (false, false) => {
-                return Err(Self::Error::FileMissing(FileMissingError {
-                    path: src.clone(),
-                }));
-            }
-            _ => {}
-        };
-
-        // Render contents.
-        let contents = self::hbst::render(src, vars, partials)?;
-
-        // Write the contents.
-        let wa = WriteAction {
-            dest: dest.clone(),
-            contents,
-        };
-
-        let resolution = WriteActionError::unwrap(wa.resolve(opts));
-        Ok(resolution)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LiquidAction {
-    pub src: PathBuf,
-    pub dest: PathBuf,
-    pub vars: Tree,
-
-    pub optional: bool,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum LiquidActionError {
-    #[error("file missing")]
-    FileMissing(#[from] FileMissingError),
-    #[error("i/o error")]
-    Io(#[from] io::Error),
-    #[error("liquid error")]
-    Liquid(#[from] liquid::Error),
-}
-
-impl From<liquidt::Error> for LiquidActionError {
-    #[inline]
-    fn from(err: liquidt::Error) -> Self {
-        match err {
-            liquidt::Error::Io(err) => err.into(),
-            liquidt::Error::Liquid(err) => err.into(),
-        }
-    }
-}
-
-impl<'lua> Resolve<'lua> for LiquidAction {
-    type Error = LiquidActionError;
-
-    #[inline]
-    fn resolve(&self, opts: &ResolveOpts) -> Result<Res<'lua>, Self::Error> {
-        let Self {
-            src,
-            dest,
-            vars,
-            optional,
-        } = self;
-
-        // If file does not exist and optional flag enabled, skip.
-        // If optional flag disabled, error.
-        match (optional, fsutil::exists(src)) {
-            (true, false) => {
-                return Ok(Res::Skip(SkipReason::OptionalMissing {
-                    path: src.clone(),
-                }));
-            }
-            (false, false) => {
-                return Err(Self::Error::FileMissing(FileMissingError {
-                    path: src.clone(),
-                }));
-            }
-            _ => {}
-        };
-
-        // Render contents.
-        let contents = self::liquidt::render(src, vars)?;
-
-        // Write contents.
-        let wa = WriteAction {
-            dest: dest.clone(),
-            contents,
-        };
-        let resolution = WriteActionError::unwrap(wa.resolve(opts));
-        Ok(resolution)
-    }
-}
-
-#[inline]
-fn read_template<P: AsRef<Path>>(path: P) -> io::Result<String> {
-    fs::read_to_string(path)
-}
-
-mod hbst {
+pub mod hbs {
     use std::collections::HashMap;
-    use std::io;
     use std::path::{Path, PathBuf};
 
     use handlebars::Handlebars;
     use serde::Serialize;
 
+    use crate::fsutil;
+
+    use super::{FileMissingError, Res, Resolve, Skip, WriteAction};
+
+    // Re-export handlebars error types.
+    pub use handlebars::{RenderError, TemplateError};
+
+    pub type HandlebarsPartials = HashMap<String, PathBuf>;
+
+    #[derive(Debug, Clone)]
+    pub struct HandlebarsAction {
+        pub src: PathBuf,
+        pub dest: PathBuf,
+        pub vars: Object,
+
+        pub optional: bool,
+        pub partials: HandlebarsPartials,
+    }
+
     #[derive(Debug, thiserror::Error)]
     pub enum Error {
+        #[error("file missing")]
+        FileMissing(#[from] FileMissingError),
         #[error("i/o error")]
         Io(#[from] io::Error),
-        #[error("couldn't parse a handlebars template")]
-        Template(#[from] handlebars::TemplateError),
-        #[error("couldn't render a handlebars template")]
-        Render(#[from] handlebars::RenderError),
+        #[error("handlebars template error")]
+        Template(#[from] TemplateError),
+        #[error("handlebars render error")]
+        Render(#[from] RenderError),
+    }
+
+    impl Resolve for HandlebarsAction {
+        type Output = Result<Res, Error>;
+
+        #[inline]
+        fn resolve(&self) -> Self::Output {
+            let Self {
+                src,
+                dest,
+                vars,
+                optional,
+                partials,
+            } = self;
+
+            match (optional, fsutil::exists(src)) {
+                // `src` is optional and does not exist, skip.
+                (true, false) => {
+                    Ok(Res::Skip(Skip::OptMissing(src.clone())));
+                }
+                // `src` is not optional but does not exist, error.
+                (false, false) => {
+                    Err(Error::FileMissing(FileMissingError { path: src.clone() }));
+                }
+                // Otherwise, `src` exists.
+                _ => {
+                    // Render contents.
+                    let contents = render(src, vars, partials)?;
+
+                    // Write the contents.
+                    let wa = WriteAction {
+                        dest: dest.clone(),
+                        contents,
+                    };
+                    Ok(wa.resolve())
+                }
+            }
+        }
     }
 
     #[inline]
-    pub fn render<P: AsRef<Path>, S: Serialize>(
+    fn render<P: AsRef<Path>, S: Serialize>(
         template: P,
         ctx: &S,
         partials: &HashMap<String, PathBuf>,
@@ -198,19 +119,72 @@ mod hbst {
     }
 }
 
-mod liquidt {
+mod liquid {
     use std::io;
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
 
     use liquid::ParserBuilder;
     use serde::Serialize;
 
+    use super::{FileMissingError, Res, Resolve, Skip, WriteAction};
+
+    // Re-export liquid error type.
+    pub use liquid::Error as LiquidError;
+
+    #[derive(Debug, Clone)]
+    pub struct LiquidAction {
+        pub src: PathBuf,
+        pub dest: PathBuf,
+        pub vars: Object,
+
+        pub optional: bool,
+    }
+
     #[derive(Debug, thiserror::Error)]
     pub enum Error {
+        #[error("file missing")]
+        FileMissing(#[from] FileMissingError),
         #[error("i/o error")]
         Io(#[from] io::Error),
         #[error("liquid error")]
-        Liquid(#[from] liquid::Error),
+        Liquid(#[from] LiquidError),
+    }
+
+    impl Resolve for LiquidAction {
+        type Output = Result<Res, Error>;
+
+        #[inline]
+        fn resolve(&self) -> Self::Output {
+            let Self {
+                src,
+                dest,
+                vars,
+                optional,
+            } = self;
+
+            match (optional, fsutil::exists(src)) {
+                // `src` is optional and does not exist, skip.
+                (true, false) => {
+                    Ok(Res::Skip(Skip::OptMissing(src.clone())));
+                }
+                // `src` is not optional but does not exist, error.
+                (false, false) => {
+                    Err(Error::FileMissing(FileMissingError { path: src.clone() }));
+                }
+                // Otherwise, `src` exists.
+                _ => {
+                    // Render contents.
+                    let contents = render(src, vars)?;
+
+                    // Write contents.
+                    let wa = WriteAction {
+                        dest: dest.clone(),
+                        contents,
+                    };
+                    Ok(wa.resolve())
+                }
+            }
+        }
     }
 
     #[inline]
@@ -224,4 +198,9 @@ mod liquidt {
         let res = parser.render(&object)?;
         Ok(res)
     }
+}
+
+#[inline]
+fn read_template<P: AsRef<Path>>(path: P) -> io::Result<String> {
+    fs::read_to_string(path)
 }

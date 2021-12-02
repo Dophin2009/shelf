@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::op::{CreateOp, Op, RmOp, WriteOp};
 
-use super::{mkdir, Res, Resolve};
+use super::{mkdir, Resolve};
 
 /// Action to write `contents` to a file at `dest`.
 #[derive(Debug, Clone)]
@@ -36,13 +36,9 @@ pub enum Op {
     Write(WriteOp),
 }
 
-/// Reason for skipping [`LinkAction`].
+/// Reason for skipping [`WriteAction`].
 #[derive(Debug, Clone)]
 pub enum Skip {
-    /// `src` and `dest` are the same path.
-    SameSrcDest(PathBuf),
-    /// Optional `src` does not exist.
-    OptMissing(PathBuf),
     /// Destination link already exists.
     DestExists(PathBuf),
 }

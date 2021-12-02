@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use crate::op::{MkdirOp, Op, RmOp};
 
-use super::{Res, Resolve};
+use super::Resolve;
 
 #[derive(Debug, Clone)]
 pub struct MkdirAction {
@@ -40,8 +40,10 @@ pub enum Skip {
 }
 
 impl Resolve for MkdirAction {
+    type Output = Res;
+
     #[inline]
-    fn resolve(&self) -> Res {
+    fn resolve(&self) -> Self::Output {
         let Self { path, parents } = self;
 
         let (overwrite, is_dir) = match fs::symlink_metadata(path) {

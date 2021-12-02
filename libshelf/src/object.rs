@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(transparent)]
-pub struct Tree(pub HashMap<String, Value>);
+pub struct Object(pub HashMap<String, Value>);
 
 // FIXME Custom serialization/deserialization to handle Nil?
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -18,14 +18,14 @@ pub enum Value {
     Object(HashMap<String, Value>),
 }
 
-impl Tree {
+impl Object {
     #[inline]
     pub fn new() -> Self {
         Self(HashMap::new())
     }
 }
 
-impl Default for Tree {
+impl Default for Object {
     fn default() -> Self {
         Self::new()
     }
@@ -34,7 +34,7 @@ impl Default for Tree {
 mod lua {
     use mlua::{Error as LuaError, FromLua, Value as LuaValue};
 
-    use super::{Tree, Value};
+    use super::{Object, Value};
 
     impl<'lua> FromLua<'lua> for Value {
         #[inline]
@@ -65,14 +65,14 @@ mod lua {
         }
     }
 
-    impl<'lua> FromLua<'lua> for Tree {
+    impl<'lua> FromLua<'lua> for Object {
         #[inline]
         fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua mlua::Lua) -> mlua::Result<Self> {
             match lua_value {
-                LuaValue::Table(t) => Ok(Tree(FromLua::from_lua(LuaValue::Table(t), lua)?)),
+                LuaValue::Table(t) => Ok(Object(FromLua::from_lua(LuaValue::Table(t), lua)?)),
                 _ => Err(LuaError::FromLuaConversionError {
                     from: lua_value.type_name(),
-                    to: "Tree",
+                    to: "Object",
                     message: Some("Only table values are valid".to_string()),
                 }),
             }
