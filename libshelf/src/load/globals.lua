@@ -111,11 +111,11 @@ end
 -- hbs {'b.hbs', 'h.txt', vars = {}}
 -- hbs {'b.hbs', 'h.txt', vars = {}, optional = true}
 function hbs(arg)
-	src = arg[1] or error("template src was not provided")
-	dest = arg[2] or error("template dest was not provided")
-	vars = arg.vars or error("template vars was not provided")
-	partials = arg.partials or {}
-	optional = arg.optional
+	local src = arg[1] or error("template src was not provided")
+	local dest = arg[2] or error("template dest was not provided")
+	local vars = arg.vars or error("template vars was not provided")
+	local partials = arg.partials or {}
+	local optional = arg.optional
 
 	pkg:hbs(src, dest, vars, partials, optional)
 end
@@ -123,10 +123,10 @@ end
 -- liquid {'b.tmpl', 'i.txt', vars = {}}
 -- liquid {'b.tmpl', 'i.txt', vars = {}, optional = true}
 function liquid(arg)
-	src = arg[1] or error("template src was not provided")
-	dest = arg[2] or error("template dest was not provided")
-	vars = arg.vars or error("template vars was not provided")
-	optional = arg.optional
+	local src = arg[1] or error("template src was not provided")
+	local dest = arg[2] or error("template dest was not provided")
+	local vars = arg.vars or error("template vars was not provided")
+	local optional = arg.optional
 
 	pkg:liquid(src, dest, vars, optional)
 end
@@ -237,7 +237,7 @@ function cmd(arg)
 		error("cmd arg must be a string or table")
 	end
 
-	pkg:cmd(command, start, shell, stdout, stdin, clean_env, env, nonzero_exit)
+	pkg:cmd(command, start, shell, stdout, stderr, clean_env, env, nonzero_exit)
 end
 
 -- fn(function() print("a") end)
@@ -257,5 +257,5 @@ function fn(arg)
 		error("fn arg must be a function or table")
 	end
 
-	pkg:fn(fun, error_exit)
+	pkg:fn(fun, start, error_exit)
 end

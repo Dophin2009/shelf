@@ -40,24 +40,24 @@ impl UserData for SpecObject {
     #[inline]
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         macro_rules! method {
-                ($name:expr; ($($arg:ident; $ty:ty),*); $drct:expr) => {
-                    #[allow(unused_parens)]
-                    methods.add_method_mut($name, |_, this, arg: ($($ty),*)| {
-                        let ($($arg),*) = arg;
-                        this.spec.directives.push($drct);
-                        Ok(())
-                    });
-                };
-                ($name:expr; ($($arg:ident; $ty:ty),*); File; $drct:expr) => {
-                    method!($name; ($($arg; $ty),*); Directive::File($drct))
-                };
-                ($name:expr; ($($arg:ident; $ty:ty),*); Gen; $drct:expr) => {
-                    method!($name; ($($arg; $ty),*); Directive::File(File::Generated($drct)))
-                };
-                ($name:expr; ($($arg:ident; $ty:ty),*); Hook; $drct:expr) => {
-                    method!($name; ($($arg; $ty),*); Directive::Hook($drct))
-                };
-            }
+            ($name:expr; ($($arg:ident; $ty:ty),*); $drct:expr) => {
+                #[allow(unused_parens)]
+                methods.add_method_mut($name, |_, this, arg: ($($ty),*)| {
+                    let ($($arg),*) = arg;
+                    this.spec.directives.push($drct);
+                    Ok(())
+                });
+            };
+            ($name:expr; ($($arg:ident; $ty:ty),*); File; $drct:expr) => {
+                method!($name; ($($arg; $ty),*); Directive::File($drct))
+            };
+            ($name:expr; ($($arg:ident; $ty:ty),*); Gen; $drct:expr) => {
+                method!($name; ($($arg; $ty),*); Directive::File(File::Generated($drct)))
+            };
+            ($name:expr; ($($arg:ident; $ty:ty),*); Hook; $drct:expr) => {
+                method!($name; ($($arg; $ty),*); Directive::Hook($drct))
+            };
+        }
 
         methods.add_method_mut("name", |_, this, name: String| {
             this.spec.name = name;
