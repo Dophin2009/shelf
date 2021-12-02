@@ -34,7 +34,7 @@ pub enum Op {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("start directory missing")]
-    StartMissing(#[from] FileMissingError),
+    StartMissing,
 }
 
 impl Resolve for CommandAction {
@@ -60,9 +60,7 @@ impl Resolve for CommandAction {
             })];
             Ok(Res::Normal(ops))
         } else {
-            Err(Error::StartMissing(FileMissingError {
-                path: start.clone(),
-            }))
+            Err(Error::StartMissing)
         }
     }
 }

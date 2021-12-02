@@ -34,10 +34,8 @@ pub enum Op {
 /// Reason for skipping [`LinkAction`].
 #[derive(Debug, Clone)]
 pub enum Skip {
-    /// Optional `src` does not exist.
-    OptMissing(PathBuf),
     /// Destination link already exists.
-    DestExists(PathBuf),
+    DestExists,
 }
 
 impl Resolve for MkdirAction {
@@ -50,7 +48,7 @@ impl Resolve for MkdirAction {
         let (overwrite, is_dir) = match fs::symlink_metadata(path) {
             // For directories, we should do nothing, as it already exists.
             Ok(meta) if meta.is_dir() => {
-                return Res::Skip(Skip::DestExists(path.clone()));
+                return Res::Skip(Skip::DestExists);
             }
 
             // For files and symlinks, warn about an overwrite, remove the file, and then link.

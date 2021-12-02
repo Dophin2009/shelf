@@ -25,12 +25,14 @@ pub struct LinkAction {
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// `src` was not found, and `optional` was false.
-    #[error("missing file")]
-    SrcMissing(#[from] FileMissingError),
+    #[error("src missing")]
+    SrcMissing,
 }
 
+// Resolution of [`LinkAction`].
 #[derive(Debug, Clone)]
 pub enum Res {
+    /// Normal procedure.
     Normal(Vec<Op>),
     /// The destination file or directory will be overwritten.
     Overwrite(Vec<Op>),
@@ -38,6 +40,7 @@ pub enum Res {
     Skip(Skip),
 }
 
+/// Operation created by resolution.
 #[derive(Debug, Clone)]
 pub enum Op {
     /// Remove operation.
@@ -54,11 +57,11 @@ pub enum Op {
 #[derive(Debug, Clone)]
 pub enum Skip {
     /// `src` and `dest` are the same path.
-    SameSrcDest(PathBuf),
+    SameSrcDest,
     /// Optional `src` does not exist.
-    OptMissing(PathBuf),
+    OptMissing,
     /// Destination link already exists.
-    DestExists(PathBuf),
+    DestExists,
 }
 
 impl Resolve for LinkAction {
@@ -75,17 +78,17 @@ impl Resolve for LinkAction {
 
         // If src and dest are the same, skip.
         if src == dest {
-            return Ok(Res::Skip(Skip::SameSrcDest(src.clone())));
+            return Ok(Res::Skip(Skip::SameSrcDest));
         }
 
         // If file does not exist and optional flag enabled, skip.
         // If optional flag disabled, error.
         match (optional, fse::symlink_exists(src)) {
             (true, false) => {
-                return Ok(Res::Skip(Skip::OptMissing(src.clone())));
+                return Ok(Res::Skip(Skip::OptMissing));
             }
             (false, false) => {
-                return Err(Error::SrcMissing(FileMissingError { path: src.clone() }));
+                return Err(Error::SrcMissing);
             }
             _ => {}
         };
@@ -117,7 +120,7 @@ impl LinkAction {
                 // SAFETY: Already determined it exists and is a symlink.
                 let target = fs::read_link(dest).unwrap();
                 if target == *src {
-                    return Ok(Res::Skip(Skip::DestExists(dest.clone())));
+                    return Ok(Res::Skip(Skip::DestExists));
                 }
 
                 (true, false)
@@ -176,7 +179,7 @@ impl LinkAction {
                     })
                     .unwrap_or(false);
                 if content_same {
-                    return Ok(Res::Skip(Skip::DestExists(dest.clone())));
+                    return Ok(Res::Skip(Skip::DestExists));
                 }
 
                 (true, false)

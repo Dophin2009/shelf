@@ -29,7 +29,7 @@ pub enum Op<'lua> {
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
     #[error("start directory missing")]
-    StartMissing(#[from] FileMissingError),
+    StartMissing,
 }
 
 impl<'lua> Resolve for FunctionAction<'lua> {
@@ -48,9 +48,7 @@ impl<'lua> Resolve for FunctionAction<'lua> {
 
             Ok(Res::Normal(ops))
         } else {
-            Err(Error::StartMissing(FileMissingError {
-                path: start.clone(),
-            }))
+            Err(Error::StartMissing)
         }
     }
 }

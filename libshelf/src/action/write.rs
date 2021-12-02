@@ -42,7 +42,7 @@ pub enum Op {
 #[derive(Debug, Clone)]
 pub enum Skip {
     /// Destination link already exists.
-    DestExists(PathBuf),
+    DestExists,
 }
 
 impl Resolve for WriteAction {
@@ -58,9 +58,7 @@ impl Resolve for WriteAction {
             // Otherwise, warn about an overwrite and write.
             Ok(meta) if meta.is_file() => match fs::read(dest) {
                 // Check for content same.
-                Ok(dest_contents) if dest_contents == *contents => {
-                    Res::Skip(Skip::DestExists(dest.clone()))
-                }
+                Ok(dest_contents) if dest_contents == *contents => Res::Skip(Skip::DestExists),
                 // If error, just assume content is different.
                 Ok(_) | Err(_) => {
                     let ops = vec![self.as_op()];

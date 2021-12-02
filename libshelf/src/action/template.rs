@@ -36,7 +36,7 @@ impl Res {
             WriteActionRes::OverwriteContents(ops) => Self::OverwriteContents(ops),
             WriteActionRes::OverwriteFile(ops) => Self::OverwriteFile(ops),
             WriteActionRes::Skip(skip) => Self::Skip(match skip {
-                WriteActionSkip::DestExists(path) => Skip::DestExists(path),
+                WriteActionSkip::DestExists => Skip::DestExists,
             }),
         }
     }
@@ -46,11 +46,11 @@ impl Res {
 #[derive(Debug, Clone)]
 pub enum Skip {
     /// `src` and `dest` are the same path.
-    SameSrcDest(PathBuf),
+    SameSrcDest,
     /// Optional `src` does not exist.
-    OptMissing(PathBuf),
+    OptMissing,
     /// Destination link already exists.
-    DestExists(PathBuf),
+    DestExists,
 }
 
 pub mod hbs {
@@ -81,7 +81,7 @@ pub mod hbs {
     #[derive(Debug, thiserror::Error)]
     pub enum Error {
         #[error("src missing")]
-        SrcMissing(#[from] FileMissingError),
+        SrcMissing,
         #[error("i/o error")]
         Io(#[from] io::Error),
         #[error("handlebars template error")]
@@ -106,6 +106,7 @@ pub mod hbs {
             super::resolve_impl(src, dest, vars, optional, |src, _dest, vars| {
                 render(src, vars, partials)
             })
+            .and_then(|res| res.ok_or(Error::SrcMissing))
         }
     }
 
@@ -152,7 +153,7 @@ pub mod liquid {
     #[derive(Debug, thiserror::Error)]
     pub enum Error {
         #[error("src missing")]
-        SrcMissing(#[from] FileMissingError),
+        SrcMissing,
         #[error("i/o error")]
         Io(#[from] io::Error),
         #[error("liquid error")]
@@ -174,6 +175,7 @@ pub mod liquid {
             super::resolve_impl(src, dest, vars, optional, |src, _dest, vars| {
                 render(src, vars)
             })
+            .and_then(|res| res.ok_or(Error::SrcMissing))
         }
     }
 
@@ -192,25 +194,24 @@ pub mod liquid {
 
 #[inline]
 fn resolve_impl<E, RF>(
-    src: &PathBuf,
-    dest: &PathBuf,
+    src: &Path,
+    dest: &Path,
     vars: &Object,
     optional: &bool,
     render: RF,
-) -> Result<Res, E>
+) -> Result<Option<Res>, E>
 where
-    E: From<FileMissingError>,
-    RF: Fn(&PathBuf, &PathBuf, &Object) -> Result<String, E>,
+    RF: Fn(&Path, &Path, &Object) -> Result<String, E>,
 {
     if src == dest {
-        return Ok(Res::Skip(Skip::SameSrcDest(src.clone())));
+        return Ok(Some(Res::Skip(Skip::SameSrcDest)));
     }
 
     match (optional, fse::symlink_exists(src)) {
         // `src` is optional and does not exist, skip.
-        (true, false) => Ok(Res::Skip(Skip::OptMissing(src.clone()))),
+        (true, false) => Ok(Some(Res::Skip(Skip::OptMissing))),
         // `src` is not optional but does not exist, error.
-        (false, false) => Err(FileMissingError { path: src.clone() }.into()),
+        (false, false) => Ok(None),
         // Otherwise, `src` exists.
         _ => {
             // Render contents.
@@ -218,12 +219,12 @@ where
 
             // Write the contents.
             let wa = WriteAction {
-                dest: dest.clone(),
+                dest: dest.to_path_buf(),
                 contents: contents.into_bytes(),
             };
             let res = wa.resolve();
 
-            Ok(Res::from_write_action_res(res))
+            Ok(Some(Res::from_write_action_res(res)))
         }
     }
 }
