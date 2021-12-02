@@ -13,7 +13,7 @@ use crate::action::{
 use crate::graph::PackageData;
 use crate::spec::{
     CmdHook, DirFile, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook,
-    LinkType, NonZeroExitBehavior, RegularFile, TemplatedFile, TemplatedFileType, TreeFile,
+    LinkType, RegularFile, TemplatedFile, TemplatedFileType, TreeFile,
 };
 
 impl PackageData {
@@ -89,20 +89,6 @@ impl<'g> ActionIter<'g> {
             optional,
         } = rf;
 
-        // let (link_s, copy_s) = match link_type {
-        // LinkType::Link => ("link", ""),
-        // LinkType::Copy => ("", "copy"),
-        // };
-        // idx_debug!(
-        // self.i,
-        // self.n,
-        // "{$cyan+bold}file{/$} ({[green]}{[yellow]} {[green]} {$dimmed}->{/$} {[green]})",
-        // link_s,
-        // copy_s,
-        // src.display(),
-        // dest.as_ref().unwrap_or(&src).display()
-        // );
-
         // Normalize src.
         let src_w = self.join_package(src);
         // Normalize dest (or use src if absent).
@@ -131,20 +117,6 @@ impl<'g> ActionIter<'g> {
             typ,
             optional,
         } = tf;
-
-        // let (hbs_s, liquid_s) = match typ {
-        // TemplatedFileType::Handlebars(_) => ("hbs", ""),
-        // TemplatedFileType::Liquid(_) => ("", "liquid"),
-        // };
-        // idx_debug!(
-        // self.i,
-        // self.n,
-        // "{$yellow+bold}template{/$} ({[red]}{[blue]} {[green]} {$dimmed}->{/$} {[green]})",
-        // hbs_s,
-        // liquid_s,
-        // src.display(),
-        // dest.display()
-        // );
 
         // Normalize src.
         let src_w = self.join_package(src);
@@ -179,22 +151,6 @@ impl<'g> ActionIter<'g> {
             optional,
         } = tf;
 
-        // let (link_s, copy_s) = match link_type {
-        // LinkType::Link => ("link", ""),
-        // LinkType::Copy => ("", "copy"),
-        // };
-        // idx_debug!(
-        // self.i,
-        // self.n,
-        // "{$yellow+bold}template{/$} ({[green]}{[yellow]} {[green]} {$dimmed}->{/$} {[green]})",
-        // link_s,
-        // copy_s,
-        // src.display(),
-        // dest.as_ref()
-        // .map(|dest| dest.display().to_string())
-        // .unwrap_or(".".to_string())
-        // );
-
         // Normalize src.
         let src_w = self.join_package(src);
         // Normalize dest.
@@ -227,37 +183,17 @@ impl<'g> ActionIter<'g> {
     fn from_file_generated(&self, gf: &GeneratedFile) -> Action<'g> {
         let GeneratedFile { dest, typ } = gf;
 
-        // FIXME this is terrible
-        // let (empty_s, string_s, yaml_s, toml_s, json_s) = match &typ {
-        // GeneratedFileTyp::Empty(_) => ("empty", "", "", "", ""),
-        // GeneratedFileTyp::String(_) => ("", "toml", "", "", ""),
-        // GeneratedFileTyp::Yaml(_) => ("", "", "yaml", "", ""),
-        // GeneratedFileTyp::Toml(_) => ("", "", "", "toml", ""),
-        // GeneratedFileTyp::Json(_) => ("", "", "", "", "json"),
-        // };
-        // idx_debug!(
-        // self.i,
-        // self.n,
-        // "{$magenta+bold}generate{/$} ({[white]}{[blue]}{[green]}{[yellow]}{[red]} {[green]})",
-        // empty_s,
-        // string_s,
-        // yaml_s,
-        // toml_s,
-        // json_s,
-        // dest.display()
-        // );
-
         // Normalize dest.
         let dest_w = self.join_dest(dest);
 
         match typ {
             GeneratedFileTyp::Empty(_) => Action::Write(WriteAction {
                 dest: dest_w,
-                contents: "".to_string(),
+                contents: "".to_string().into_bytes(),
             }),
             GeneratedFileTyp::String(s) => Action::Write(WriteAction {
                 dest: dest_w,
-                contents: s.contents.clone(),
+                contents: s.contents.clone().into_bytes(),
             }),
             // FIXME error context
             GeneratedFileTyp::Yaml(y) => Action::Yaml(YamlAction {
@@ -311,13 +247,6 @@ impl<'g> ActionIter<'g> {
             nonzero_exit: _,
         } = cmd;
 
-        // idx_debug!(
-        // self.i,
-        // self.n,
-        // "{$blue+bold}hook{/$} ({$white}shell{/$} '{[dimmed]})",
-        // command
-        // );
-
         // Normalize start path.
         let start = start
             .as_ref()
@@ -346,12 +275,6 @@ impl<'g> ActionIter<'g> {
             start,
             nonzero_exit: _,
         } = fun;
-
-        // idx_debug!(
-        // self.i,
-        // self.n,
-        // "{$blue+bold}hook{/$} ({$white}fn{/$} '{$dimmed+italic}<function>{/$})"
-        // );
 
         // Load function from Lua registry.
         let function: Function = self.lua.named_registry_value(name).unwrap();

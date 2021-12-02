@@ -2,12 +2,16 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use crate::fsutil;
+
 use super::error::FileMissingError;
 use super::write::{Res as WriteActionRes, WriteAction};
 use super::Resolve;
 
 // Re-export action types.
 pub use self::{hbs::HandlebarsAction, liquid::LiquidAction};
+// Re-export Res types.
+pub use super::write::Op;
 // Re-export shared Object type.
 pub use crate::object::Object;
 
@@ -51,12 +55,11 @@ pub enum Skip {
 
 pub mod hbs {
     use std::collections::HashMap;
+    use std::io;
     use std::path::{Path, PathBuf};
 
     use handlebars::Handlebars;
     use serde::Serialize;
-
-    use crate::fsutil;
 
     use super::{FileMissingError, Object, Res, Resolve};
 
@@ -100,8 +103,9 @@ pub mod hbs {
                 partials,
             } = self;
 
-            let render = |src, _dest, vars| render(src, vars, partials);
-            super::resolve_impl(src, dest, vars, optional, render)
+            super::resolve_impl(src, dest, vars, optional, |src, _dest, vars| {
+                render(src, vars, partials)
+            })
         }
     }
 
@@ -124,7 +128,7 @@ pub mod hbs {
     }
 }
 
-mod liquid {
+pub mod liquid {
     use std::io;
     use std::path::{Path, PathBuf};
 
@@ -167,8 +171,9 @@ mod liquid {
                 optional,
             } = self;
 
-            let render = |src, _dest, vars| render(src, vars);
-            super::resolve_impl(src, dest, vars, optional, render)
+            super::resolve_impl(src, dest, vars, optional, |src, _dest, vars| {
+                render(src, vars)
+            })
         }
     }
 
@@ -198,27 +203,23 @@ where
     RF: Fn(&PathBuf, &PathBuf, &Object) -> Result<String, E>,
 {
     if src == dest {
-        return Res::Skip(Skip::SameSrcDest(src.clone()));
+        return Ok(Res::Skip(Skip::SameSrcDest(src.clone())));
     }
 
     match (optional, fsutil::exists(src)) {
         // `src` is optional and does not exist, skip.
-        (true, false) => {
-            Ok(Res::Skip(Skip::OptMissing(src.clone())));
-        }
+        (true, false) => Ok(Res::Skip(Skip::OptMissing(src.clone()))),
         // `src` is not optional but does not exist, error.
-        (false, false) => {
-            Err(FileMissingError { path: src.clone() }.into());
-        }
+        (false, false) => Err(FileMissingError { path: src.clone() }.into()),
         // Otherwise, `src` exists.
         _ => {
             // Render contents.
-            let contents = render(src, dest, vars, optional)?;
+            let contents = render(src, dest, vars)?;
 
             // Write the contents.
             let wa = WriteAction {
                 dest: dest.clone(),
-                contents,
+                contents: contents.into_bytes(),
             };
             let res = wa.resolve();
 

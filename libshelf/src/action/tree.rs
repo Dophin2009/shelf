@@ -6,7 +6,6 @@ use glob::{GlobError, PatternError};
 
 use crate::fsutil;
 
-use super::error::FileMissingError;
 use super::link::Res as LinkActionRes;
 use super::{LinkAction, Resolve};
 
@@ -105,7 +104,7 @@ impl Resolve for TreeAction {
             });
 
         // SAFETY: Should be fine since all these files should exist?
-        let resvec: Vec<_> = it.map(|action| action.resolve(opts).unwrap());
+        let resvec: Vec<_> = it.map(|action| action.resolve().unwrap()).collect();
         Ok(Res::Normal(resvec))
     }
 }
@@ -128,7 +127,7 @@ where
         .into_iter()
         .flatten()
         .filter_map(|r| match r {
-            Ok(path) => Some(path).filter(keep_globbed),
+            Ok(path) => Some(path).filter(|path| keep_globbed(path)).map(Ok),
             Err(err) => Some(Err(err)),
         })
         .collect::<Result<_, _>>()?;

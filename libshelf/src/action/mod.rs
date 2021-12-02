@@ -1,18 +1,14 @@
 pub mod error;
 pub mod resolve;
 
-mod command;
-mod function;
-mod generated;
-mod link;
-mod mkdir;
-mod template;
-mod tree;
-mod write;
-
-use std::path::PathBuf;
-
-use crate::op::Op;
+pub mod command;
+pub mod function;
+pub mod generated;
+pub mod link;
+pub mod mkdir;
+pub mod template;
+pub mod tree;
+pub mod write;
 
 // Re-export main trait.
 pub use self::resolve::Resolve;
@@ -44,23 +40,19 @@ pub enum Action<'lua> {
 #[derive(Debug, thiserror::Error)]
 pub enum ResolutionError {
     #[error("link action resolution error")]
-    Link(#[from] Error),
-    #[error("write action resolution error")]
-    Write(#[from] WriteActionError),
-    #[error("tree action resolution error")]
-    Tree(#[from] TreeActionError),
+    Link(#[from] self::link::Error),
     #[error("handlebars action resolution error")]
-    Handlebars(#[from] HandlebarsActionError),
+    Handlebars(#[from] self::template::hbs::Error),
     #[error("liquid action resolution error")]
-    Liquid(#[from] LiquidActionError),
+    Liquid(#[from] self::template::liquid::Error),
     #[error("yaml action resolution error")]
-    Yaml(#[from] YamlActionError),
+    Yaml(#[from] self::generated::yaml::Error),
     #[error("toml action resolution error")]
-    Toml(#[from] TomlActionError),
+    Toml(#[from] self::generated::toml::Error),
     #[error("json action resolution error")]
-    Json(#[from] JsonActionError),
+    Json(#[from] self::generated::json::Error),
     #[error("command action resolution error")]
-    Command(#[from] CommandActionError),
+    Command(#[from] self::command::Error),
     #[error("function action resolution error")]
-    Function(#[from] FunctionActionError),
+    Function(#[from] self::function::Error),
 }

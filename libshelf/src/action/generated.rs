@@ -110,7 +110,7 @@ pub mod json {
 
             // Render contents.
             let contents = serde_json::to_string(&values)?;
-            Ok(super::write_resolve(dest, contents, &None));
+            Ok(super::write_resolve(dest, contents, &None))
         }
     }
 }

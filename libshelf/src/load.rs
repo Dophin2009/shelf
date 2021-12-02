@@ -168,14 +168,18 @@ impl SpecLoaderEvaled {
 mod specobject {
     use std::collections::HashMap;
 
-    use mlua::{Function, UserData, UserDataMethods, Variadic};
+    use mlua::{
+        Error as LuaError, FromLua, Function, UserData, UserDataMethods, Value as LuaValue,
+        Variadic,
+    };
     use uuid::Uuid;
 
     use crate::spec::{
         CmdHook, Dep, DirFile, Directive, EmptyGeneratedFile, File, FunHook, GeneratedFile,
         GeneratedFileTyp, HandlebarsTemplatedFile, Hook, JsonGeneratedFile, LinkType,
-        LiquidTemplatedFile, NonZeroExitBehavior, Patterns, RegularFile, Spec, StringGeneratedFile,
-        TemplatedFile, TemplatedFileType, TomlGeneratedFile, Tree, TreeFile, YamlGeneratedFile,
+        LiquidTemplatedFile, NonZeroExitBehavior, Object, ObjectValue, Patterns, RegularFile, Spec,
+        StringGeneratedFile, TemplatedFile, TemplatedFileType, TomlGeneratedFile, TreeFile,
+        YamlGeneratedFile,
     };
 
     pub trait SpecLoaderState {}
@@ -205,24 +209,24 @@ mod specobject {
         #[inline]
         fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
             macro_rules! method {
-            ($name:expr; ($($arg:ident; $ty:ty),*); $drct:expr) => {
-                #[allow(unused_parens)]
-                methods.add_method_mut($name, |_, this, arg: ($($ty),*)| {
-                    let ($($arg),*) = arg;
-                    this.spec.directives.push($drct);
-                    Ok(())
-                });
-            };
-            ($name:expr; ($($arg:ident; $ty:ty),*); File; $drct:expr) => {
-                method!($name; ($($arg; $ty),*); Directive::File($drct))
-            };
-            ($name:expr; ($($arg:ident; $ty:ty),*); Gen; $drct:expr) => {
-                method!($name; ($($arg; $ty),*); Directive::File(File::Generated($drct)))
-            };
-            ($name:expr; ($($arg:ident; $ty:ty),*); Hook; $drct:expr) => {
-                method!($name; ($($arg; $ty),*); Directive::Hook($drct))
-            };
-        }
+                ($name:expr; ($($arg:ident; $ty:ty),*); $drct:expr) => {
+                    #[allow(unused_parens)]
+                    methods.add_method_mut($name, |_, this, arg: ($($ty),*)| {
+                        let ($($arg),*) = arg;
+                        this.spec.directives.push($drct);
+                        Ok(())
+                    });
+                };
+                ($name:expr; ($($arg:ident; $ty:ty),*); File; $drct:expr) => {
+                    method!($name; ($($arg; $ty),*); Directive::File($drct))
+                };
+                ($name:expr; ($($arg:ident; $ty:ty),*); Gen; $drct:expr) => {
+                    method!($name; ($($arg; $ty),*); Directive::File(File::Generated($drct)))
+                };
+                ($name:expr; ($($arg:ident; $ty:ty),*); Hook; $drct:expr) => {
+                    method!($name; ($($arg; $ty),*); Directive::Hook($drct))
+                };
+            }
 
             methods.add_method_mut("name", |_, this, name: String| {
                 this.spec.name = name;
@@ -255,7 +259,7 @@ mod specobject {
                 optional: optional.unwrap_or(false)
             }));
 
-            method!("hbs"; (src; String, dest; String, vars; Tree, partials; HashMap<String, String>, optional; Option<bool>);
+            method!("hbs"; (src; String, dest; String, vars; Object, partials; HashMap<String, String>, optional; Option<bool>);
             File; {
                 let partials = partials.into_iter().map(|(k, v)| (k, v.into())).collect();
                 File::Templated(TemplatedFile {
@@ -267,7 +271,7 @@ mod specobject {
                 })
             });
 
-            method!("liquid"; (src; String, dest; String, vars; Tree, optional; Option<bool>);
+            method!("liquid"; (src; String, dest; String, vars; Object, optional; Option<bool>);
             File; File::Templated(TemplatedFile {
                 src: src.into(),
                 dest: dest.into(),
@@ -284,15 +288,15 @@ mod specobject {
             Gen; GeneratedFile {
                 dest: dest.into(), typ: GeneratedFileTyp::String(StringGeneratedFile { contents })
             });
-            method!("yaml"; (dest; String, values; Tree, header; Option<String>);
+            method!("yaml"; (dest; String, values; Object, header; Option<String>);
             Gen; GeneratedFile {
                 dest: dest.into(), typ: GeneratedFileTyp::Yaml(YamlGeneratedFile { values, header })
             });
-            method!("toml"; (dest; String, values; Tree, header; Option<String>);
+            method!("toml"; (dest; String, values; Object, header; Option<String>);
             Gen; GeneratedFile {
                 dest: dest.into(), typ: GeneratedFileTyp::Toml(TomlGeneratedFile { values, header })
             });
-            method!("json"; (dest; String, values; Tree);
+            method!("json"; (dest; String, values; Object);
             Gen; GeneratedFile {
                 dest: dest.into(), typ: GeneratedFileTyp::Json(JsonGeneratedFile { values })
             });
@@ -337,6 +341,51 @@ mod specobject {
                     Ok(())
                 },
             );
+        }
+    }
+
+    impl<'lua> FromLua<'lua> for ObjectValue {
+        #[inline]
+        fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua mlua::Lua) -> mlua::Result<Self> {
+            let res = match lua_value {
+                LuaValue::Nil => ObjectValue::Nil,
+                LuaValue::Boolean(b) => ObjectValue::Bool(b),
+                LuaValue::Integer(i) => ObjectValue::Int(i),
+                LuaValue::Number(n) => ObjectValue::Float(n),
+                LuaValue::String(s) => ObjectValue::Str(s.to_str()?.to_string()),
+                LuaValue::Table(t) => {
+                    ObjectValue::Object(FromLua::from_lua(LuaValue::Table(t), lua)?)
+                }
+                LuaValue::Function(_)
+                | LuaValue::Thread(_)
+                | LuaValue::LightUserData(_)
+                | LuaValue::UserData(_)
+                | LuaValue::Error(_) => {
+                    return Err(LuaError::FromLuaConversionError {
+                        from: lua_value.type_name(),
+                        to: "Value",
+                        message: Some(
+                            "Only nil, bool, int, float, string, and table values are valid"
+                                .to_string(),
+                        ),
+                    })
+                }
+            };
+            Ok(res)
+        }
+    }
+
+    impl<'lua> FromLua<'lua> for Object {
+        #[inline]
+        fn from_lua(lua_value: LuaValue<'lua>, lua: &'lua mlua::Lua) -> mlua::Result<Self> {
+            match lua_value {
+                LuaValue::Table(t) => Ok(Object(FromLua::from_lua(LuaValue::Table(t), lua)?)),
+                _ => Err(LuaError::FromLuaConversionError {
+                    from: lua_value.type_name(),
+                    to: "Object",
+                    message: Some("Only table values are valid".to_string()),
+                }),
+            }
         }
     }
 }

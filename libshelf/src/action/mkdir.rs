@@ -1,7 +1,8 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-use crate::op::{MkdirOp, Op, RmOp};
+use crate::fsutil;
+use crate::op::{MkdirOp, RmOp};
 
 use super::Resolve;
 
@@ -65,7 +66,7 @@ impl Resolve for MkdirAction {
                 dir: is_dir,
             })])
         } else {
-            let mut ops = if parents {
+            let mut ops = if *parents {
                 let mut ops = Vec::new();
                 mkdir_parents_ops(path, &mut ops);
                 ops.into_iter().map(Op::Mkdir).collect()

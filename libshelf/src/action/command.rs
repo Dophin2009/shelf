@@ -62,7 +62,7 @@ impl Resolve for CommandAction {
         } else {
             Err(Error::StartMissing(FileMissingError {
                 path: start.clone(),
-            }));
+            }))
         }
     }
 }

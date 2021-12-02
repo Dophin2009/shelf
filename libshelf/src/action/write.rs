@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use crate::op::{CreateOp, Op, RmOp, WriteOp};
+use crate::op::{CreateOp, MkdirOp, RmOp, WriteOp};
 
 use super::{mkdir, Resolve};
 
@@ -31,9 +31,11 @@ pub enum Op {
     /// Remove operation.
     Rm(RmOp),
     /// Create operation.
-    Create(CreatOp),
+    Create(CreateOp),
     /// Write operation.
     Write(WriteOp),
+    /// Mkdir operation.
+    Mkdir(MkdirOp),
 }
 
 /// Reason for skipping [`WriteAction`].
@@ -56,8 +58,8 @@ impl Resolve for WriteAction {
             // Otherwise, warn about an overwrite and write.
             Ok(meta) if meta.is_file() => match fs::read(dest) {
                 // Check for content same.
-                Ok(dest_contents) if dest_contents == contents => {
-                    Res::Skip(Skip::DestExists(path.clone()))
+                Ok(dest_contents) if dest_contents == *contents => {
+                    Res::Skip(Skip::DestExists(dest.clone()))
                 }
                 // If error, just assume content is different.
                 Ok(_) | Err(_) => {
@@ -104,8 +106,10 @@ impl Resolve for WriteAction {
 impl WriteAction {
     #[inline]
     fn as_op(&self) -> Op {
+        let Self { dest, contents } = self;
+
         Op::Write(WriteOp {
-            path: path.clone(),
+            path: dest.clone(),
             contents: contents.clone(),
         })
     }

@@ -1,12 +1,11 @@
 mod lua;
 
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
 pub use crate::action::{template::hbs::HandlebarsPartials, tree::Patterns};
-pub use crate::object::Object;
+pub use crate::object::{Object, Value as ObjectValue};
 pub use crate::op::command::EnvMap;
 
 #[derive(Debug, Clone)]
@@ -75,7 +74,7 @@ pub struct TemplatedFile {
     pub src: PathBuf,
     pub dest: PathBuf,
 
-    pub vars: Tree,
+    pub vars: Object,
 
     pub typ: TemplatedFileType,
 
@@ -125,19 +124,19 @@ pub struct StringGeneratedFile {
 
 #[derive(Debug, Clone)]
 pub struct YamlGeneratedFile {
-    pub values: Tree,
+    pub values: Object,
     pub header: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TomlGeneratedFile {
-    pub values: Tree,
+    pub values: Object,
     pub header: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct JsonGeneratedFile {
-    pub values: Tree,
+    pub values: Object,
 }
 
 // TODO: permissions
@@ -160,6 +159,9 @@ pub struct CmdHook {
 
     pub start: Option<PathBuf>,
     pub shell: Option<String>,
+
+    pub stdout: Option<bool>,
+    pub stderr: Option<bool>,
 
     pub clean_env: Option<bool>,
     pub env: Option<EnvMap>,

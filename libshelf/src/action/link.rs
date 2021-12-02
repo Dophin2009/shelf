@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use crate::fsutil;
 use crate::op::{CopyOp, LinkOp, MkdirOp, RmOp};
@@ -46,6 +46,8 @@ pub enum Op {
     Link(LinkOp),
     /// Copy operation.
     Copy(CopyOp),
+    /// Mkdir operation.
+    Mkdir(MkdirOp),
 }
 
 /// Reason for skipping [`LinkAction`].
@@ -89,9 +91,9 @@ impl Resolve for LinkAction {
         };
 
         if *copy {
-            self.resolve_copy(opts)
+            self.resolve_copy()
         } else {
-            self.resolve_link(opts)
+            self.resolve_link()
         }
     }
 }
@@ -112,7 +114,8 @@ impl LinkAction {
             // For symlinks, check the target.
             // If it's the same as src, skip.
             Ok(meta) if meta.is_symlink() => {
-                let target = fs::read_link(dest)?;
+                // SAFETY: Already determined it exists and is a symlink.
+                let target = fs::read_link(dest).unwrap();
                 if target == *src {
                     return Ok(Res::Skip(Skip::DestExists(dest.clone())));
                 }
@@ -134,7 +137,7 @@ impl LinkAction {
             src: src.clone(),
             dest: dest.clone(),
         });
-        if (overwrite) {
+        if overwrite {
             // Add op to remove existing file if exist.
             let rm_op = Op::Rm(RmOp {
                 path: dest.clone(),
@@ -159,7 +162,7 @@ impl LinkAction {
     }
 
     #[inline]
-    fn resolve_copy(&self, _opts: &ResolveOpts) -> Result<Res, <Self as Resolve>::Error> {
+    fn resolve_copy(&self) -> Result<Res, Error> {
         let Self { src, dest, .. } = self;
 
         let (overwrite, is_dir) = match fs::symlink_metadata(dest) {
@@ -185,14 +188,15 @@ impl LinkAction {
             Ok(meta) if meta.is_file() => (true, false),
 
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
-            Ok(_) | Err(_) => {}
+            // TODO: Treat error as error here?
+            Ok(_) | Err(_) => (false, false),
         };
 
         let copy_op = Op::Copy(CopyOp {
             src: src.clone(),
             dest: dest.clone(),
         });
-        if (overwrite) {
+        if overwrite {
             // Add op to remove existing file if exist.
             let rm_op = Op::Rm(RmOp {
                 path: dest.clone(),

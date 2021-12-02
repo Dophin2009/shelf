@@ -6,6 +6,7 @@ use crate::fsutil;
 use crate::op::FunctionOp;
 
 use super::error::FileMissingError;
+use super::Resolve;
 
 #[derive(Debug, Clone)]
 pub struct FunctionAction<'lua> {
@@ -15,12 +16,12 @@ pub struct FunctionAction<'lua> {
 }
 
 #[derive(Debug, Clone)]
-pub enum Res {
-    Normal(Vec<Op>),
+pub enum Res<'lua> {
+    Normal(Vec<Op<'lua>>),
 }
 
 #[derive(Debug, Clone)]
-pub enum Op {
+pub enum Op<'lua> {
     /// Function op.
     Function(FunctionOp<'lua>),
 }
@@ -32,7 +33,7 @@ pub enum Error {
 }
 
 impl<'lua> Resolve for FunctionAction<'lua> {
-    type Output = Result<Res, Error>;
+    type Output = Result<Res<'lua>, Error>;
 
     #[inline]
     fn resolve(&self) -> Self::Output {
