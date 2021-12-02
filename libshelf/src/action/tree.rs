@@ -66,7 +66,7 @@ impl Resolve for TreeAction {
             optional,
         } = self;
 
-        match (optional, fsutil::exists(src)) {
+        match (optional, fsutil::symlink_exists(src)) {
             // `src` is optional and does not exist; skip.
             (true, false) => {
                 return Ok(Res::Skip(Skip::OptMissing));

@@ -50,7 +50,7 @@ impl Resolve for CommandAction {
             env,
         } = self;
 
-        if fsutil::exists(start) {
+        if fsutil::symlink_exists(start) {
             let ops = vec![Op::Command(CommandOp {
                 command: command.clone(),
                 start: start.clone(),

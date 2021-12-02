@@ -191,13 +191,13 @@ mod test {
             };
 
             let opf = op.finish(&ctx)?;
-            assert!(!fsutil::exists(&path));
-            assert!(fsutil::exists(&opf.safepath));
+            assert!(!fsutil::symlink_exists(&path));
+            assert!(fsutil::symlink_exists(&opf.safepath));
 
             let undo = opf.rollback();
             let undof = undo.finish(ctx)?;
-            assert!(fsutil::exists(&path));
-            assert!(!fsutil::exists(&opf.safepath));
+            assert!(fsutil::symlink_exists(&path));
+            assert!(!fsutil::symlink_exists(&opf.safepath));
 
             let op2 = undof.rollback();
             assert_eq!(op, op2);

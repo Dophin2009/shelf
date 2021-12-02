@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 #[inline]
-pub fn exists<P>(path: P) -> bool
+pub fn symlink_exists<P>(path: P) -> bool
 where
     P: AsRef<Path>,
 {

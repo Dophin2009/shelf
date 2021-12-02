@@ -206,7 +206,7 @@ where
         return Ok(Res::Skip(Skip::SameSrcDest(src.clone())));
     }
 
-    match (optional, fsutil::exists(src)) {
+    match (optional, fsutil::symlink_exists(src)) {
         // `src` is optional and does not exist, skip.
         (true, false) => Ok(Res::Skip(Skip::OptMissing(src.clone()))),
         // `src` is not optional but does not exist, error.

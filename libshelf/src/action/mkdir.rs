@@ -90,7 +90,7 @@ where
 
     while let Some(parent) = parent_opt.as_ref() {
         // Add mkdir ops for all nonexisting parents.
-        if !fsutil::exists(parent) {
+        if !fsutil::symlink_exists(parent) {
             ops.push(MkdirOp {
                 path: parent.to_path_buf(),
             });

@@ -40,7 +40,7 @@ impl<'lua> Resolve for FunctionAction<'lua> {
         let Self { function, start } = self;
 
         // If the start directory doesn't exist, we should error.
-        if fsutil::exists(start) {
+        if fsutil::symlink_exists(start) {
             let ops = vec![Op::Function(FunctionOp {
                 function: function.clone(),
                 start: start.clone(),

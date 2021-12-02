@@ -80,7 +80,7 @@ impl Resolve for LinkAction {
 
         // If file does not exist and optional flag enabled, skip.
         // If optional flag disabled, error.
-        match (optional, fsutil::exists(src)) {
+        match (optional, fsutil::symlink_exists(src)) {
             (true, false) => {
                 return Ok(Res::Skip(Skip::OptMissing(src.clone())));
             }
