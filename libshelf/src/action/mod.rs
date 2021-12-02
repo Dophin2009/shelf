@@ -1,5 +1,4 @@
 pub mod error;
-pub mod resolve;
 
 pub mod object;
 
@@ -12,8 +11,6 @@ pub mod template;
 pub mod tree;
 pub mod write;
 
-// Re-export main trait.
-pub use self::resolve::Resolve;
 // Re-export action types.
 pub use self::command::CommandAction;
 pub use self::function::FunctionAction;
@@ -23,6 +20,12 @@ pub use self::mkdir::MkdirAction;
 pub use self::template::{HandlebarsAction, LiquidAction};
 pub use self::tree::TreeAction;
 pub use self::write::WriteAction;
+
+pub trait Resolve {
+    type Output;
+
+    fn resolve(&self) -> Self::Output;
+}
 
 #[derive(Debug, Clone)]
 pub enum Action<'lua> {
