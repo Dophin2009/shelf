@@ -5,7 +5,6 @@ use mlua::Function;
 use crate::fse;
 use crate::op::FunctionOp;
 
-use super::error::FileMissingError;
 use super::Resolve;
 
 #[derive(Debug, Clone)]

@@ -1,10 +1,9 @@
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::{Path, };
 
 use crate::fse;
 
-use super::error::FileMissingError;
 use super::write::{Res as WriteActionRes, WriteAction};
 use super::Resolve;
 
@@ -61,7 +60,7 @@ pub mod hbs {
     use handlebars::Handlebars;
     use serde::Serialize;
 
-    use super::{FileMissingError, Object, Res, Resolve};
+    use super::{Object, Res, Resolve};
 
     // Re-export handlebars error types.
     pub use handlebars::{RenderError, TemplateError};
@@ -136,7 +135,7 @@ pub mod liquid {
     use liquid::ParserBuilder;
     use serde::Serialize;
 
-    use super::{FileMissingError, Object, Res, Resolve};
+    use super::{Object, Res, Resolve};
 
     // Re-export liquid error type.
     pub use liquid::Error as LiquidError;

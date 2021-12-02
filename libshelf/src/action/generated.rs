@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path};
 
 use super::write::WriteAction;
 use super::Resolve;
@@ -116,7 +116,7 @@ pub mod json {
 }
 
 #[inline]
-fn write_resolve(dest: &PathBuf, mut contents: String, header: &Option<String>) -> Res {
+fn write_resolve(dest: &Path, mut contents: String, header: &Option<String>) -> Res {
     if let Some(header) = header.as_ref() {
         contents.insert_str(0, header);
         contents.insert(0, '\n');
@@ -124,7 +124,7 @@ fn write_resolve(dest: &PathBuf, mut contents: String, header: &Option<String>) 
 
     // Write contents.
     let wa = WriteAction {
-        dest: dest.clone(),
+        dest: dest.to_path_buf(),
         contents: contents.into_bytes(),
     };
 

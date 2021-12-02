@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use crate::fse;
 use crate::op::{CopyOp, LinkOp, MkdirOp, RmOp};
 
-use super::error::FileMissingError;
 use super::{mkdir, Resolve};
 
 /// Action to symlink or copy from `src` to `dest`.
@@ -153,10 +152,7 @@ impl LinkAction {
             // they don't exist.
             let mut ops = Vec::new();
             mkdir::mkdir_parents_ops(dest, &mut ops);
-            let mut ops: Vec<_> = ops
-                .into_iter()
-                .map(|mkdir_op| Op::Mkdir(mkdir_op))
-                .collect();
+            let mut ops: Vec<_> = ops.into_iter().map(Op::Mkdir).collect();
 
             ops.push(link_op);
 
@@ -212,10 +208,7 @@ impl LinkAction {
             // they don't exist.
             let mut ops = Vec::new();
             mkdir::mkdir_parents_ops(dest, &mut ops);
-            let mut ops: Vec<_> = ops
-                .into_iter()
-                .map(|mkdir_op| Op::Mkdir(mkdir_op))
-                .collect();
+            let mut ops: Vec<_> = ops.into_iter().map(Op::Mkdir).collect();
 
             ops.push(copy_op);
             Ok(Res::Normal(ops))

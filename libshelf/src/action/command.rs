@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use crate::fse;
 use crate::op::CommandOp;
 
-use super::error::FileMissingError;
 use super::Resolve;
 
 // Re-export action member types.
