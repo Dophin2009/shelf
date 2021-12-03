@@ -6,7 +6,7 @@ mod pathutil;
 use std::process;
 
 use bunt_logger::{ColorChoice, Level};
-use clap::Clap;
+use clap::Parser;
 
 use crate::cli::Options;
 

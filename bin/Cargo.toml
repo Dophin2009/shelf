@@ -1,0 +1,21 @@
+[package]
+name = "shelf"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+bunt = "0.2"
+bunt-logger = "0.1"
+clap = "3.0.0-beta.5"
+directories-next = "2.0"
+
+shelflib = { path = ".." }
+
+[features]
+default = []
+lua51 = ["shelflib/lua51"]
+lua52 = ["shelflib/lua52"]
+lua53 = ["shelflib/lua53"]
+lua54 = ["shelflib/lua54"]
+luajit = ["shelflib/luajit"]
+unsafe = []
