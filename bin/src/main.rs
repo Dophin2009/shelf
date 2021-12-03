@@ -2,6 +2,7 @@
 mod output;
 
 mod cli;
+mod load;
 
 use std::process;
 
