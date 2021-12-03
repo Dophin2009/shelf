@@ -15,7 +15,8 @@ use petgraph::{
     graphmap::{DiGraphMap, Nodes},
 };
 
-use crate::spec::Spec;
+use crate::fse;
+use crate::spec::{Dep, Spec};
 
 pub use self::action::ActionIter;
 
@@ -35,6 +36,17 @@ impl fmt::Debug for PackageData {
             .field("spec", &self.spec)
             .field("lua", &"<lua>")
             .finish()
+    }
+}
+
+impl PackageData {
+    #[inline]
+    pub fn dep_paths(&self) -> impl Iterator<Item = PathBuf> + '_ {
+        let path = self.path.clone();
+        self.spec
+            .deps
+            .iter()
+            .map(move |Dep { path: dpath }| fse::clean(path.join(dpath)))
     }
 }
 
