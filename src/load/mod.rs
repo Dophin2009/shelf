@@ -73,6 +73,7 @@ impl SpecLoaderEmpty {
         })
     }
 
+
     #[inline]
     fn lua_instance() -> Result<Lua, mlua::Error> {
         #[cfg(not(feature = "unsafe"))]

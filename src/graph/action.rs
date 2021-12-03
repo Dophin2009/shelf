@@ -3,12 +3,12 @@ use std::path::{Path, PathBuf};
 use std::slice;
 
 use mlua::{Function, Lua};
-use path_clean::PathClean;
 
 use crate::action::{
     Action, CommandAction, FunctionAction, HandlebarsAction, JsonAction, LinkAction, LiquidAction,
     MkdirAction, TomlAction, TreeAction, WriteAction, YamlAction,
 };
+use crate::fse;
 use crate::graph::PackageData;
 use crate::spec::{
     CmdHook, DirFile, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook,
@@ -307,6 +307,6 @@ impl<'g> ActionIter<'g> {
         P: AsRef<Path>,
         S: AsRef<Path>,
     {
-        start.as_ref().join(path).clean()
+        fse::clean(start.as_ref().join(path))
     }
 }
