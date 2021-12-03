@@ -22,6 +22,7 @@ pub struct Options {
     #[clap(long, about = "Clear any existing cache")]
     pub clear_cache: bool,
 
+    #[clap(required = true)]
     pub packages: Vec<String>,
 }
 
@@ -32,11 +33,6 @@ pub fn cli(opts: Options) -> Result<(), ()> {
 
 #[inline]
 fn run(opts: Options) -> Result<(), ()> {
-    if opts.packages.is_empty() {
-        tl_info!("No packages specified, exiting");
-        return Ok(());
-    }
-
     tl_info!("Loading packages");
     let _graph = crate::load::load(&opts.packages);
 
