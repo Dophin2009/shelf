@@ -55,7 +55,7 @@ pub struct PackageGraph {
     /// Directional graph of package dependencies.
     graph: DiGraphMap<u64, ()>,
     /// Map storing package data.
-    datamap: HashMap<u64, (PathBuf, PackageData)>,
+    datamap: HashMap<u64, PackageData>,
 }
 
 impl PackageGraph {
@@ -68,12 +68,12 @@ impl PackageGraph {
     }
 
     #[inline]
-    pub fn get<P>(&self, path: P) -> Option<(&PathBuf, &PackageData)>
+    pub fn get<P>(&self, path: P) -> Option<&PackageData>
     where
         P: AsRef<Path>,
     {
         let id = self.keyid(&path);
-        self.datamap.get(&id).map(|(path, data)| (path, data))
+        self.datamap.get(&id)
     }
 
     #[inline]
@@ -88,16 +88,13 @@ impl PackageGraph {
     /// Inserts a package to the graph, returning the existing data if it exists and `None` if it
     /// does not.
     #[inline]
-    pub fn add_package<P>(&mut self, path: P, data: PackageData) -> Option<PackageData>
-    where
-        P: AsRef<Path>,
+    pub fn add_package(&mut self, data: PackageData) -> Option<PackageData>
     {
-        let id = self.keyid(&path);
+        let id = self.keyid(&data.path);
 
-        let path = path.as_ref().to_path_buf();
-        let existing = self.datamap.insert(id, (path, data));
+        let existing = self.datamap.insert(id, data);
         match existing {
-            Some((_, data)) => Some(data),
+            Some(data) => Some(data),
             None => {
                 self.graph.add_node(id);
                 None
@@ -114,7 +111,7 @@ impl PackageGraph {
     {
         let id = self.keyid(&path);
 
-        let data = self.datamap.remove(&id).map(|(_, data)| data);
+        let data = self.datamap.remove(&id);
         if data.is_some() {
             self.graph.remove_node(id);
         }
@@ -143,6 +140,7 @@ impl PackageGraph {
     {
         let id = self.keyid(&path);
         let pid = self.keyid(&parent);
+
         match (self.datamap.get(&id), self.datamap.get(&pid)) {
             (Some(_), Some(_)) => {
                 self.graph.add_edge(pid, id, ());
@@ -225,7 +223,7 @@ impl PackageGraph {
             Ok(v) => v,
             Err(cycle) => {
                 let node_id = cycle.node_id();
-                let (_, data) = self.datamap.get(&node_id).unwrap();
+                let data = self.datamap.get(&node_id).unwrap();
                 return Err(CircularDependencyError(data.path.clone()));
             }
         };
@@ -257,26 +255,24 @@ where
     I: Iterator<Item = u64>,
 {
     order: I,
-    datamap: &'g HashMap<u64, (PathBuf, PackageData)>,
+    datamap: &'g HashMap<u64, PackageData>,
 }
 
 impl<'g, I> Iterator for Iter<'g, I>
 where
     I: Iterator<Item = u64>,
 {
-    type Item = (&'g Path, &'g PackageData);
+    type Item = &'g PackageData;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let id = self.order.next()?;
-        self.datamap
-            .get(&id)
-            .map(|(path, data)| (path.as_path(), data))
+        self.datamap.get(&id)
     }
 }
 
 pub struct IterMut<'g> {
-    inner: hash_map::IterMut<'g, u64, (PathBuf, PackageData)>,
+    inner: hash_map::IterMut<'g, u64, PackageData>,
 }
 
 impl<'g> Iterator for IterMut<'g> {
@@ -284,7 +280,7 @@ impl<'g> Iterator for IterMut<'g> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next().map(|(_, (_, v))| v)
+        self.inner.next().map(|(_, v)| v)
     }
 }
 
@@ -303,3 +299,10 @@ impl fmt::Display for CircularDependencyError {
 }
 
 impl std::error::Error for CircularDependencyError {}
+
+impl CircularDependencyError {
+    #[inline]
+    pub fn path(&self) -> &Path {
+        &self.0
+    }
+}

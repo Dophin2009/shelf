@@ -71,7 +71,7 @@ where
             .collect();
 
         // Add to package graph.
-        let _ = graph.add_package(&path, data);
+        let _ = graph.add_package(data);
 
         sl_debug!("Finished!");
 
