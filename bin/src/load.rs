@@ -55,7 +55,7 @@ where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
-    if !graph.contains(&path) {
+    let deps = if !graph.contains(&path) {
         let loader = SpecLoader::new(&path)?;
 
         sl_debug!("Reading package");
@@ -72,14 +72,20 @@ where
 
         // Add to package graph.
         let _ = graph.add_package(&path, data);
-        if let Some(parent) = parent {
-            let _ = graph.add_dependency(path, parent);
-        }
 
         sl_debug!("Finished!");
 
-        Ok(deps)
+        deps
     } else {
-        Ok(vec![])
+        vec![]
+    };
+
+    if let Some(parent) = parent {
+        let success = graph.add_dependency(&path, parent);
+        if !success {
+            unreachable!();
+        }
     }
+
+    Ok(deps)
 }
