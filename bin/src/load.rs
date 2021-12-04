@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 
 use shelflib::graph::PackageGraph;
@@ -7,13 +7,14 @@ use shelflib::load::{LoadError, SpecLoader};
 use crate::ctxpath::CtxPath;
 
 #[inline]
-pub fn load(paths: Vec<PathBuf>) -> Result<PackageGraph, ()> {
+pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPath>), ()> {
     let mut paths: VecDeque<_> = paths
         .into_iter()
         .map(|path| (CtxPath::from_cwd(path), None))
         .collect();
 
     let mut pg = PackageGraph::new();
+    let mut pm = HashMap::new();
     let mut errors = Vec::new();
     while let Some((path, parent)) = paths.pop_front() {
         match load_one(&path, parent.as_ref(), &mut pg) {
@@ -23,6 +24,7 @@ pub fn load(paths: Vec<PathBuf>) -> Result<PackageGraph, ()> {
             Ok(deps) => {
                 let deps = deps.into_iter().map(|dpath| (dpath, Some(path.clone())));
                 paths.extend(deps);
+                pm.insert(path.abs().to_path_buf(), path);
             }
         };
     }
@@ -42,7 +44,7 @@ pub fn load(paths: Vec<PathBuf>) -> Result<PackageGraph, ()> {
 
         Err(())
     } else {
-        Ok(pg)
+        Ok((pg, pm))
     }
 }
 

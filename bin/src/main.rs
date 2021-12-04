@@ -4,6 +4,7 @@ mod ctxpath;
 
 mod load;
 
+use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
 use std::process;
@@ -57,28 +58,33 @@ pub fn cli(opts: Options) -> Result<(), ()> {
 fn run(opts: Options) -> Result<(), ()> {
     let packages: Vec<_> = opts
         .packages
-        .into_iter()
+        .iter()
         .map(|path| PathBuf::from(path))
         .collect();
 
-    tl_info!("Loading packages");
-    let graph = crate::load::load(packages)?;
-
-    tl_info!("Processing packages");
+    let (graph, pm) = crate::load::load(packages)?;
     match graph.order() {
-        Ok(order) => {
-            order.map(|pd| process(pd)).collect::<Result<Vec<_>, _>>()?;
+        Err(err) => {
+            tl_error!(
+                "{$red}Circular dependency detected for:{/$} '{[green]}'",
+                err.path().display()
+            );
+            return Err(());
         }
-        Err(err) => tl_error!(
-            "{$red}Circular dependency detected for:{/$} '{[green]}'",
-            err.path().display()
-        ),
+        Ok(order) => {
+            order
+                .map(|pd| process(pd, &pm, &opts))
+                .collect::<Result<Vec<_>, _>>()?;
+        }
     }
 
     Ok(())
 }
 
 #[inline]
-fn process(pd: &PackageData) -> Result<(), ()> {
+fn process(pd: &PackageData, pm: &HashMap<PathBuf, CtxPath>, opts: &Options) -> Result<(), ()> {
+    let ctxpath = pm.get(&pd.path).unwrap();
+    tl_info!("Processing '{[green]}'", ctxpath.rel().display());
+
     Ok(())
 }
