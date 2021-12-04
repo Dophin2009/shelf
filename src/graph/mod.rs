@@ -88,8 +88,7 @@ impl PackageGraph {
     /// Inserts a package to the graph, returning the existing data if it exists and `None` if it
     /// does not.
     #[inline]
-    pub fn add_package(&mut self, data: PackageData) -> Option<PackageData>
-    {
+    pub fn add_package(&mut self, data: PackageData) -> Option<PackageData> {
         let id = self.keyid(&data.path);
 
         let existing = self.datamap.insert(id, data);
