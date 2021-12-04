@@ -6,4 +6,4 @@ pub mod spec;
 pub mod journal;
 pub mod op;
 
-mod fse;
+pub mod fse;
