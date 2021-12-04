@@ -28,7 +28,7 @@ macro_rules! tl_info {
 // Utility for creating sl_* macros.
 macro_rules! sl_fmt {
     ($level:ident; $color:literal; [$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
-        bunt_logger::$level!(["{:4}", "{$", $color, "}>{/$} ", $($format_str),+], "" $(, $arg )*)
+        bunt_logger::$level!(["{:2}", "{$", $color, "}>{/$} ", $($format_str),+], "" $(, $arg )*)
     };
 }
 
@@ -80,7 +80,7 @@ macro_rules! sl_trace {
 // Utility for creating sl_* macros.
 macro_rules! sl_i_fmt {
     ($level:ident; $color:literal; [$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
-        bunt_logger::$level!(["{:4}", "{$", $color, "}>{/$} ", "{:2}", $($format_str),+], "", "" $(, $arg )*)
+        bunt_logger::$level!(["{:2}", "{$", $color, "}>{/$} ", "{:2}", $($format_str),+], "", "" $(, $arg )*)
     };
 }
 
