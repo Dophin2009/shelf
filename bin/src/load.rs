@@ -4,18 +4,19 @@ use std::path::{Path, PathBuf};
 use shelflib::graph::PackageGraph;
 use shelflib::load::{LoadError, SpecLoader};
 
+use crate::ctxpath::CtxPath;
+
 #[inline]
-pub fn load(paths: &[String]) -> Result<PackageGraph, ()> {
+pub fn load(paths: Vec<PathBuf>) -> Result<PackageGraph, ()> {
     let mut paths: VecDeque<_> = paths
-        .iter()
-        .map(|path| (PathBuf::from(path), None))
+        .into_iter()
+        .map(|path| (CtxPath::from_cwd(path), None))
         .collect();
 
     let mut pg = PackageGraph::new();
     let mut errors = Vec::new();
     while let Some((path, parent)) = paths.pop_front() {
-        tl_info!("Loading package '{[green]}'", path.display());
-        match load_one(&path, parent, &mut pg) {
+        match load_one(&path, parent.as_ref(), &mut pg) {
             Err(err) => {
                 errors.push(err);
             }
@@ -46,17 +47,18 @@ pub fn load(paths: &[String]) -> Result<PackageGraph, ()> {
 }
 
 #[inline]
-fn load_one<P, Q>(
-    path: P,
-    parent: Option<Q>,
+fn load_one(
+    path: &CtxPath,
+    parent: Option<&CtxPath>,
     graph: &mut PackageGraph,
-) -> Result<Vec<PathBuf>, LoadError>
-where
-    P: AsRef<Path>,
-    Q: AsRef<Path>,
-{
-    let deps = if !graph.contains(&path) {
-        let loader = SpecLoader::new(&path)?;
+) -> Result<Vec<CtxPath>, LoadError> {
+    tl_info!("Loading package '{[green]}'", path.rel().display());
+
+    let deps = if graph.contains(path.abs()) {
+        tl_info!("Already done, skipping!");
+        vec![]
+    } else {
+        let loader = SpecLoader::new(&path.abs())?;
 
         sl_debug!("Reading package");
         let loader = loader.read()?;
@@ -67,7 +69,11 @@ where
 
         let deps = data
             .dep_paths()
-            .inspect(|dpath| sl_debug!("Queueing dependency '{[green]}'", dpath.display()))
+            .map(|dpath| CtxPath::from_cwd(dpath))
+            .inspect(|dpath| {
+                let dpath_rel = CtxPath::new(dpath.abs(), &data.path).unwrap();
+                sl_debug!("Queueing dependency '{[green]}'", dpath_rel.rel().display())
+            })
             .collect();
 
         // Add to package graph.
@@ -76,12 +82,10 @@ where
         sl_debug!("Finished!");
 
         deps
-    } else {
-        vec![]
     };
 
     if let Some(parent) = parent {
-        let success = graph.add_dependency(&path, parent);
+        let success = graph.add_dependency(path.abs(), parent.abs());
         if !success {
             unreachable!();
         }

@@ -1,25 +1,21 @@
 #[macro_use]
 mod output;
+mod ctxpath;
 
 mod load;
 
 use std::env;
+use std::path::PathBuf;
 use std::process;
 
 use bunt_logger::{ColorChoice, Level};
 use clap::Parser;
+use shelflib::graph::PackageData;
+
+use crate::ctxpath::CtxPath;
 
 fn main() {
     let opts = Options::parse();
-
-    bunt_logger::with()
-        .quiet(opts.quiet)
-        .level(match opts.verbosity {
-            0 => Level::Info,
-            1 => Level::Debug,
-            _ => Level::Trace,
-        })
-        .stderr(ColorChoice::Auto);
 
     if cli(opts).is_err() {
         process::exit(1);
@@ -45,13 +41,44 @@ pub struct Options {
 
 #[inline]
 pub fn cli(opts: Options) -> Result<(), ()> {
+    bunt_logger::with()
+        .quiet(opts.quiet)
+        .level(match opts.verbosity {
+            0 => Level::Info,
+            1 => Level::Debug,
+            _ => Level::Trace,
+        })
+        .stderr(ColorChoice::Auto);
+
     run(opts).map_err(|_| tl_error!("{$red+bold}Fatal errors were encountered! See above.{/$}"))
 }
 
 #[inline]
 fn run(opts: Options) -> Result<(), ()> {
-    tl_info!("Loading packages");
-    let _graph = crate::load::load(&opts.packages);
+    let packages: Vec<_> = opts
+        .packages
+        .into_iter()
+        .map(|path| PathBuf::from(path))
+        .collect();
 
+    tl_info!("Loading packages");
+    let graph = crate::load::load(packages)?;
+
+    tl_info!("Processing packages");
+    match graph.order() {
+        Ok(order) => {
+            order.map(|pd| process(pd)).collect::<Result<Vec<_>, _>>()?;
+        }
+        Err(err) => tl_error!(
+            "{$red}Circular dependency detected for:{/$} '{[green]}'",
+            err.path().display()
+        ),
+    }
+
+    Ok(())
+}
+
+#[inline]
+fn process(pd: &PackageData) -> Result<(), ()> {
     Ok(())
 }
