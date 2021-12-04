@@ -1,8 +1,10 @@
 use std::collections::{HashMap, VecDeque};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-use shelflib::graph::PackageGraph;
-use shelflib::load::{LoadError, SpecLoader};
+use shelflib::{
+    graph::PackageGraph,
+    load::{LoadError, SpecLoader},
+};
 
 use crate::ctxpath::CtxPath;
 
@@ -19,7 +21,7 @@ pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPa
     while let Some((path, parent)) = paths.pop_front() {
         match load_one(&path, parent.as_ref(), &mut pg) {
             Err(err) => {
-                errors.push(err);
+                errors.push((path, err));
             }
             Ok(deps) => {
                 let deps = deps.into_iter().map(|dpath| (dpath, Some(path.clone())));
@@ -30,14 +32,18 @@ pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPa
     }
 
     if !errors.is_empty() {
-        sl_error!("{$red}Encountered errors while trying to load packages:{/$}\n");
-        for err in errors {
+        sl_error!("{$bold}{$red}fatal:{/$} encountered errors while trying to load packages{/$}");
+        for (path, err) in errors {
+            sl_i_error!("in '{[green]}':", path.abs().display());
             match err {
+                // TODO: More specific error messages
                 LoadError::Read(err) => {
-                    sl_error!("{$red}Couldn't read the package config:{/$} {}", err);
+                    sl_ii_error!(
+                        "couldn't read the package config: are you sure it exists ({$dimmed}package.lua{/$})?",
+                    );
                 }
                 LoadError::Lua(err) => {
-                    sl_error!("{$red}Couldn't evaluate Lua:{/$} {}", err);
+                    sl_ii_error!("couldn't evaluate Lua: {}",  err);
                 }
             }
         }

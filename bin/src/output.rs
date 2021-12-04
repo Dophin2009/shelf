@@ -77,7 +77,7 @@ macro_rules! sl_trace {
     };
 }
 
-// Utility for creating sl_* macros.
+// Utility for creating sl_i_* macros.
 macro_rules! sl_i_fmt {
     ($level:ident; $color:literal; [$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
         bunt_logger::$level!(["{:2}", "{$", $color, "}>{/$} ", "{:2}", $($format_str),+], "", "" $(, $arg )*)
@@ -126,6 +126,58 @@ macro_rules! sl_i_trace {
     };
     ([$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
         sl_i_fmt!(trace; "dimmed"; [$($format_str),+] $(, $arg )*)
+    };
+}
+
+// Utility for creating sl_ii_* macros.
+macro_rules! sl_ii_fmt {
+    ($level:ident; $color:literal; [$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
+        bunt_logger::$level!(["{:2}", "{$", $color, "}>{/$} ", "{:4}", $($format_str),+], "", "" $(, $arg )*)
+    };
+}
+
+macro_rules! sl_ii_error {
+    ($format_str:literal $(, $arg:expr)* $(,)?) => {
+        sl_ii_error!([$format_str] $(, $arg )*)
+    };
+    ([$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
+        sl_ii_fmt!(error; "red"; [$($format_str),+] $(, $arg )*)
+    };
+}
+
+macro_rules! sl_ii_warn {
+    ($format_str:literal $(, $arg:expr)* $(,)?) => {
+        sl_ii_warn!([$format_str] $(, $arg )*)
+    };
+    ([$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
+        sl_ii_fmt!(warn; "yellow"; [$($format_str),+] $(, $arg )*)
+    };
+}
+
+macro_rules! sl_ii_info {
+    ($format_str:literal $(, $arg:expr)* $(,)?) => {
+        sl_ii_info!([$format_str] $(, $arg )*)
+    };
+    ([$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
+        sl_ii_fmt!(info; "dimmed"; [$($format_str),+] $(, $arg )*)
+    };
+}
+
+macro_rules! sl_ii_debug {
+    ($format_str:literal $(, $arg:expr)* $(,)?) => {
+        sl_ii_debug!([$format_str] $(, $arg )*)
+    };
+    ([$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
+        sl_ii_fmt!(debug; "dimmed"; [$($format_str),+] $(, $arg )*)
+    };
+}
+
+macro_rules! sl_ii_trace {
+    ($format_str:literal $(, $arg:expr)* $(,)?) => {
+        sl_ii_trace!([$format_str] $(, $arg )*)
+    };
+    ([$($format_str:literal),+ $(,)?] $(, $arg:expr)* $(,)?) => {
+        sl_ii_fmt!(trace; "dimmed"; [$($format_str),+] $(, $arg )*)
     };
 }
 
