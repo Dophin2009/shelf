@@ -30,6 +30,7 @@ fn main() {
     author = clap::crate_authors!(", "),
     about = clap::crate_description!(),
     license = clap::crate_license!(),
+    after_help = concat!("Any and all bug reports and contributors are greatly appreciated at ", env!("CARGO_PKG_REPOSITORY"), "!")
 )]
 pub struct Options {
     #[clap(short, long, parse(from_occurrences), about = "Message verbosity")]
