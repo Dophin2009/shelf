@@ -29,7 +29,7 @@ lua53 = ["mlua/lua53"]
 lua54 = ["mlua/lua54"]
 luajit = ["mlua/luajit"]
 lua-vendor = ["mlua/vendored"]
-unsafe = []
+lua-unsafe = []
 
 [workspace]
 members = [".", "bin"]

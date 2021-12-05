@@ -73,12 +73,11 @@ impl SpecLoaderEmpty {
         })
     }
 
-
     #[inline]
     fn lua_instance() -> Result<Lua, mlua::Error> {
-        #[cfg(not(feature = "unsafe"))]
+        #[cfg(not(feature = "lua-unsafe"))]
         let lua = Lua::new();
-        #[cfg(feature = "unsafe")]
+        #[cfg(feature = "lua-unsafe")]
         let lua = unsafe { Lua::unsafe_new() };
 
         lua.globals().set("pkg", SpecObject::new())?;

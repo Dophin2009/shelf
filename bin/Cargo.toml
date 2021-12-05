@@ -15,4 +15,4 @@ shelflib = { path = "..", features = ["lua54"] }
 [features]
 default = []
 vendor = ["shelflib/lua-vendor"]
-unsafe = ["shelflib/unsafe"]
+unsafe = ["shelflib/lua-unsafe"]
