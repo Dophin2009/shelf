@@ -46,16 +46,18 @@ end
 -- selene: allow(unused_variable)
 function link(arg)
 	if type(arg) == "table" then
-		arg.link_type = "link"
+		arg.type = "link"
 	end
 	file(arg)
 end
 
 -- selene: allow(unused_variable)
 function copy(arg)
-	if type(arg) == "table" then
-		arg.link_type = "copy"
+	if type(arg) == "string" then
+		arg = { arg }
 	end
+
+	arg.type = "copy"
 	file(arg)
 end
 
