@@ -120,9 +120,9 @@ impl LinkAction {
                 let target = fs::read_link(dest).unwrap();
                 if target == *src {
                     return Ok(Res::Skip(Skip::DestExists));
+                } else {
+                    (true, false)
                 }
-
-                (true, false)
             }
 
             // For existing files and directories, warn about an overwrite.
@@ -184,7 +184,7 @@ impl LinkAction {
             // For directories and symlinks, warn about an overwrite.
             // Remove the directory, and then link.
             Ok(meta) if meta.is_dir() => (true, true),
-            Ok(meta) if meta.is_file() => (true, false),
+            Ok(meta) if meta.is_file() || meta.is_symlink() => (true, false),
 
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
             // TODO: Treat error as error here?
