@@ -24,7 +24,13 @@ fn main() {
 }
 
 #[derive(Parser, Debug, Clone)]
-#[clap(version = clap::crate_version!(), author = clap::crate_authors!(), about = clap::crate_description!())]
+#[clap(
+    name = clap::crate_name!(),
+    version = clap::crate_version!(),
+    author = clap::crate_authors!(", "),
+    about = clap::crate_description!(),
+    license = clap::crate_license!(),
+)]
 pub struct Options {
     #[clap(short, long, parse(from_occurrences), about = "Message verbosity")]
     pub verbosity: usize,

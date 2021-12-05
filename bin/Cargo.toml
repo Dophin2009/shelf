@@ -1,6 +1,8 @@
 [package]
 name = "shelf"
 version = "0.1.0"
+author = "Eric Zhao <21zhaoe@protonmail.com>"
+description = "Dotfiles package manager."
 edition = "2018"
 
 [dependencies]
