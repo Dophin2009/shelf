@@ -25,10 +25,7 @@ fn main() {
 
 #[derive(Parser, Debug, Clone)]
 #[clap(
-    name = clap::crate_name!(),
-    version = clap::crate_version!(),
-    author = clap::crate_authors!(", "),
-    about = clap::crate_description!(),
+    author, version, about,
     license = clap::crate_license!(),
     after_help = concat!("Any and all bug reports and contributors are greatly appreciated at ", env!("CARGO_PKG_REPOSITORY"), "!")
 )]
@@ -41,7 +38,11 @@ pub struct Options {
     #[clap(short, long, about = "Pretend to process")]
     pub noop: bool,
 
-    #[clap(short, long, about = "Linking destination (defaults to $HOME)")]
+    #[clap(
+        short,
+        long,
+        about = "Linking destination (defaults to home directory)"
+    )]
     pub home: Option<String>,
 
     #[clap(required = true)]

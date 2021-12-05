@@ -1,7 +1,8 @@
 [package]
 name = "shelf"
 version = "0.1.0"
-author = "Eric Zhao <21zhaoe@protonmail.com>"
+license = "GPL-3.0-or-later"
+authors = ["Eric Zhao <21zhaoe@protonmail.com>"]
 description = "Dotfiles package manager."
 homepage = "https://github.com/Dophin2009/shelf"
 repository = "https://github.com/Dophin2009/shelf.git"
