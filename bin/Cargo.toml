@@ -10,13 +10,8 @@ clap = "3.0.0-beta.5"
 directories-next = "2.0"
 pathdiff = "0.2"
 
-shelflib = { path = ".." }
+shelflib = { path = "..", features = ["lua54"] }
 
 [features]
 default = []
-lua51 = ["shelflib/lua51"]
-lua52 = ["shelflib/lua52"]
-lua53 = ["shelflib/lua53"]
-lua54 = ["shelflib/lua54"]
-luajit = ["shelflib/luajit"]
-unsafe = []
+unsafe = ["shelflib/unsafe"]
