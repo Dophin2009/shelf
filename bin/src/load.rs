@@ -7,6 +7,11 @@ use shelflib::{
 };
 
 use crate::ctxpath::CtxPath;
+use crate::pretty::{
+    fatal,
+    output::{sl_debug, sl_error, sli_error, slii_error, tl_debug, tl_info},
+    path, ppath,
+};
 
 #[inline]
 pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPath>), ()> {
@@ -32,18 +37,19 @@ pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPa
     }
 
     if !errors.is_empty() {
-        sl_error!("{$bold}{$red}fatal:{/$} encountered errors while trying to load packages{/$}");
+        sl_error(fatal("encountered errors while trying to load packages"));
         for (path, err) in errors {
-            sl_i_error!("in '{[green]}':", path.abs().display());
+            sli_error(format!("in {}:", ppath(path.abs())));
             match err {
                 // TODO: More specific error messages
                 LoadError::Read(err) => {
-                    sl_ii_error!(
-                        "couldn't read the package config: are you sure it exists ({$dimmed}package.lua{/$})?",
-                    );
+                    slii_error(format!(
+                        "couldn't read the package config: are you sure it exists ({})?",
+                        ppath("package.lua")
+                    ));
                 }
                 LoadError::Lua(err) => {
-                    sl_ii_error!("couldn't evaluate Lua: {}",  err);
+                    slii_error(format!("couldn't evaluate Lua: {}", err));
                 }
             }
         }
@@ -60,18 +66,18 @@ fn load_one(
     parent: Option<&CtxPath>,
     graph: &mut PackageGraph,
 ) -> Result<Vec<CtxPath>, LoadError> {
-    tl_info!("Loading package '{[green]}'", path.rel().display());
+    tl_info(format!("Loading package {}", ppath(path.rel())));
 
     let deps = if graph.contains(path.abs()) {
-        tl_info!("Already done, skipping!");
+        tl_debug("Already done, skipping!");
         vec![]
     } else {
         let loader = SpecLoader::new(&path.abs())?;
 
-        sl_debug!("Reading package");
+        sl_debug("Reading package");
         let loader = loader.read()?;
 
-        sl_debug!("Evaluating Lua");
+        sl_debug("Evaluating Lua");
         let loader = loader.eval()?;
         let data = loader.finish()?;
 
@@ -80,14 +86,14 @@ fn load_one(
             .map(|dpath| CtxPath::from_cwd(dpath))
             .inspect(|dpath| {
                 let dpath_rel = CtxPath::new(dpath.abs(), &data.path).unwrap();
-                sl_debug!("Queueing dependency '{[green]}'", dpath_rel.rel().display())
+                sl_debug(format!("Queueing dependency {}", ppath(dpath_rel.rel())));
             })
             .collect();
 
         // Add to package graph.
         let _ = graph.add_package(data);
 
-        sl_debug!("Finished!");
+        sl_debug("Finished!");
 
         deps
     };

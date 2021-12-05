@@ -4,19 +4,24 @@ use shelflib::action::link::{Res, Skip};
 use shelflib::action::{link::Error, LinkAction, Resolve};
 
 use crate::ctxpath::CtxPath;
+use crate::pretty::error;
+use crate::pretty::{
+    arrshowdim,
+    output::{sl_debug, sli_error, sli_warn, slii_error, slii_warn},
+    ppath, skipping, var,
+};
 
 #[inline]
 pub fn process(action: LinkAction, path: &CtxPath, dest: &PathBuf) -> Result<(), ()> {
     let src = CtxPath::new(&action.src, path.abs()).unwrap();
     let dest = CtxPath::new(&action.dest, dest).unwrap();
 
-    let opstr = if action.copy { "Copying" } else { "Linking" };
-    sl_debug!(
-        "{} '{[green]}' to '{[green]}'",
-        opstr,
-        src.rel().display(),
-        dest.rel().display(),
-    );
+    sl_debug(format!(
+        "{} {} to {}",
+        if action.copy { "Copying" } else { "Linking" },
+        ppath(src.rel()),
+        ppath(dest.rel())
+    ));
 
     let res = match action.resolve() {
         Ok(res) => res,
@@ -39,9 +44,13 @@ pub fn process(action: LinkAction, path: &CtxPath, dest: &PathBuf) -> Result<(),
 fn process_skip(src: &CtxPath, dest: &CtxPath, skip: Skip) {
     match skip {
         Skip::SameSrcDest => {
-            sl_i_warn!("{$yellow+bold}skipping:{/$} {$blue}src{/$} and {$blue}dest{/$} are the same");
-            sl_ii_warn!("{$dimmed}-> {}{/$}", src.abs().display());
-            sl_ii_warn!("{$dimmed}-> {}{/$}", dest.abs().display());
+            sli_warn(skipping(format!(
+                "{} and {} are the same",
+                var("src"),
+                var("dest")
+            )));
+            slii_warn(arrshowdim(src.abs().display()));
+            slii_warn(arrshowdim(dest.abs().display()));
         }
         Skip::OptMissing => {}
         Skip::DestExists => {}
@@ -52,11 +61,12 @@ fn process_skip(src: &CtxPath, dest: &CtxPath, skip: Skip) {
 fn process_error(src: &CtxPath, _dest: &CtxPath, err: Error) {
     match err {
         Error::SrcMissing => {
-            sl_i_error!(
-                "{$red+bold}error:{/$} {$blue}src{/$} missing: '{[green]}'",
-                src.rel().display()
-            );
-            sl_ii_error!("{$dimmed}-> {}{/$}", src.abs().display());
+            sli_error(error(format!(
+                "{} missing: {}",
+                var("src"),
+                ppath(src.rel())
+            )));
+            slii_error(arrshowdim(src.abs().display()));
         }
     }
 }

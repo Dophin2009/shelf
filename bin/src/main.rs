@@ -1,6 +1,5 @@
-#[macro_use]
-mod output;
 mod ctxpath;
+mod pretty;
 
 mod load;
 mod process;
@@ -8,11 +7,13 @@ mod process;
 use std::env;
 use std::path::PathBuf;
 
-use bunt_logger::{ColorChoice, Level};
 use clap::Parser;
 use directories_next::BaseDirs;
+use log::Level;
+use stderrlog::ColorChoice;
 use shelflib::{action::Action, graph::PackageData};
 
+use crate::pretty::{fatal, output::tl_error};
 use crate::process::ProcessOptions;
 
 fn main() {
@@ -27,7 +28,8 @@ fn main() {
 #[clap(
     author, version, about,
     license = clap::crate_license!(),
-    after_help = concat!("Any and all bug reports and contributors are greatly appreciated at ", env!("CARGO_PKG_REPOSITORY"), "!")
+    after_help = concat!("Any and all bug reports and contributors are greatly appreciated at ",
+                         env!("CARGO_PKG_REPOSITORY"), "!")
 )]
 pub struct Options {
     #[clap(short, long, parse(from_occurrences), about = "Message verbosity")]
@@ -51,16 +53,15 @@ pub struct Options {
 
 #[inline]
 pub fn cli(opts: Options) -> Result<(), ()> {
-    bunt_logger::with()
+    stderrlog::new()
         .quiet(opts.quiet)
-        .level(match opts.verbosity {
-            0 => Level::Info,
-            1 => Level::Debug,
-            _ => Level::Trace,
-        })
-        .stderr(ColorChoice::Auto);
+        .verbosity(opts.verbosity + 2)
+        .show_level(false)
+        .color(ColorChoice::Never)
+        .init()
+        .unwrap();
 
-    run(opts).map_err(|_| tl_error!("{$red+bold}fatal:{/$} errors were encountered! See above."))
+    run(opts).map_err(|_| tl_error(fatal("errors were encountered; see above.")))
 }
 
 #[inline]
@@ -93,6 +94,9 @@ fn process_opts(opts: Options) -> Result<ProcessOptions, ()> {
                 dest,
             })
         }
-        None => Err(()),
+        None => {
+            tl_error(fatal("couldn't determine home directory; try --home"));
+            Err(())
+        }
     }
 }
