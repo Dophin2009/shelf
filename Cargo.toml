@@ -1,6 +1,11 @@
 [package]
 name = "shelflib"
 version = "0.1.0"
+license = "GPL-3.0-or-later"
+authors = ["Eric Zhao <21zhaoe@protonmail.com>"]
+description = "Dotfiles package manager, library."
+homepage = "https://github.com/Dophin2009/shelf"
+repository = "https://github.com/Dophin2009/shelf.git"
 edition = "2018"
 
 [dependencies]
