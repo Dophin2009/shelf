@@ -13,7 +13,7 @@ use log::Level;
 use stderrlog::ColorChoice;
 use shelflib::{action::Action, graph::PackageData};
 
-use crate::pretty::{fatal, output::tl_error};
+use crate::pretty::{semantic::fatal, output::tl_error};
 use crate::process::ProcessOptions;
 
 fn main() {

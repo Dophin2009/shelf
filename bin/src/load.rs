@@ -8,9 +8,9 @@ use shelflib::{
 
 use crate::ctxpath::CtxPath;
 use crate::pretty::{
-    fatal,
     output::{sl_debug, sl_error, sli_error, slii_error, tl_debug, tl_info},
-    path, ppath,
+    semantic::{path, ppath,
+    fatal,}
 };
 
 #[inline]

@@ -1,12 +1,40 @@
 use std::fmt::Display;
 
-use super::{fatal, join2, pretty, Prettify, Pretty};
+use super::{join2, pretty, Prettify, Pretty};
+
+pub trait Emit: Display {
+    #[inline]
+    fn error(&self) {
+        error(self);
+    }
+
+    #[inline]
+    fn warn(&self) {
+        warn(self);
+    }
+    #[inline]
+    fn info(&self) {
+        info(self);
+    }
+
+    #[inline]
+    fn trace(&self) {
+        trace(self);
+    }
+
+    #[inline]
+    fn debug(&self) {
+        debug(self);
+    }
+}
+
+impl<D> Emit for Pretty<D> where D: Display {}
 
 macro_rules! logfn {
     ($level:ident) => {
         #[inline]
         pub fn $level<D: Display>(d: D) {
-            log::$level!("{}", format!("{}", d));
+            log::$level!("{}", d);
         }
     };
     ($($level:ident),*) => {

@@ -10,9 +10,8 @@ use shelflib::{
 
 use crate::ctxpath::CtxPath;
 use crate::pretty::{
-    fatal,
+    semantic::{fatal, ppath},
     output::{tl_error, tl_info},
-    ppath,
 };
 
 #[derive(Debug, Clone)]

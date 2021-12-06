@@ -7,9 +7,8 @@ use shelflib::action::{
 
 use crate::ctxpath::CtxPath;
 use crate::pretty::{
-    arrshowdim, error,
     output::{sl_debug, sl_info, sli_debug, sli_error, sli_warn, slii_error, slii_warn},
-    ppath, skipping, var, warning,
+    semantic::{arrshowdim, error, ppath, skipping, var, warning},
 };
 
 #[inline]
@@ -50,10 +49,7 @@ fn process_normal(src: &CtxPath, dest: &CtxPath, ops: Vec<Op>) {
 
 #[inline]
 fn process_overwrite(src: &CtxPath, dest: &CtxPath, ops: Vec<Op>) {
-    sli_warn(warning(format!(
-        "{} will be overwritten",
-        ppath(dest.rel())
-    )));
+    sli_warn(warning(format!("{} will be replaced", ppath(dest.rel()))));
     slii_warn(arrshowdim(dest.abs().display()));
 
     // TODO: Implement
