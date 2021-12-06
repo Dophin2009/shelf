@@ -10,10 +10,13 @@ use std::path::PathBuf;
 use clap::Parser;
 use directories_next::BaseDirs;
 use log::Level;
-use stderrlog::ColorChoice;
 use shelflib::{action::Action, graph::PackageData};
+use stderrlog::ColorChoice;
 
-use crate::pretty::{semantic::fatal, output::tl_error};
+use crate::pretty::{
+    output::tl_error,
+    semantic::{error, fatal},
+};
 use crate::process::ProcessOptions;
 
 fn main() {
@@ -95,7 +98,7 @@ fn process_opts(opts: Options) -> Result<ProcessOptions, ()> {
             })
         }
         None => {
-            tl_error(fatal("couldn't determine home directory; try --home"));
+            tl_error(error("couldn't determine home directory; try --home"));
             Err(())
         }
     }

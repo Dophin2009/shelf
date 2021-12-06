@@ -9,8 +9,7 @@ use shelflib::{
 use crate::ctxpath::CtxPath;
 use crate::pretty::{
     output::{sl_debug, sl_error, sli_error, slii_error, tl_debug, tl_info},
-    semantic::{path, ppath,
-    fatal,}
+    semantic::{error, path, ppath},
 };
 
 #[inline]
@@ -37,7 +36,7 @@ pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPa
     }
 
     if !errors.is_empty() {
-        sl_error(fatal("encountered errors while trying to load packages"));
+        sl_error(error("encountered errors while trying to load packages"));
         for (path, err) in errors {
             sli_error(format!("in {}:", ppath(path.abs())));
             match err {
