@@ -14,7 +14,8 @@ use shelflib::{action::Action, graph::PackageData};
 use stderrlog::ColorChoice;
 
 use crate::pretty::{
-    output::tl_error,
+    nline,
+    output::Emit,
     semantic::{error, fatal},
 };
 use crate::process::ProcessOptions;
@@ -64,7 +65,7 @@ pub fn cli(opts: Options) -> Result<(), ()> {
         .init()
         .unwrap();
 
-    run(opts).map_err(|_| tl_error(fatal("errors were encountered; see above.")))
+    run(opts).map_err(|_| nline(fatal("errors were encountered; see above")).error())
 }
 
 #[inline]
@@ -98,7 +99,7 @@ fn process_opts(opts: Options) -> Result<ProcessOptions, ()> {
             })
         }
         None => {
-            tl_error(error("couldn't determine home directory; try --home"));
+            error("couldn't determine home directory; try --home").error();
             Err(())
         }
     }
