@@ -1,3 +1,5 @@
+pub mod output;
+
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 
@@ -7,10 +9,6 @@ use shelflib::{
 };
 
 use crate::ctxpath::CtxPath;
-use crate::pretty::{
-    output::{sl_debug, sl_error, sli_error, slii_error, tl_debug, tl_info},
-    semantic::{error, path, ppath},
-};
 
 #[inline]
 pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPath>), ()> {
@@ -36,21 +34,9 @@ pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPa
     }
 
     if !errors.is_empty() {
-        sl_error(error("encountered errors while trying to load packages"));
-        for (path, err) in errors {
-            sli_error(format!("in {}:", ppath(path.abs())));
-            match err {
-                // TODO: More specific error messages
-                LoadError::Read(err) => {
-                    slii_error(format!(
-                        "couldn't read the package config: are you sure it exists ({})?",
-                        ppath("package.lua")
-                    ));
-                }
-                LoadError::Lua(err) => {
-                    slii_error(format!("couldn't evaluate Lua: {}", err));
-                }
-            }
+        output::error_loading();
+        for (path, err) in errors.into_iter() {
+            output::error_loading_path(&path, err);
         }
 
         Err(())
@@ -65,34 +51,30 @@ fn load_one(
     parent: Option<&CtxPath>,
     graph: &mut PackageGraph,
 ) -> Result<Vec<CtxPath>, LoadError> {
-    tl_info(format!("Loading package {}", ppath(path.rel())));
-
     let deps = if graph.contains(path.abs()) {
-        tl_debug("Already done, skipping!");
+        output::info_loading_skip(path);
+
         vec![]
     } else {
+        output::info_loading(path);
+
         let loader = SpecLoader::new(&path.abs())?;
 
-        sl_debug("Reading package");
+        output::debug_reading();
         let loader = loader.read()?;
 
-        sl_debug("Evaluating Lua");
+        output::debug_evaling();
         let loader = loader.eval()?;
         let data = loader.finish()?;
 
         let deps = data
             .dep_paths()
             .map(|dpath| CtxPath::from_cwd(dpath))
-            .inspect(|dpath| {
-                let dpath_rel = CtxPath::new(dpath.abs(), &data.path).unwrap();
-                sl_debug(format!("Queueing dependency {}", ppath(dpath_rel.rel())));
-            })
+            .inspect(|dpath| output::debug_queue_dep(dpath, &data.path))
             .collect();
 
         // Add to package graph.
         let _ = graph.add_package(data);
-
-        sl_debug("Finished!");
 
         deps
     };
