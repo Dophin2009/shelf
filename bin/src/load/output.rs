@@ -3,20 +3,29 @@ use std::path::PathBuf;
 use shelflib::load::LoadError;
 
 use crate::ctxpath::CtxPath;
-use crate::pretty::output::Emit;
-use crate::pretty::semantic::{arrow, context, error, info, ppath};
-use crate::pretty::{indent2, indent4, joins2, joins3, paren};
+use crate::pretty::{
+    indent2, indent4, joins2, joins3,
+    output::Emit,
+    paren, pretty,
+    semantic::{arrow, context, contextm, error, info, ppath},
+    Prettify, Pretty,
+};
+
+#[inline]
+fn loading() -> Pretty<&'static str> {
+    pretty("loading").bold().dim()
+}
 
 #[inline]
 pub fn info_loading(path: &CtxPath) {
-    info(joins2("Loading package", ppath(path.rel()))).info();
+    joins2(loading(), path.rel().display()).info();
 }
 
 #[inline]
 pub fn info_loading_skip(path: &CtxPath) {
     info(joins3(
-        "Loading package",
-        ppath(path.rel()),
+        loading(),
+        path.rel().display(),
         paren("already done"),
     ))
     .info();
@@ -24,18 +33,18 @@ pub fn info_loading_skip(path: &CtxPath) {
 
 #[inline]
 pub fn debug_reading() {
-    indent2(arrow("Reading package")).debug();
+    indent2(arrow("reading package")).debug();
 }
 
 #[inline]
 pub fn debug_evaling() {
-    indent2(arrow("Evaluating Lua")).debug();
+    indent2(arrow("evaluating Lua")).debug();
 }
 
 #[inline]
 pub fn debug_queue_dep(dpath: &CtxPath, path: &PathBuf) {
     let dpath_rel = CtxPath::new(dpath.abs(), &path).unwrap();
-    indent2(arrow(joins2("Queueing dependency", ppath(dpath_rel.rel())))).debug();
+    indent2(arrow(joins2("queueing dependency", ppath(dpath_rel.rel())))).debug();
 }
 
 #[inline]
