@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use super::{join2, pretty, Prettify, Pretty};
+use super::{joins2, pretty, Prettify, Pretty};
 
 pub trait Emit: Display {
     #[inline]
@@ -57,7 +57,7 @@ macro_rules! xlfn {
         paste::paste! {
             #[inline]
             pub fn [<$hlevel _ $level>]<D: Display>(d: D) {
-                let f = join2([<$hlevel _prefix>]()$(.$modifier())*, d);
+                let f = joins2([<$hlevel _prefix>]()$(.$modifier())*, d);
                 $level(f)
             }
         }
