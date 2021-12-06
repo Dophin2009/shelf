@@ -6,25 +6,25 @@ use super::{concat2, joins2, pretty, string, Prettify, Pretty};
 /// A fatal error message.
 #[inline]
 pub fn fatal<D: Display>(d: D) -> Pretty<String> {
-    contextm(pretty("fatal").red().bold(), d)
+    joins2(pretty("fatal:").red().bold(), d)
 }
 
 /// A non-fatal error message.
 #[inline]
 pub fn error<D: Display>(d: D) -> Pretty<String> {
-    contextm(pretty("error").red().bold(), d)
+    joins2(pretty("error:").red().bold(), d)
 }
 
 /// A warning message.
 #[inline]
 pub fn warning<D: Display>(d: D) -> Pretty<String> {
-    contextm(pretty("warning").dark_yellow().bold(), d)
+    joins2(pretty("warning:").dark_yellow().bold(), d)
 }
 
 /// A skip warning.
 #[inline]
 pub fn skipping<D: Display>(d: D) -> Pretty<String> {
-    contextm(pretty("skipping").dark_yellow().bold(), d)
+    joins2(pretty("skipping:").dark_yellow().bold(), d)
 }
 
 #[inline]
