@@ -1,5 +1,5 @@
-mod ctxpath;
-mod pretty;
+pub mod ctxpath;
+pub mod pretty;
 
 mod load;
 mod process;
