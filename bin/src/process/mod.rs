@@ -1,4 +1,5 @@
 mod link;
+mod write;
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -57,6 +58,7 @@ fn process_one(
     aiter
         .map(|action| match action {
             Action::Link(action) => link::process(action, path, &opts.dest),
+            Action::Write(action) => write::process(action, path, &opts.dest),
             _ => Ok(()),
         })
         .collect::<Result<Vec<_>, _>>()?;
