@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, };
 
 use shelflib::action::{
     write::{Op, Res, Skip},
@@ -12,7 +12,7 @@ use crate::pretty::{
 };
 
 #[inline]
-pub fn process(action: WriteAction, path: &CtxPath, dest: &PathBuf) -> Result<(), ()> {
+pub fn process(action: WriteAction, _path: &CtxPath, dest: &Path) -> Result<(), ()> {
     let dest = CtxPath::new(&action.dest, dest).unwrap();
 
     sl_info(format!("Writing {}", ppath(dest.rel())));
@@ -31,12 +31,12 @@ pub fn process(action: WriteAction, path: &CtxPath, dest: &PathBuf) -> Result<()
 }
 
 #[inline]
-fn process_normal(dest: &CtxPath, ops: Vec<Op>) {
+fn process_normal(_dest: &CtxPath, _ops: Vec<Op>) {
     // TODO: Implement
 }
 
 #[inline]
-fn process_overwrite_contents(dest: &CtxPath, ops: Vec<Op>) {
+fn process_overwrite_contents(dest: &CtxPath, _ops: Vec<Op>) {
     sli_warn(warning(format!(
         "{} will be overwritten",
         ppath(dest.rel())
@@ -47,7 +47,7 @@ fn process_overwrite_contents(dest: &CtxPath, ops: Vec<Op>) {
 }
 
 #[inline]
-fn process_overwrite_file(dest: &CtxPath, ops: Vec<Op>) {
+fn process_overwrite_file(dest: &CtxPath, _ops: Vec<Op>) {
     sli_warn(warning(format!("{} will be replaced", ppath(dest.rel()))));
     slii_warn(arrowdim(dest.abs().display()));
 

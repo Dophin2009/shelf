@@ -3,7 +3,6 @@ pub mod semantic;
 
 use std::fmt::Display;
 use std::iter;
-use std::path::Path;
 
 // Re-export core style types.
 pub use crossterm::style::{style as pretty, StyledContent as Pretty, Stylize as Prettify};

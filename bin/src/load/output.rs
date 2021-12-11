@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::Path;
 
 use shelflib::load::LoadError;
 
@@ -6,8 +6,8 @@ use crate::ctxpath::CtxPath;
 use crate::pretty::{
     indent2, indent4, joins2, joins3,
     output::Emit,
-    paren, pretty,
-    semantic::{arrow, context, contextm, error, info, ppath},
+    pretty,
+    semantic::{arrow, context, error, ppath},
     Prettify, Pretty,
 };
 
@@ -22,7 +22,8 @@ pub fn info_loading(path: &CtxPath) {
 }
 
 #[inline]
-pub fn debug_skip(path: &CtxPath) {
+pub fn debug_skip(_path: &CtxPath) {
+    // TODO: Print path?
     indent2(arrow("already done")).debug();
 }
 
@@ -37,7 +38,7 @@ pub fn debug_evaling() {
 }
 
 #[inline]
-pub fn debug_queue_dep(dpath: &CtxPath, path: &PathBuf) {
+pub fn debug_queue_dep(dpath: &CtxPath, path: &Path) {
     let dpath_rel = CtxPath::new(dpath.abs(), &path).unwrap();
     indent2(arrow(joins2("queueing dependency", ppath(dpath_rel.rel())))).debug();
 }
@@ -53,7 +54,7 @@ pub fn error_loading_path(path: &CtxPath, err: LoadError) {
 
     let message = match err {
         // TODO: More specific error messages
-        LoadError::Read(err) => joins3(
+        LoadError::Read(_err) => joins3(
             "couldn't read the package config; are you sure",
             ppath("package.lua"),
             "exists?",

@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use shelflib::{
-    action::{Action, Resolve},
+    action::{Action, },
     graph::{PackageData, PackageGraph},
 };
 
@@ -32,7 +32,7 @@ pub fn process(
         }
         Ok(order) => {
             order
-                .map(|pd| process_one(pd, &pm, &opts))
+                .map(|pd| process_one(pd, pm, &opts))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(())
         }

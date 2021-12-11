@@ -11,8 +11,6 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use directories_next::BaseDirs;
-use log::Level;
-use shelflib::{action::Action, graph::PackageData};
 use stderrlog::ColorChoice;
 
 use crate::pretty::{
@@ -72,11 +70,7 @@ pub fn cli(opts: Options) -> Result<(), ()> {
 
 #[inline]
 fn run(opts: Options) -> Result<(), ()> {
-    let packages: Vec<_> = opts
-        .packages
-        .iter()
-        .map(|path| PathBuf::from(path))
-        .collect();
+    let packages: Vec<_> = opts.packages.iter().map(PathBuf::from).collect();
 
     let (graph, pm) = load::load(packages)?;
 

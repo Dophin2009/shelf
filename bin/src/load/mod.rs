@@ -69,7 +69,7 @@ fn load_one(
 
         let deps = data
             .dep_paths()
-            .map(|dpath| CtxPath::from_cwd(dpath))
+            .map(CtxPath::from_cwd)
             .inspect(|dpath| output::debug_queue_dep(dpath, &data.path))
             .collect();
 

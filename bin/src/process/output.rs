@@ -5,7 +5,7 @@ use crate::pretty::{
     indent2, joins2,
     output::Emit,
     pretty,
-    semantic::{contextm, error, ppath},
+    semantic::{contextm, error, },
     Prettify, Pretty,
 };
 

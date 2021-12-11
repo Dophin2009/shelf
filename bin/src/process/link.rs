@@ -1,14 +1,14 @@
-use std::path::PathBuf;
+use std::path::{Path, };
 
 use shelflib::action::{
-    link::{Error, Op, Res, Skip},
+    link::{Op, Res},
     LinkAction, Resolve,
 };
 
 use crate::ctxpath::CtxPath;
 
 #[inline]
-pub fn process(action: LinkAction, path: &CtxPath, dest: &PathBuf) -> Result<(), ()> {
+pub fn process(action: LinkAction, path: &CtxPath, dest: &Path) -> Result<(), ()> {
     let src = CtxPath::new(&action.src, path.abs()).unwrap();
     let dest = CtxPath::new(&action.dest, dest).unwrap();
 
@@ -52,12 +52,10 @@ mod output {
     use shelflib::action::link::{Error, Skip};
 
     use crate::ctxpath::CtxPath;
-    use crate::pretty::semantic::{skipping, warning};
     use crate::pretty::{
         indent2, indent4, indent6, joins2, joins3, joins4,
         output::Emit,
-        semantic::{arrow, arrowdim, bulletdim, contextm, error, ppath, var},
-        Pretty,
+        semantic::{arrow, bulletdim, contextm, error, ppath, skipping, var, warning},
     };
 
     #[inline]
