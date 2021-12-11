@@ -1,3 +1,5 @@
+mod output;
+
 mod link;
 mod write;
 
@@ -10,10 +12,6 @@ use shelflib::{
 };
 
 use crate::ctxpath::CtxPath;
-use crate::pretty::{
-    semantic::{fatal, ppath},
-    output::{tl_error, tl_info},
-};
 
 #[derive(Debug, Clone)]
 pub struct ProcessOptions {
@@ -29,10 +27,7 @@ pub fn process(
 ) -> Result<(), ()> {
     match graph.order() {
         Err(err) => {
-            tl_error(fatal(format!(
-                "circular dependency detected for: {}",
-                ppath(err.path())
-            )));
+            output::error_circular_dep(err);
             Err(())
         }
         Ok(order) => {
@@ -52,7 +47,8 @@ fn process_one(
 ) -> Result<(), ()> {
     // SAFETY: Path guaranteed to be in it by `load`.
     let path = pm.get(&pd.path).unwrap();
-    tl_info(format!("Processing {}", ppath(path.rel())));
+
+    output::info_processing(path);
 
     let aiter = pd.action_iter(&opts.dest);
     aiter

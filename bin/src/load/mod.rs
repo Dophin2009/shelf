@@ -1,4 +1,4 @@
-pub mod output;
+mod output;
 
 use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
@@ -51,12 +51,12 @@ fn load_one(
     parent: Option<&CtxPath>,
     graph: &mut PackageGraph,
 ) -> Result<Vec<CtxPath>, LoadError> {
+        output::info_loading(path);
     let deps = if graph.contains(path.abs()) {
-        output::info_loading_skip(path);
+        output::debug_skip(path);
 
         vec![]
     } else {
-        output::info_loading(path);
 
         let loader = SpecLoader::new(&path.abs())?;
 

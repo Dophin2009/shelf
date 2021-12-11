@@ -52,6 +52,16 @@ pub fn arrowdim<D: Display>(d: D) -> Pretty<String> {
     joins2("->", d).dim()
 }
 
+#[inline]
+pub fn bullet<D: Display>(d: D) -> Pretty<String> {
+    joins2(pretty("-").dim(), d)
+}
+
+#[inline]
+pub fn bulletdim<D: Display>(d: D) -> Pretty<String> {
+    joins2("-", d).dim()
+}
+
 /// A path.
 #[inline]
 pub fn path<D: Display>(d: D) -> Pretty<String> {

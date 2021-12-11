@@ -8,7 +8,7 @@ use shelflib::action::{
 use crate::ctxpath::CtxPath;
 use crate::pretty::{
     output::{sl_info, sli_debug, sli_warn, slii_warn},
-    semantic::{arrshowdim, ppath, skipping, var, warning},
+    semantic::{arrowdim, ppath, skipping, var, warning},
 };
 
 #[inline]
@@ -16,7 +16,7 @@ pub fn process(action: WriteAction, path: &CtxPath, dest: &PathBuf) -> Result<()
     let dest = CtxPath::new(&action.dest, dest).unwrap();
 
     sl_info(format!("Writing {}", ppath(dest.rel())));
-    sli_debug(arrshowdim(dest.abs().display()));
+    sli_debug(arrowdim(dest.abs().display()));
 
     let res = action.resolve();
 
@@ -41,7 +41,7 @@ fn process_overwrite_contents(dest: &CtxPath, ops: Vec<Op>) {
         "{} will be overwritten",
         ppath(dest.rel())
     )));
-    slii_warn(arrshowdim(dest.abs().display()));
+    slii_warn(arrowdim(dest.abs().display()));
 
     // TODO: Implement
 }
@@ -49,7 +49,7 @@ fn process_overwrite_contents(dest: &CtxPath, ops: Vec<Op>) {
 #[inline]
 fn process_overwrite_file(dest: &CtxPath, ops: Vec<Op>) {
     sli_warn(warning(format!("{} will be replaced", ppath(dest.rel()))));
-    slii_warn(arrshowdim(dest.abs().display()));
+    slii_warn(arrowdim(dest.abs().display()));
 
     // TODO: Implement
 }
@@ -63,7 +63,7 @@ fn process_skip(dest: &CtxPath, skip: Skip) {
                 var("dest"),
                 ppath(dest.rel())
             )));
-            slii_warn(arrshowdim(dest.abs().display()));
+            slii_warn(arrowdim(dest.abs().display()));
         }
     }
 }

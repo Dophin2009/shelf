@@ -13,7 +13,7 @@ use crate::pretty::{
 
 #[inline]
 fn loading() -> Pretty<&'static str> {
-    pretty("loading").bold().dim()
+    pretty("loading").dim().bold()
 }
 
 #[inline]
@@ -22,13 +22,8 @@ pub fn info_loading(path: &CtxPath) {
 }
 
 #[inline]
-pub fn info_loading_skip(path: &CtxPath) {
-    info(joins3(
-        loading(),
-        path.rel().display(),
-        paren("already done"),
-    ))
-    .info();
+pub fn debug_skip(path: &CtxPath) {
+    indent2(arrow("already done")).debug();
 }
 
 #[inline]
