@@ -47,7 +47,7 @@ pub struct Options {
     #[clap(short, long, help = "Pretend to process")]
     pub noop: bool,
 
-    #[clap(short, long, help = "Linking destination (defaults to home directory)")]
+    #[clap(short, long, help = "Set linking destination")]
     pub home: Option<String>,
 
     #[clap(required = true)]
