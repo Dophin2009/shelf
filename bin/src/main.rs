@@ -9,7 +9,7 @@ mod process;
 use std::env;
 use std::path::PathBuf;
 
-use clap::Parser;
+use clap::{ArgGroup, Parser};
 use directories_next::BaseDirs;
 use stderrlog::ColorChoice;
 
@@ -31,24 +31,23 @@ fn main() {
 #[derive(Parser, Debug, Clone)]
 #[clap(
     author, version, about,
-    license = clap::crate_license!(),
     after_help = concat!("Any and all bug reports and contributors are greatly appreciated at ",
                          env!("CARGO_PKG_REPOSITORY"), "!")
 )]
+#[clap(group(
+    ArgGroup::new("vers")
+        .args(&["verbosity", "quiet"]),
+))]
 pub struct Options {
-    #[clap(short, long, parse(from_occurrences), about = "Message verbosity")]
+    #[clap(short, long, parse(from_occurrences), help = "Message verbosity")]
     pub verbosity: usize,
-    #[clap(short, long, about = "Silence all output")]
+    #[clap(short, long, help = "Silence all output")]
     pub quiet: bool,
 
-    #[clap(short, long, about = "Pretend to process")]
+    #[clap(short, long, help = "Pretend to process")]
     pub noop: bool,
 
-    #[clap(
-        short,
-        long,
-        about = "Linking destination (defaults to home directory)"
-    )]
+    #[clap(short, long, help = "Linking destination (defaults to home directory)")]
     pub home: Option<String>,
 
     #[clap(required = true)]
