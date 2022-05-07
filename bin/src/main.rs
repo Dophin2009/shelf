@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 use clap::{ArgGroup, Parser};
 use directories_next::BaseDirs;
+use load::Loaded;
 use stderrlog::ColorChoice;
 
 use crate::pretty::{
@@ -18,7 +19,7 @@ use crate::pretty::{
     output::Emit,
     semantic::{error, fatal},
 };
-use crate::process::ProcessOptions;
+use crate::process::{Processor, ProcessorOptions};
 
 fn main() {
     let opts = Options::parse();
@@ -31,7 +32,7 @@ fn main() {
 #[derive(Parser, Debug, Clone)]
 #[clap(
     author, version, about,
-    after_help = concat!("Any and all bug reports and contributors are greatly appreciated at ",
+    after_help = concat!("Any and all bug reports and contributions are greatly appreciated at ",
                          env!("CARGO_PKG_REPOSITORY"), "!")
 )]
 #[clap(group(
@@ -70,17 +71,20 @@ pub fn cli(opts: Options) -> Result<(), ()> {
 #[inline]
 fn run(opts: Options) -> Result<(), ()> {
     let packages: Vec<_> = opts.packages.iter().map(PathBuf::from).collect();
+    let loaded = load::load(packages)?;
 
-    let (graph, pm) = load::load(packages)?;
-
-    let process_opts = process_opts(opts)?;
-    process::process(&graph, &pm, process_opts)?;
-
-    Ok(())
+    process(process_opts(opts)?, &loaded)
 }
 
 #[inline]
-fn process_opts(opts: Options) -> Result<ProcessOptions, ()> {
+fn process(opts: ProcessorOptions, loaded: &Loaded) -> Result<(), ()> {
+    // TODO: Load journal from filesystem.
+    let mut processor = Processor::new(opts);
+    processor.process(&loaded.graph, &loaded.paths)
+}
+
+#[inline]
+fn process_opts(opts: Options) -> Result<ProcessorOptions, ()> {
     match BaseDirs::new() {
         Some(bd) => {
             let dest = opts
@@ -88,7 +92,7 @@ fn process_opts(opts: Options) -> Result<ProcessOptions, ()> {
                 .map(PathBuf::from)
                 .unwrap_or_else(|| bd.home_dir().to_path_buf());
 
-            Ok(ProcessOptions {
+            Ok(ProcessorOptions {
                 noop: opts.noop,
                 dest,
             })

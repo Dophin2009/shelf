@@ -1,7 +1,7 @@
 use shelflib::{
     action::{
-        write::{self, Res},
-        Resolve, WriteAction,
+        mkdir::{self, Res},
+        MkdirAction, Resolve,
     },
     op::Op,
 };
@@ -11,22 +11,14 @@ use crate::ctxpath::CtxPath;
 
 impl<'p, 'g> GraphProcessor<'p, 'g> {
     #[inline]
-    pub fn resolve_write(
-        &self,
-        action: WriteAction,
-        _path: &CtxPath,
-    ) -> Result<Vec<Op<'static>>, ()> {
+    pub fn resolve_mkdir(&self, action: MkdirAction, _path: &CtxPath) -> Result<Vec<Op<'static>>, ()> {
         let res = action.resolve();
         match res {
             Res::Normal(ops) => {
                 // TODO: Output
                 Ok(map_ops(ops))
             }
-            Res::OverwriteContents(ops) => {
-                // TODO: Output
-                Ok(map_ops(ops))
-            }
-            Res::OverwriteFile(ops) => {
+            Res::Overwrite(ops) => {
                 // TODO: Output
                 Ok(map_ops(ops))
             }
@@ -39,13 +31,11 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
 }
 
 #[inline]
-fn map_ops(ops: Vec<write::Op>) -> Vec<Op<'static>> {
+fn map_ops(ops: Vec<mkdir::Op>) -> Vec<Op<'static>> {
     ops.into_iter()
         .map(|op| match op {
-            write::Op::Rm(op) => Op::Rm(op),
-            write::Op::Create(op) => Op::Create(op),
-            write::Op::Write(op) => Op::Write(op),
-            write::Op::Mkdir(op) => Op::Mkdir(op),
+            mkdir::Op::Rm(op) => Op::Rm(op),
+            mkdir::Op::Mkdir(op) => Op::Mkdir(op),
         })
         .collect()
 }

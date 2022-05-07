@@ -10,8 +10,14 @@ use shelflib::{
 
 use crate::ctxpath::CtxPath;
 
+#[derive(Debug)]
+pub struct Loaded {
+    pub graph: PackageGraph,
+    pub paths: HashMap<PathBuf, CtxPath>,
+}
+
 #[inline]
-pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPath>), ()> {
+pub fn load(paths: Vec<PathBuf>) -> Result<Loaded, ()> {
     let mut paths: VecDeque<_> = paths
         .into_iter()
         .map(|path| (CtxPath::from_cwd(path), None))
@@ -41,7 +47,10 @@ pub fn load(paths: Vec<PathBuf>) -> Result<(PackageGraph, HashMap<PathBuf, CtxPa
 
         Err(())
     } else {
-        Ok((pg, pm))
+        Ok(Loaded {
+            graph: pg,
+            paths: pm,
+        })
     }
 }
 
@@ -51,13 +60,11 @@ fn load_one(
     parent: Option<&CtxPath>,
     graph: &mut PackageGraph,
 ) -> Result<Vec<CtxPath>, LoadError> {
-        output::info_loading(path);
+    output::info_loading(path);
     let deps = if graph.contains(path.abs()) {
         output::debug_skip(path);
-
         vec![]
     } else {
-
         let loader = SpecLoader::new(&path.abs())?;
 
         output::debug_reading();
@@ -75,7 +82,6 @@ fn load_one(
 
         // Add to package graph.
         let _ = graph.add_package(data);
-
         deps
     };
 
