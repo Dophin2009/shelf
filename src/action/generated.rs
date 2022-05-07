@@ -6,7 +6,7 @@ use super::Resolve;
 // Re-export action types.
 pub use self::{json::JsonAction, toml::TomlAction, yaml::YamlAction};
 // Re-export shared Res type.
-pub use super::write::Res;
+pub use super::write::{Op, Res, Skip};
 // Re-export shared Object type.
 pub use super::object::Object;
 
