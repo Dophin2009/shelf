@@ -11,7 +11,7 @@ use crate::action::{
 use crate::fse;
 use crate::graph::PackageData;
 use crate::spec::{
-    CmdHook, DirFile, Directive, EnvMap, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook,
+    CmdHook, DirFile, Directive, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook,
     LinkType, RegularFile, TemplatedFile, TemplatedFileType, TreeFile,
 };
 
@@ -55,32 +55,32 @@ impl<'g> Iterator for ActionIter<'g> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let drct = self.directives.next()?;
-        Some(self.from_directive(drct))
+        Some(self.get_directive(drct))
     }
 }
 
 impl<'g> ActionIter<'g> {
     #[inline]
-    fn from_directive(&self, drct: &Directive) -> Action<'g> {
+    fn get_directive(&self, drct: &Directive) -> Action<'g> {
         match drct {
-            Directive::File(f) => self.from_file(f),
-            Directive::Hook(h) => self.from_hook(h),
+            Directive::File(f) => self.get_file(f),
+            Directive::Hook(h) => self.get_hook(h),
         }
     }
 
     #[inline]
-    fn from_file(&self, f: &File) -> Action<'g> {
+    fn get_file(&self, f: &File) -> Action<'g> {
         match f {
-            File::Regular(rf) => self.from_file_regular(rf),
-            File::Templated(tf) => self.from_file_template(tf),
-            File::Tree(tf) => self.from_file_tree(tf),
-            File::Generated(gf) => self.from_file_generated(gf),
-            File::Dir(df) => self.from_file_dir(df),
+            File::Regular(rf) => self.get_file_regular(rf),
+            File::Templated(tf) => self.get_file_template(tf),
+            File::Tree(tf) => self.get_file_tree(tf),
+            File::Generated(gf) => self.get_file_generated(gf),
+            File::Dir(df) => self.get_file_dir(df),
         }
     }
 
     #[inline]
-    fn from_file_regular(&self, rf: &RegularFile) -> Action<'g> {
+    fn get_file_regular(&self, rf: &RegularFile) -> Action<'g> {
         let RegularFile {
             src,
             dest,
@@ -108,7 +108,7 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn from_file_template(&self, tf: &TemplatedFile) -> Action<'g> {
+    fn get_file_template(&self, tf: &TemplatedFile) -> Action<'g> {
         let TemplatedFile {
             src,
             dest,
@@ -140,7 +140,7 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn from_file_tree(&self, tf: &TreeFile) -> Action<'g> {
+    fn get_file_tree(&self, tf: &TreeFile) -> Action<'g> {
         let TreeFile {
             src,
             dest,
@@ -179,7 +179,7 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn from_file_generated(&self, gf: &GeneratedFile) -> Action<'g> {
+    fn get_file_generated(&self, gf: &GeneratedFile) -> Action<'g> {
         let GeneratedFile { dest, typ } = gf;
 
         // Normalize dest.
@@ -213,7 +213,7 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn from_file_dir(&self, df: &DirFile) -> Action<'g> {
+    fn get_file_dir(&self, df: &DirFile) -> Action<'g> {
         let DirFile { dest, parents } = df;
 
         let path = self.join_dest(dest);
@@ -224,15 +224,15 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn from_hook(&self, h: &Hook) -> Action<'g> {
+    fn get_hook(&self, h: &Hook) -> Action<'g> {
         match h {
-            Hook::Cmd(cmd) => self.from_hook_cmd(cmd),
-            Hook::Fun(fun) => self.from_hook_fun(fun),
+            Hook::Cmd(cmd) => self.get_hook_cmd(cmd),
+            Hook::Fun(fun) => self.get_hook_fun(fun),
         }
     }
 
     #[inline]
-    fn from_hook_cmd(&self, cmd: &CmdHook) -> Action<'g> {
+    fn get_hook_cmd(&self, cmd: &CmdHook) -> Action<'g> {
         let CmdHook {
             command,
             start,
@@ -256,7 +256,7 @@ impl<'g> ActionIter<'g> {
         // Use sh as default shell.
         let shell = shell.clone().unwrap_or_else(|| "sh".to_string());
         let clean_env = *clean_env.as_ref().unwrap_or(&false);
-        let env = env.clone().unwrap_or_else(EnvMap::new);
+        let env = env.clone().unwrap_or_default();
 
         Action::Command(CommandAction {
             command,
@@ -268,7 +268,7 @@ impl<'g> ActionIter<'g> {
     }
 
     #[inline]
-    fn from_hook_fun(&self, fun: &FunHook) -> Action<'g> {
+    fn get_hook_fun(&self, fun: &FunHook) -> Action<'g> {
         let FunHook {
             name,
             start,
