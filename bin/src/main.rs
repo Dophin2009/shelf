@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 use clap::{ArgGroup, Parser};
 use directories_next::BaseDirs;
+use load::Loader;
 use once_cell::unsync::Lazy;
 use shelflib::op::{
     ctx::{FileSafe, FinishCtx},
@@ -75,7 +76,7 @@ pub fn cli(opts: Options) -> Result<(), ()> {
 #[inline]
 fn run(opts: Options) -> Result<(), ()> {
     let packages: Vec<_> = opts.packages.iter().map(PathBuf::from).collect();
-    let loaded = load::load(packages)?;
+    let loaded = Loader::new(packages).load()?;
 
     // TODO: Load journal from filesystem.
     let mut journal = OpJournal::new();
