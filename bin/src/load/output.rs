@@ -16,17 +16,17 @@ pub fn skip(_path: &CtxPath) {
 }
 
 #[inline]
-pub fn debug_reading() {
+pub fn reading() {
     output::step("reading package");
 }
 
 #[inline]
-pub fn debug_evaling() {
+pub fn evaling() {
     output::step("evaluating lua");
 }
 
 #[inline]
-pub fn debug_queue_dep(dep: &CtxPath, parent: &Path) {
+pub fn queueing_dep(dep: &CtxPath, parent: &Path) {
     let dep_rel = CtxPath::new(dep.abs(), &parent).unwrap();
     output::step(comb::sjoin2(
         "queueing dependency",

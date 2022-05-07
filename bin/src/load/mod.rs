@@ -77,17 +77,17 @@ impl Loader {
         } else {
             let loader = SpecLoader::new(&path.abs())?;
 
-            output::debug_reading();
+            output::reading();
             let loader = loader.read()?;
 
-            output::debug_evaling();
+            output::evaling();
             let loader = loader.eval()?;
             let data = loader.finish()?;
 
             let deps = data
                 .dep_paths()
                 .map(CtxPath::from_cwd)
-                .inspect(|dpath| output::debug_queue_dep(dpath, &data.path))
+                .inspect(|dpath| output::queueing_dep(dpath, &data.path))
                 .collect();
 
             // Add to package graph.
