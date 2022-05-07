@@ -1,4 +1,4 @@
-use std::path::{Path};
+use std::path::Path;
 
 use super::write::WriteAction;
 use super::Resolve;

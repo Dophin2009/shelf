@@ -202,9 +202,7 @@ mod test {
     #[test]
     fn test_rollback_no_commit() {
         let mut journal = Journal::new();
-        let mut records = Vec::new();
-
-        records.push(FORWARD);
+        let mut records = vec![FORWARD];
         journal.append(FORWARD);
 
         let mut rollback = journal.rollback();

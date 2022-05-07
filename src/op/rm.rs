@@ -190,7 +190,7 @@ mod test {
                 dir: false,
             };
 
-            let opf = op.finish(&ctx)?;
+            let opf = op.finish(ctx)?;
             assert!(!fse::symlink_exists(&path));
             assert!(fse::symlink_exists(&opf.safepath));
 
