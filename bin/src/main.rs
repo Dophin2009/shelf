@@ -11,7 +11,11 @@ use std::path::PathBuf;
 
 use clap::{ArgGroup, Parser};
 use directories_next::BaseDirs;
-use load::Loaded;
+use once_cell::unsync::Lazy;
+use shelflib::op::{
+    ctx::{FileSafe, FinishCtx},
+    journal::OpJournal,
+};
 use stderrlog::ColorChoice;
 
 use crate::pretty::{
@@ -73,33 +77,41 @@ fn run(opts: Options) -> Result<(), ()> {
     let packages: Vec<_> = opts.packages.iter().map(PathBuf::from).collect();
     let loaded = load::load(packages)?;
 
-    process(process_opts(opts)?, &loaded)
-}
-
-#[inline]
-fn process(opts: ProcessorOptions, loaded: &Loaded) -> Result<(), ()> {
     // TODO: Load journal from filesystem.
-    let mut processor = Processor::new(opts);
+    let mut journal = OpJournal::new();
+
+    let mut processor = Processor::new(process_opts(opts)?, &mut journal);
     processor.process(&loaded.graph, &loaded.paths)
 }
 
 #[inline]
 fn process_opts(opts: Options) -> Result<ProcessorOptions, ()> {
-    match BaseDirs::new() {
-        Some(bd) => {
-            let dest = opts
-                .home
-                .map(PathBuf::from)
-                .unwrap_or_else(|| bd.home_dir().to_path_buf());
+    let bd = Lazy::new(BaseDirs::new);
 
-            Ok(ProcessorOptions {
-                noop: opts.noop,
-                dest,
-            })
-        }
+    let dest = match opts.home.map(PathBuf::from) {
+        Some(home) => home,
+        None => match &*bd {
+            Some(bd) => bd.home_dir().to_path_buf(),
+            None => {
+                error("couldn't determine home directory; try --home").error();
+                return Err(());
+            }
+        },
+    };
+
+    // TODO: No journal option.
+    let file_safe_path = match &*bd {
+        Some(bd) => bd.data_local_dir().to_path_buf(),
         None => {
-            error("couldn't determine home directory; try --home").error();
-            Err(())
+            error("couldn't determine a suitable location for auxiliary data").error();
+            return Err(());
         }
-    }
+    };
+    let ctx = FinishCtx::new(FileSafe::new(file_safe_path));
+
+    Ok(ProcessorOptions {
+        noop: opts.noop,
+        dest,
+        ctx,
+    })
 }

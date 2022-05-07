@@ -13,7 +13,11 @@ use std::path::PathBuf;
 use shelflib::{
     action::Action,
     graph::{PackageData, PackageGraph},
-    op::{journal::OpJournal, Op},
+    op::{
+        ctx::FinishCtx,
+        journal::{JournalOp, OpJournal},
+        Finish, Op,
+    },
 };
 
 use crate::ctxpath::CtxPath;
@@ -22,29 +26,29 @@ use crate::ctxpath::CtxPath;
 pub struct ProcessorOptions {
     pub noop: bool,
     pub dest: PathBuf,
+
+    pub ctx: FinishCtx,
 }
 
 #[derive(Debug)]
-pub struct Processor {
+pub struct Processor<'j> {
     opts: ProcessorOptions,
-    journal: OpJournal,
+    journal: &'j mut OpJournal,
 }
 
 #[derive(Debug)]
 pub(self) struct GraphProcessor<'p, 'g> {
     opts: &'p ProcessorOptions,
-    journal: &'p OpJournal,
+    journal: &'p mut OpJournal,
+
     graph: &'g PackageGraph,
     paths: &'g HashMap<PathBuf, CtxPath>,
 }
 
-impl Processor {
+impl<'j> Processor<'j> {
     #[inline]
-    pub fn new(opts: ProcessorOptions) -> Self {
-        Self {
-            opts,
-            journal: OpJournal::new(),
-        }
+    pub fn new(opts: ProcessorOptions, journal: &'j mut OpJournal) -> Self {
+        Self { opts, journal }
     }
 
     #[inline]
@@ -53,7 +57,7 @@ impl Processor {
         graph: &PackageGraph,
         paths: &HashMap<PathBuf, CtxPath>,
     ) -> Result<(), ()> {
-        let mut processor = GraphProcessor::new(&self.opts, &self.journal, graph, paths);
+        let mut processor = GraphProcessor::new(&self.opts, self.journal, graph, paths);
         processor.process()
     }
 }
@@ -62,7 +66,7 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
     #[inline]
     pub fn new(
         opts: &'p ProcessorOptions,
-        journal: &'p OpJournal,
+        journal: &'p mut OpJournal,
         graph: &'g PackageGraph,
         paths: &'g HashMap<PathBuf, CtxPath>,
     ) -> Self {
@@ -129,8 +133,66 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
     }
 
     #[inline]
-    pub fn process_op(&mut self, _op: Op) -> Result<(), ()> {
-        // TODO: Implement
+    pub fn process_op(&mut self, op: Op) -> Result<(), ()> {
+        match op {
+            Op::Link(op) => self.process_journal_op(op),
+            Op::LinkUndo(op) => self.process_journal_op(op),
+            Op::Copy(op) => self.process_journal_op(op),
+            Op::CopyUndo(op) => self.process_journal_op(op),
+            Op::Create(op) => self.process_journal_op(op),
+            Op::CreateUndo(op) => self.process_journal_op(op),
+            Op::Write(op) => self.process_journal_op(op),
+            Op::WriteUndo(op) => self.process_journal_op(op),
+            Op::Mkdir(op) => self.process_journal_op(op),
+            Op::MkdirUndo(op) => self.process_journal_op(op),
+            Op::Rm(op) => self.process_journal_op(op),
+            Op::RmUndo(op) => self.process_journal_op(op),
+            Op::Command(op) => {
+                // TODO: Output
+                match op.finish(&self.opts.ctx) {
+                    Ok(_fin) => {
+                        // TODO: Output
+                        Ok(())
+                    }
+                    Err(_err) => {
+                        // TODO: Output
+                        Err(())
+                    }
+                }
+            }
+            Op::Function(op) => {
+                // TODO: Output
+                match op.finish(&self.opts.ctx) {
+                    Ok(_fin) => {
+                        // TODO: Output
+                        Ok(())
+                    }
+                    Err(_err) => {
+                        // TODO: Output
+                        Err(())
+                    }
+                }
+            }
+        }
+    }
+
+    #[inline]
+    pub fn process_journal_op<O>(&mut self, op: O) -> Result<(), ()>
+    where
+        O: Into<JournalOp>,
+    {
+        {
+            let mut t = self.journal.lock();
+            match t.append_finish(op, &self.opts.ctx) {
+                Ok(_fin) => {
+                    // TODO: Output
+                }
+                Err(_err) => {
+                    // TODO: Output
+                    return Err(());
+                }
+            }
+        }
 
         Ok(())
     }
