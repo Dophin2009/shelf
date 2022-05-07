@@ -1,7 +1,7 @@
 #![allow(clippy::result_unit_err)]
 
-pub mod ctxpath;
-pub mod pretty;
+mod ctxpath;
+mod output;
 
 mod load;
 mod process;
@@ -11,7 +11,6 @@ use std::path::PathBuf;
 
 use clap::{ArgGroup, Parser};
 use directories_next::BaseDirs;
-use load::Loader;
 use once_cell::unsync::Lazy;
 use shelflib::op::{
     ctx::{FileSafe, FinishCtx},
@@ -19,11 +18,7 @@ use shelflib::op::{
 };
 use stderrlog::ColorChoice;
 
-use crate::pretty::{
-    nline,
-    output::Emit,
-    semantic::{error, fatal},
-};
+use crate::load::Loader;
 use crate::process::{Processor, ProcessorOptions};
 
 fn main() {
@@ -70,7 +65,7 @@ pub fn cli(opts: Options) -> Result<(), ()> {
         .init()
         .unwrap();
 
-    run(opts).map_err(|_| nline(fatal("errors were encountered; see above")).error())
+    run(opts).map_err(|_| output::fatal("errors were encountered; see above"))
 }
 
 #[inline]
@@ -94,7 +89,7 @@ fn process_opts(opts: Options) -> Result<ProcessorOptions, ()> {
         None => match &*bd {
             Some(bd) => bd.home_dir().to_path_buf(),
             None => {
-                error("couldn't determine home directory; try --home").error();
+                output::section_error("couldn't determine home directory; try --home");
                 return Err(());
             }
         },
@@ -104,7 +99,7 @@ fn process_opts(opts: Options) -> Result<ProcessorOptions, ()> {
     let file_safe_path = match &*bd {
         Some(bd) => bd.data_local_dir().to_path_buf(),
         None => {
-            error("couldn't determine a suitable location for auxiliary data").error();
+            output::section_error("couldn't determine a suitable location for auxiliary data");
             return Err(());
         }
     };

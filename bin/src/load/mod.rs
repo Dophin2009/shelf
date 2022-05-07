@@ -53,10 +53,7 @@ impl Loader {
         }
 
         if !errors.is_empty() {
-            output::error_loading();
-            for (path, err) in errors.into_iter() {
-                output::error_loading_path(&path, err);
-            }
+            output::error_loading(errors);
 
             Err(())
         } else {
@@ -73,9 +70,9 @@ impl Loader {
         path: &CtxPath,
         parent: Option<&CtxPath>,
     ) -> Result<Vec<CtxPath>, LoadError> {
-        output::info_loading(path);
+        output::loading(path);
         let deps = if self.graph.contains(path.abs()) {
-            output::debug_skip(path);
+            output::skip(path);
             vec![]
         } else {
             let loader = SpecLoader::new(&path.abs())?;

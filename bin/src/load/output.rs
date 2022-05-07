@@ -3,64 +3,59 @@ use std::path::Path;
 use shelflib::load::LoadError;
 
 use crate::ctxpath::CtxPath;
-use crate::pretty::{
-    indent2, indent4, joins2, joins3,
-    output::Emit,
-    pretty,
-    semantic::{arrow, context, error, ppath},
-    Prettify, Pretty,
-};
+use crate::output::{self, comb};
 
 #[inline]
-fn loading() -> Pretty<&'static str> {
-    pretty("loading").dim().bold()
+pub fn loading(path: &CtxPath) {
+    output::section("loading", path.rel().display());
 }
 
 #[inline]
-pub fn info_loading(path: &CtxPath) {
-    joins2(loading(), path.rel().display()).info();
-}
-
-#[inline]
-pub fn debug_skip(_path: &CtxPath) {
-    // TODO: Print path?
-    indent2(arrow("already done")).debug();
+pub fn skip(_path: &CtxPath) {
+    output::step("already done");
 }
 
 #[inline]
 pub fn debug_reading() {
-    indent2(arrow("reading package")).debug();
+    output::step("reading package");
 }
 
 #[inline]
 pub fn debug_evaling() {
-    indent2(arrow("evaluating Lua")).debug();
+    output::step("evaluating lua");
 }
 
 #[inline]
-pub fn debug_queue_dep(dpath: &CtxPath, path: &Path) {
-    let dpath_rel = CtxPath::new(dpath.abs(), &path).unwrap();
-    indent2(arrow(joins2("queueing dependency", ppath(dpath_rel.rel())))).debug();
+pub fn debug_queue_dep(dep: &CtxPath, parent: &Path) {
+    let dep_rel = CtxPath::new(dep.abs(), &parent).unwrap();
+    output::step(comb::sjoin2(
+        "queueing dependency",
+        output::path(dep_rel.rel()),
+    ));
 }
 
 #[inline]
-pub fn error_loading() {
-    error("encountered errors while trying to load packages").error();
+pub fn error_loading(errors: Vec<(CtxPath, LoadError)>) {
+    output::section_error("encountered errors while trying to load packages");
+
+    for (path, err) in errors.into_iter() {
+        error_loading_path(path, err);
+    }
 }
 
 #[inline]
-pub fn error_loading_path(path: &CtxPath, err: LoadError) {
-    indent2(context(joins2("in", ppath(path.abs())))).error();
+pub fn error_loading_path(path: CtxPath, err: LoadError) {
+    output::step_error_context(output::path(path.abs()));
 
     let message = match err {
         // TODO: More specific error messages
-        LoadError::Read(_err) => joins3(
+        LoadError::Read(_err) => comb::sjoin3(
             "couldn't read the package config; are you sure",
-            ppath("package.lua"),
+            output::path("package.lua"),
             "exists?",
         ),
-        LoadError::Lua(err) => joins2("couldn't evaluate Lua:", err),
+        LoadError::Lua(err) => comb::sjoin2("couldn't evaluate Lua:", err),
     };
 
-    indent4(message).error();
+    output::step_error(message);
 }
