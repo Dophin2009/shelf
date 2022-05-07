@@ -27,7 +27,7 @@ mlua = { version = "0.7", features = ["macros", "send", "serialize"] }
 tempfile = "3.2"
 
 [features]
-default = []
+default = ["luajit"]
 lua51 = ["mlua/lua51"]
 lua52 = ["mlua/lua52"]
 lua53 = ["mlua/lua53"]
