@@ -11,10 +11,10 @@ use super::{Finish, Rollback};
 
 sa::assert_impl_all!(WriteOp: Finish<Output = WriteFinish, Error = WriteOpError>);
 sa::assert_impl_all!(WriteFinish: Rollback<Output = WriteUndoOp>);
-sa::assert_impl_all!(WriteUndoOp: Finish<Output = WriteUndoFinish, Error = WriteOpError>);
+sa::assert_impl_all!(WriteUndoOp: Finish<Output = WriteUndoFinish, Error = WriteUndoOpError>);
 sa::assert_impl_all!(WriteUndoFinish: Rollback<Output = WriteOp>);
 
-/// Error encountered when finishing [`WriteOp`] or [`WriteUndoOp`].
+/// Error encountered when finishing [`WriteOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum WriteOpError {
     #[error("open error")]
@@ -66,7 +66,7 @@ impl Finish for WriteOp {
         let Self { path, contents } = self;
 
         let mut overwritten = Vec::new();
-        read_write_swap(path, contents, &mut overwritten)?;
+        read_write_swap::<_, Self::Error>(path, contents, &mut overwritten)?;
 
         Ok(Self::Output {
             path: path.clone(),
@@ -95,6 +95,17 @@ impl Rollback for WriteFinish {
     }
 }
 
+/// Error encountered when finishing [`WriteUndoOp`].
+#[derive(Debug, thiserror::Error)]
+pub enum WriteUndoOpError {
+    #[error("open error")]
+    Open(#[from] OpenError),
+    #[error("read error")]
+    Read(#[from] ReadError),
+    #[error("write error")]
+    Write(#[from] WriteError),
+}
+
 /// The undo of [`WriteOp`] (see its documentation), created by rolling back [`WriteFinish`].
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct WriteUndoOp {
@@ -118,7 +129,7 @@ pub struct WriteUndoFinish {
 
 impl Finish for WriteUndoOp {
     type Output = WriteUndoFinish;
-    type Error = WriteOpError;
+    type Error = WriteUndoOpError;
 
     // FIXME: We need a parameter that allows access to the original file contents.
     #[inline]
@@ -129,7 +140,7 @@ impl Finish for WriteUndoOp {
             overwritten,
         } = self;
 
-        read_write_swap(path, overwritten, &mut Vec::new())?;
+        read_write_swap::<_, WriteUndoOpError>(path, overwritten, &mut Vec::new())?;
 
         Ok(Self::Output {
             path: path.clone(),
@@ -155,13 +166,10 @@ impl Rollback for WriteUndoFinish {
 /// Open the file at `path`, read the contents into `overwritten`, and write `contents` to the
 /// file.
 #[inline]
-fn read_write_swap<P>(
-    path: P,
-    contents: &[u8],
-    overwritten: &mut Vec<u8>,
-) -> Result<(), WriteOpError>
+fn read_write_swap<P, E>(path: P, contents: &[u8], overwritten: &mut Vec<u8>) -> Result<(), E>
 where
     P: AsRef<Path>,
+    E: From<OpenError> + From<ReadError> + From<WriteError>,
 {
     // Open file.
     let mut file = File::open(&path).map_err(|inner| OpenError {

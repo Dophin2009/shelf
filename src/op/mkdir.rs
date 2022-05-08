@@ -11,16 +11,14 @@ use super::{Finish, Rollback};
 
 sa::assert_impl_all!(MkdirOp: Finish<Output = MkdirFinish, Error = MkdirOpError>);
 sa::assert_impl_all!(MkdirFinish: Rollback<Output = MkdirUndoOp>);
-sa::assert_impl_all!(MkdirUndoOp: Finish<Output = MkdirUndoFinish, Error = MkdirOpError>);
+sa::assert_impl_all!(MkdirUndoOp: Finish<Output = MkdirUndoFinish, Error = MkdirUndoOpError>);
 sa::assert_impl_all!(MkdirUndoFinish: Rollback<Output = MkdirOp>);
 
-/// Error encountered when finishing [`MkdirOp`] or [`MkdirUndoOp`].
+/// Error encountered when finishing [`MkdirOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum MkdirOpError {
     #[error("mkdir error")]
     Mkdir(#[from] MkdirError),
-    #[error("remove error")]
-    Remove(#[from] RemoveError),
 }
 
 /// Operation to create a directory at `path`.
@@ -75,6 +73,13 @@ impl Rollback for MkdirFinish {
     }
 }
 
+/// Error encountered when finishing [`MkdirUndoOp`].
+#[derive(Debug, thiserror::Error)]
+pub enum MkdirUndoOpError {
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
+}
+
 /// The undo of [`MkdirOp`] (see its documentation), created by rolling back [`MkdirFinish`].
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct MkdirUndoOp {
@@ -91,7 +96,7 @@ pub struct MkdirUndoFinish {
 
 impl Finish for MkdirUndoOp {
     type Output = MkdirUndoFinish;
-    type Error = MkdirOpError;
+    type Error = MkdirUndoOpError;
 
     #[inline]
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {

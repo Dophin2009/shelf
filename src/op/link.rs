@@ -10,16 +10,14 @@ use super::{Finish, Rollback};
 
 sa::assert_impl_all!(LinkOp: Finish<Output = LinkFinish, Error = LinkOpError>);
 sa::assert_impl_all!(LinkFinish: Rollback<Output = LinkUndoOp>);
-sa::assert_impl_all!(LinkUndoOp: Finish<Output = LinkUndoFinish, Error = LinkOpError>);
+sa::assert_impl_all!(LinkUndoOp: Finish<Output = LinkUndoFinish, Error = LinkUndoOpError>);
 sa::assert_impl_all!(LinkUndoFinish: Rollback<Output = LinkOp>);
 
-/// Error encountered when finishing [`LinkOp`] or [`LinkUndoOp`].
+/// Error encountered when finishing [`LinkOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum LinkOpError {
     #[error("symlink error")]
     Symlink(#[from] SymlinkError),
-    #[error("remove error")]
-    Remove(#[from] RemoveError),
 }
 
 /// Operation to link a file from `src` to `dest`. It roughly corresponds to
@@ -109,6 +107,13 @@ impl Rollback for LinkFinish {
     }
 }
 
+/// Error encountered when finishing [`LinkUndoOp`].
+#[derive(Debug, thiserror::Error)]
+pub enum LinkUndoOpError {
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
+}
+
 /// The undo of [`LinkOp`] (see its documentation), created by rolling back [`LinkFinish`].
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LinkUndoOp {
@@ -129,7 +134,7 @@ pub struct LinkUndoFinish {
 
 impl Finish for LinkUndoOp {
     type Output = LinkUndoFinish;
-    type Error = LinkOpError;
+    type Error = LinkUndoOpError;
 
     #[inline]
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {

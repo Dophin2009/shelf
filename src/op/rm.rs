@@ -10,10 +10,10 @@ use super::{Finish, Rollback};
 
 sa::assert_impl_all!(RmOp: Finish<Output = RmFinish, Error = RmOpError>);
 sa::assert_impl_all!(RmFinish: Rollback<Output = RmUndoOp>);
-sa::assert_impl_all!(RmUndoOp: Finish<Output = RmUndoFinish, Error = RmOpError>);
+sa::assert_impl_all!(RmUndoOp: Finish<Output = RmUndoFinish, Error = RmUndoOpError>);
 sa::assert_impl_all!(RmUndoFinish: Rollback<Output = RmOp>);
 
-/// Error encountered when finishing [`RmOp`] or [`RmUndoOp`].
+/// Error encountered when finishing [`RmOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum RmOpError {
     #[error("rename error")]
@@ -98,6 +98,13 @@ impl Rollback for RmFinish {
     }
 }
 
+/// Error encountered when finishing [`RmUndoOp`].
+#[derive(Debug, thiserror::Error)]
+pub enum RmUndoOpError {
+    #[error("rename error")]
+    Rename(#[from] RenameError),
+}
+
 /// The undo of [`RmOp`] (see its documentation), created by rolling back [`RmFinish`].
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RmUndoOp {
@@ -121,7 +128,7 @@ pub struct RmUndoFinish {
 
 impl Finish for RmUndoOp {
     type Output = RmUndoFinish;
-    type Error = RmOpError;
+    type Error = RmUndoOpError;
 
     #[inline]
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {

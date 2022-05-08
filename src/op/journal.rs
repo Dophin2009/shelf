@@ -4,24 +4,36 @@ use crate::journal::{self, Journal, Record, Rollback};
 
 use super::ctx::FinishCtx;
 use super::{
-    CopyOp, CreateOp, Finish, Finished, FinishedError, LinkOp, MkdirOp, RmOp, Undo, UndoFinished,
-    WriteOp,
+    CopyOp, CopyUndoOp, CreateOp, CreateUndoOp, Finish, Finished, FinishedError, LinkOp,
+    LinkUndoOp, MkdirOp, MkdirUndoOp, RmOp, RmUndoOp, Undo, UndoFinished, WriteOp, WriteUndoOp,
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum JournalOpError {
     #[error("link op error")]
     Link(#[from] FinishedError<LinkOp>),
+    #[error("link undo op error")]
+    LinkUndo(#[from] FinishedError<LinkUndoOp>),
     #[error("copy op error")]
     Copy(#[from] FinishedError<CopyOp>),
+    #[error("copy undo op error")]
+    CopyUndo(#[from] FinishedError<CopyUndoOp>),
     #[error("create op error")]
     Create(#[from] FinishedError<CreateOp>),
+    #[error("create undo op error")]
+    CreateUndo(#[from] FinishedError<CreateUndoOp>),
     #[error("write op error")]
     Write(#[from] FinishedError<WriteOp>),
+    #[error("write undo op error")]
+    WriteUndo(#[from] FinishedError<WriteUndoOp>),
     #[error("mkdir op error")]
     Mkdir(#[from] FinishedError<MkdirOp>),
+    #[error("mkdir undo op error")]
+    MkdirUndo(#[from] FinishedError<MkdirUndoOp>),
     #[error("rm op error")]
     Rm(#[from] FinishedError<RmOp>),
+    #[error("rm undo op error")]
+    RmUndo(#[from] FinishedError<RmUndoOp>),
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -327,29 +339,22 @@ impl<'j> Transaction<'j> {
         &mut self,
         op: O,
         ctx: &FinishCtx,
-    ) -> Result<&JournalOpFinish, JournalOpError>
+    ) -> Result<&JournalOpFinish, <O as Finish>::Error>
     where
-        O: Into<JournalOp>,
+        O: Finish,
+        <O as Finish>::Output: Into<JournalOpFinish>,
     {
-        let op = op.into();
-        let datum = self.finish(&op, ctx)?;
+        let fin = op.finish(ctx)?;
+        let atom = JournalOpAtom {
+            op: fin.into(),
+            ctx: ctx.clone(),
+        };
 
-        self.inner.append(datum);
-
+        self.inner.append(atom);
         match self.inner.journal().latest().unwrap() {
             Record::Atom(ref atom) => Ok(&atom.op),
             Record::Commit => unreachable!(),
         }
-    }
-
-    /// Finish an op and return an [`OpAtom`] to append.
-    #[inline]
-    fn finish(&self, op: &JournalOp, ctx: &FinishCtx) -> Result<JournalOpAtom, JournalOpError> {
-        let opf = op.finish(ctx)?;
-        Ok(JournalOpAtom {
-            op: opf,
-            ctx: ctx.clone(),
-        })
     }
 }
 

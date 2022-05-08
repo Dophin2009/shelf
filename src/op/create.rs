@@ -10,16 +10,14 @@ use super::{Finish, Rollback};
 
 sa::assert_impl_all!(CreateOp: Finish<Output = CreateFinish, Error = CreateOpError>);
 sa::assert_impl_all!(CreateFinish: Rollback<Output = CreateUndoOp>);
-sa::assert_impl_all!(CreateUndoOp: Finish<Output = CreateUndoFinish, Error = CreateOpError>);
+sa::assert_impl_all!(CreateUndoOp: Finish<Output = CreateUndoFinish, Error = CreateUndoOpError>);
 sa::assert_impl_all!(CreateUndoFinish: Rollback<Output = CreateOp>);
 
-/// Error encountered when finishing [`CreateOp`] or [`CreateUndoOp`].
+/// Error encountered when finishing [`CreateOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum CreateOpError {
     #[error("create error")]
     Create(#[from] CreateError),
-    #[error("remove error")]
-    Remove(#[from] RemoveError),
 }
 
 /// Operation to create a regular file at `path`.
@@ -76,6 +74,13 @@ impl Rollback for CreateFinish {
     }
 }
 
+/// Error encountered when finishing [`CreateUndoOp`].
+#[derive(Debug, thiserror::Error)]
+pub enum CreateUndoOpError {
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
+}
+
 /// The undo of [`CreateOp`] (see its documentation), created by rolling back [`CreateFinish`].
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CreateUndoOp {
@@ -92,7 +97,7 @@ pub struct CreateUndoFinish {
 
 impl Finish for CreateUndoOp {
     type Output = CreateUndoFinish;
-    type Error = CreateOpError;
+    type Error = CreateUndoOpError;
 
     #[inline]
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {

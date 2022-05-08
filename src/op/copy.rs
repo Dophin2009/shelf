@@ -10,16 +10,14 @@ use super::{Finish, Rollback};
 
 sa::assert_impl_all!(CopyOp: Finish<Output = CopyFinish, Error = CopyOpError>);
 sa::assert_impl_all!(CopyFinish: Rollback<Output = CopyUndoOp>);
-sa::assert_impl_all!(CopyUndoOp: Finish<Output = CopyUndoFinish, Error = CopyOpError>);
+sa::assert_impl_all!(CopyUndoOp: Finish<Output = CopyUndoFinish, Error = CopyUndoOpError>);
 sa::assert_impl_all!(CopyUndoFinish: Rollback<Output = CopyOp>);
 
-/// Error encountered when finishing [`CopyOp`] or [`CopyUndoOp`].
+/// Error encountered when finishing [`CopyOp`].
 #[derive(Debug, thiserror::Error)]
 pub enum CopyOpError {
     #[error("copy error")]
     Copy(#[from] CopyError),
-    #[error("remove error")]
-    Remove(#[from] RemoveError),
 }
 
 /// Operation to copy a file from `src` to `dest`.
@@ -92,6 +90,13 @@ impl Rollback for CopyFinish {
     }
 }
 
+/// Error encountered when finishing [`CopyUndoOp`].
+#[derive(Debug, thiserror::Error)]
+pub enum CopyUndoOpError {
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
+}
+
 /// The undo of [`CopyOp`] (see its documentation), created by rolling back [`CopyFinish`].
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CopyUndoOp {
@@ -112,7 +117,7 @@ pub struct CopyUndoFinish {
 
 impl Finish for CopyUndoOp {
     type Output = CopyUndoFinish;
-    type Error = CopyOpError;
+    type Error = CopyUndoOpError;
 
     #[inline]
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
