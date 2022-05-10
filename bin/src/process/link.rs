@@ -86,7 +86,7 @@ mod output {
     pub fn src_missing(action: &LinkAction, path: &CtxPath, dest: &Path) {
         Step::error().message(sjoin2(
             "missing source",
-            describe::sdest_relative(&action.src, dest),
+            describe::spath_relative(&action.src, path),
         ));
         Step::error().context(action.describe_info(path, dest));
     }
@@ -95,7 +95,7 @@ mod output {
     pub fn overwriting(action: &LinkAction, path: &CtxPath, dest: &Path) {
         Step::warning().message(sjoin2(
             "overwriting existing",
-            describe::sdest_relative(&action.dest, dest),
+            describe::spath_relative(&action.dest, path),
         ));
         Step::warning().context(action.describe_info(path, dest));
     }
@@ -105,11 +105,11 @@ mod output {
         let message = match skip {
             Skip::SameSrcDest => sjoin2(
                 "same source and destination",
-                describe::sdest_relative(&action.src, dest),
+                describe::spath_relative(&action.src, path),
             ),
             Skip::OptMissing => sjoin2(
                 "missing optional source",
-                describe::sdest_relative(&action.src, dest),
+                describe::spath_relative(&action.src, path),
             ),
             Skip::DestExists => sjoin2(
                 "existing destination",
