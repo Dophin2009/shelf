@@ -19,7 +19,7 @@ use shelflib::op::{
 use stderrlog::ColorChoice;
 
 use crate::load::Loader;
-use crate::output::Section;
+use crate::output::{Prettify, Section};
 use crate::process::{Processor, ProcessorOptions};
 
 fn main() {
@@ -80,7 +80,12 @@ fn run(opts: Options) -> Result<(), ()> {
     let mut journal = OpJournal::new();
 
     let mut processor = Processor::new(process_opts(opts)?, &mut journal);
-    processor.process(&loaded.graph, &loaded.paths)
+    processor.process(&loaded.graph, &loaded.paths)?;
+
+    Section::message("", "");
+    Section::message("done:".green().bold(), "no issues encountered");
+
+    Ok(())
 }
 
 #[inline]

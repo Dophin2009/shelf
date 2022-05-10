@@ -143,6 +143,7 @@ Prefixes!(
     log::warn
 );
 
+// TODO: Separate colors for source and destination paths?
 #[inline]
 pub fn spath(path: impl AsRef<Path>) -> Pretty {
     comb::pretty(path.as_ref().display()).green()
