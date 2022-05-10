@@ -11,8 +11,8 @@ use crate::action::{
 use crate::fse;
 use crate::graph::PackageData;
 use crate::spec::{
-    CmdHook, DirFile, Directive, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook,
-    LinkType, RegularFile, TemplatedFile, TemplatedFileType, TreeFile,
+    CmdHook, DirFile, Directive, File, FunHook, GeneratedFile, GeneratedFileTyp, Hook, LinkType,
+    RegularFile, TemplatedFile, TemplatedFileType, TreeFile,
 };
 
 impl PackageData {

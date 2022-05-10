@@ -19,7 +19,6 @@ pub struct Spec {
     pub directives: Vec<Directive>,
 }
 
-
 #[derive(Debug, Clone)]
 pub enum Directive {
     File(File),

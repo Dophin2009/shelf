@@ -138,6 +138,7 @@ impl Finish for RmUndoOp {
             safepath,
         } = self;
 
+        // TODO: Fall back to copying and removing if renaming fails (e.g. cross-device link).
         fs::rename(safepath, path).map_err(|inner| RenameError {
             src: safepath.clone(),
             dest: path.clone(),
