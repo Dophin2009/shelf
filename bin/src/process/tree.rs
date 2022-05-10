@@ -8,7 +8,11 @@ use crate::ctxpath::CtxPath;
 
 impl<'p, 'g> GraphProcessor<'p, 'g> {
     #[inline]
-    pub fn resolve_tree(&self, action: TreeAction, _path: &CtxPath) -> Result<Vec<Op<'static>>, ()> {
+    pub fn resolve_tree(
+        &self,
+        action: TreeAction,
+        _path: &CtxPath,
+    ) -> Result<Vec<Op<'static>>, ()> {
         let res = match action.resolve() {
             Ok(res) => res,
             Err(_err) => {
@@ -37,6 +41,30 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
                 // TODO: Output
                 Ok(vec![])
             }
+        }
+    }
+}
+
+mod output {
+    use std::path::Path;
+
+    use shelflib::action::TreeAction;
+
+    use super::super::{describe, Describe, DescribeMode};
+    use crate::ctxpath::CtxPath;
+    use crate::output::{comb::sjoin4, Pretty};
+
+    impl Describe for TreeAction {
+        #[inline]
+        fn describe(&self, path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+            let src = describe::path_relative(&self.src, path);
+            let dest = describe::dest_relative(&self.dest, dest);
+            sjoin4(
+                "linking tree",
+                describe::mode_spath(src, mode),
+                "to",
+                describe::mode_spath(dest, mode),
+            )
         }
     }
 }

@@ -3,40 +3,37 @@ use std::path::Path;
 use shelflib::load::LoadError;
 
 use crate::ctxpath::CtxPath;
-use crate::output::{self, comb};
+use crate::output::{comb, spath, Section, Step};
 
 #[inline]
 pub fn loading(path: &CtxPath) {
-    output::section("loading", path.rel().display());
+    Section::message("loading", path.rel().display());
 }
 
 #[inline]
 pub fn skip(_path: &CtxPath) {
-    output::step("already done");
+    Step::message("already done");
 }
 
 #[inline]
 pub fn reading() {
-    output::step("reading package");
+    Step::message("reading package");
 }
 
 #[inline]
 pub fn evaling() {
-    output::step("evaluating lua");
+    Step::message("evaluating lua");
 }
 
 #[inline]
 pub fn queueing_dep(dep: &CtxPath, parent: &Path) {
     let dep_rel = CtxPath::new(dep.abs(), &parent).unwrap();
-    output::step(comb::sjoin2(
-        "queueing dependency",
-        output::path(dep_rel.rel()),
-    ));
+    Step::message(comb::sjoin2("queueing dependency", spath(dep_rel.rel())));
 }
 
 #[inline]
 pub fn error_loading(errors: Vec<(CtxPath, LoadError)>) {
-    output::section_error("encountered errors while trying to load packages");
+    Step::error().message("encountered errors while trying to load packages");
 
     for (path, err) in errors.into_iter() {
         error_loading_path(path, err);
@@ -45,17 +42,17 @@ pub fn error_loading(errors: Vec<(CtxPath, LoadError)>) {
 
 #[inline]
 pub fn error_loading_path(path: CtxPath, err: LoadError) {
-    output::step_error_context(output::path(path.abs()));
+    Step::error().context(spath(path.abs()));
 
     let message = match err {
         // TODO: More specific error messages
         LoadError::Read(_err) => comb::sjoin3(
             "couldn't read the package config; are you sure",
-            output::path("package.lua"),
+            spath("package.lua"),
             "exists?",
         ),
         LoadError::Lua(err) => comb::sjoin2("couldn't evaluate Lua:", err),
     };
 
-    output::step_error(message);
+    Step::error().message(message);
 }

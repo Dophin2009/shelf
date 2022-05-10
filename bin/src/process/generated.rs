@@ -11,7 +11,11 @@ use crate::ctxpath::CtxPath;
 
 impl<'p, 'g> GraphProcessor<'p, 'g> {
     #[inline]
-    pub fn resolve_yaml(&self, action: YamlAction, _path: &CtxPath) -> Result<Vec<Op<'static>>, ()> {
+    pub fn resolve_yaml(
+        &self,
+        action: YamlAction,
+        _path: &CtxPath,
+    ) -> Result<Vec<Op<'static>>, ()> {
         let res = match action.resolve() {
             Ok(res) => res,
             Err(_err) => {
@@ -24,7 +28,11 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
     }
 
     #[inline]
-    pub fn resolve_toml(&self, action: TomlAction, _path: &CtxPath) -> Result<Vec<Op<'static>>, ()> {
+    pub fn resolve_toml(
+        &self,
+        action: TomlAction,
+        _path: &CtxPath,
+    ) -> Result<Vec<Op<'static>>, ()> {
         let res = match action.resolve() {
             Ok(res) => res,
             Err(_err) => {
@@ -37,7 +45,11 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
     }
 
     #[inline]
-    pub fn resolve_json(&self, action: JsonAction, _path: &CtxPath) -> Result<Vec<Op<'static>>, ()> {
+    pub fn resolve_json(
+        &self,
+        action: JsonAction,
+        _path: &CtxPath,
+    ) -> Result<Vec<Op<'static>>, ()> {
         let res = match action.resolve() {
             Ok(res) => res,
             Err(_err) => {
@@ -82,4 +94,51 @@ fn map_ops(ops: Vec<generated::Op>) -> Vec<Op<'static>> {
             generated::Op::Mkdir(op) => Op::Mkdir(op),
         })
         .collect()
+}
+
+mod output {
+    use std::path::{Path, };
+
+    use shelflib::action::{JsonAction, TomlAction, YamlAction};
+
+    use super::super::{describe, Describe, DescribeMode};
+    use crate::ctxpath::CtxPath;
+    use crate::output::{comb::sjoin4, Pretty};
+
+    impl Describe for YamlAction {
+        #[inline]
+        fn describe(&self, _path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+            common_describe("yaml", &self.dest, dest, mode)
+        }
+    }
+
+    impl Describe for TomlAction {
+        #[inline]
+        fn describe(&self, _path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+            common_describe("json", &self.dest, dest, mode)
+        }
+    }
+
+    impl Describe for JsonAction {
+        #[inline]
+        fn describe(&self, _path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+            common_describe("json", &self.dest, dest, mode)
+        }
+    }
+
+    #[inline]
+    fn common_describe(
+        format: &str,
+        action_dest: &Path,
+        dest: &Path,
+        mode: DescribeMode,
+    ) -> Pretty {
+        let action_dest = describe::dest_relative(action_dest, dest);
+        sjoin4(
+            "writing",
+            format,
+            "to",
+            describe::mode_spath(action_dest, mode),
+        )
+    }
 }

@@ -78,3 +78,41 @@ fn map_ops(ops: Vec<template::Op>) -> Vec<Op<'static>> {
         })
         .collect()
 }
+
+mod output {
+    use std::path::Path;
+
+    use shelflib::action::{HandlebarsAction, LiquidAction};
+
+    use super::super::{describe, Describe, DescribeMode};
+    use crate::ctxpath::CtxPath;
+    use crate::output::{comb::sjoin4, Pretty};
+
+    impl Describe for HandlebarsAction {
+        #[inline]
+        fn describe(&self, path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+            let src = describe::path_relative(&self.src, path);
+            let dest = describe::dest_relative(&self.dest, dest);
+            sjoin4(
+                "templating (handlebars)",
+                describe::mode_spath(src, mode),
+                "to",
+                describe::mode_spath(dest, mode),
+            )
+        }
+    }
+
+    impl Describe for LiquidAction {
+        #[inline]
+        fn describe(&self, path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+            let src = describe::path_relative(&self.src, path);
+            let dest = describe::dest_relative(&self.dest, dest);
+            sjoin4(
+                "templating (handlebars)",
+                describe::mode_spath(src, mode),
+                "to",
+                describe::mode_spath(dest, mode),
+            )
+        }
+    }
+}

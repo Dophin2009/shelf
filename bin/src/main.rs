@@ -19,6 +19,7 @@ use shelflib::op::{
 use stderrlog::ColorChoice;
 
 use crate::load::Loader;
+use crate::output::Section;
 use crate::process::{Processor, ProcessorOptions};
 
 fn main() {
@@ -65,7 +66,9 @@ pub fn cli(opts: Options) -> Result<(), ()> {
         .init()
         .unwrap();
 
-    run(opts).map_err(|_| output::fatal("errors were encountered; see above"))
+    run(opts)
+        .map_err(|_| Section::fatal().message("errors were encountered; see above"))
+        .map_err(|_| ())
 }
 
 #[inline]
@@ -85,24 +88,38 @@ fn process_opts(opts: Options) -> Result<ProcessorOptions, ()> {
     let bd = Lazy::new(BaseDirs::new);
 
     let dest = match opts.home.map(PathBuf::from) {
-        Some(home) => home,
+        Some(home) => {
+            // Ensure home directory is absolute.
+            let cwd = match env::current_dir() {
+                Ok(cwd) => cwd,
+                Err(_) => {
+                    Section::error().message("couldn't determine current directory");
+                    return Err(());
+                }
+            };
+            cwd.join(home)
+        }
         None => match &*bd {
             Some(bd) => bd.home_dir().to_path_buf(),
             None => {
-                output::section_error("couldn't determine home directory; try --home");
+                Section::error().message("couldn't determine home directory; try --home");
                 return Err(());
             }
         },
     };
 
+    debug_assert!(dest.is_absolute());
+
     // TODO: No journal option.
     let file_safe_path = match &*bd {
         Some(bd) => bd.data_local_dir().to_path_buf(),
         None => {
-            output::section_error("couldn't determine a suitable location for auxiliary data");
+            Section::error().message("couldn't determine a suitable location for auxiliary data");
             return Err(());
         }
     };
+    debug_assert!(file_safe_path.is_absolute());
+
     let ctx = FinishCtx::new(FileSafe::new(file_safe_path));
 
     Ok(ProcessorOptions {

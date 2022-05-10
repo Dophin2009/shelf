@@ -41,3 +41,20 @@ fn map_ops(ops: Vec<function::Op<'_>>) -> Vec<Op<'_>> {
         })
         .collect()
 }
+
+mod output {
+    use std::path::Path;
+
+    use shelflib::action::FunctionAction;
+
+    use super::super::{Describe, DescribeMode};
+    use crate::ctxpath::CtxPath;
+    use crate::output::{comb::pretty, Pretty};
+
+    impl<'lua> Describe for FunctionAction<'lua> {
+        #[inline]
+        fn describe(&self, _path: &CtxPath, _dest: &Path, _mode: DescribeMode) -> Pretty {
+            pretty("calling lua function")
+        }
+    }
+}

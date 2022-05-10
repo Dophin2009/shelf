@@ -7,20 +7,24 @@ mod template;
 mod tree;
 mod write;
 
-use std::collections::HashMap;
+mod op;
+
+mod describe;
+mod output;
+
 use std::path::PathBuf;
+use std::{collections::HashMap, path::Path};
 
 use shelflib::{
     action::Action,
     graph::{PackageData, PackageGraph},
-    op::{
-        ctx::FinishCtx,
-        journal::{JournalOp, OpJournal},
-        Finish, Op,
-    },
+    op::{ctx::FinishCtx, journal::OpJournal},
 };
 
 use crate::ctxpath::CtxPath;
+use crate::output::Pretty;
+
+pub(self) use self::describe::{Describe, DescribeMode};
 
 #[derive(Debug, Clone)]
 pub struct ProcessorOptions {
@@ -77,7 +81,9 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
             paths,
         }
     }
+}
 
+impl<'p, 'g> GraphProcessor<'p, 'g> {
     #[inline]
     pub fn process(&mut self) -> Result<(), ()> {
         match self.graph.order() {
@@ -87,8 +93,8 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(())
             }
-            Err(_err) => {
-                // TODO: Output
+            Err(err) => {
+                output::error_circular(err);
                 Err(())
             }
         }
@@ -99,19 +105,24 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
         // SAFETY: Path guaranteed to be in it by `load`.
         let path = self.paths.get(&pd.path).unwrap();
 
-        // output::info_processing(path);
+        output::processing(path);
 
         let aiter = pd.action_iter(&self.opts.dest);
         aiter
-            .map(|action| self.process_action(action, path))
+            .map(|action| self.process_action(action, path, &self.opts.dest))
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(())
     }
 
     #[inline]
-    pub fn process_action(&mut self, action: Action, path: &CtxPath) -> Result<(), ()> {
-        let ops = match action {
+    pub fn process_action(
+        &mut self,
+        action: Action,
+        path: &CtxPath,
+        dest: &Path,
+    ) -> Result<(), ()> {
+        let ops = match action.clone() {
             Action::Link(action) => self.resolve_link(action, path),
             Action::Write(action) => self.resolve_write(action, path),
             Action::Mkdir(action) => self.resolve_mkdir(action, path),
@@ -126,74 +137,28 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
         }?;
 
         ops.into_iter()
-            .map(|op| self.process_op(op))
+            .map(|op| self.process_op(&action, op, path, dest))
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(())
     }
+}
 
+impl<'lua> Describe for Action<'lua> {
     #[inline]
-    pub fn process_op(&mut self, op: Op) -> Result<(), ()> {
-        match op {
-            Op::Link(op) => self.process_journal_op(op),
-            Op::LinkUndo(op) => self.process_journal_op(op),
-            Op::Copy(op) => self.process_journal_op(op),
-            Op::CopyUndo(op) => self.process_journal_op(op),
-            Op::Create(op) => self.process_journal_op(op),
-            Op::CreateUndo(op) => self.process_journal_op(op),
-            Op::Write(op) => self.process_journal_op(op),
-            Op::WriteUndo(op) => self.process_journal_op(op),
-            Op::Mkdir(op) => self.process_journal_op(op),
-            Op::MkdirUndo(op) => self.process_journal_op(op),
-            Op::Rm(op) => self.process_journal_op(op),
-            Op::RmUndo(op) => self.process_journal_op(op),
-            Op::Command(op) => {
-                // TODO: Output
-                match op.finish(&self.opts.ctx) {
-                    Ok(_fin) => {
-                        // TODO: Output
-                        Ok(())
-                    }
-                    Err(_err) => {
-                        // TODO: Output
-                        Err(())
-                    }
-                }
-            }
-            Op::Function(op) => {
-                // TODO: Output
-                match op.finish(&self.opts.ctx) {
-                    Ok(_fin) => {
-                        // TODO: Output
-                        Ok(())
-                    }
-                    Err(_err) => {
-                        // TODO: Output
-                        Err(())
-                    }
-                }
-            }
+    fn describe(&self, path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+        match self {
+            Action::Link(action) => action.describe(path, dest, mode),
+            Action::Write(action) => action.describe(path, dest, mode),
+            Action::Tree(action) => action.describe(path, dest, mode),
+            Action::Handlebars(action) => action.describe(path, dest, mode),
+            Action::Liquid(action) => action.describe(path, dest, mode),
+            Action::Yaml(action) => action.describe(path, dest, mode),
+            Action::Toml(action) => action.describe(path, dest, mode),
+            Action::Json(action) => action.describe(path, dest, mode),
+            Action::Mkdir(action) => action.describe(path, dest, mode),
+            Action::Command(action) => action.describe(path, dest, mode),
+            Action::Function(action) => action.describe(path, dest, mode),
         }
-    }
-
-    #[inline]
-    pub fn process_journal_op<O>(&mut self, op: O) -> Result<(), ()>
-    where
-        O: Into<JournalOp>,
-    {
-        {
-            let mut t = self.journal.lock();
-            match t.append_finish(op, &self.opts.ctx) {
-                Ok(_fin) => {
-                    // TODO: Output
-                }
-                Err(_err) => {
-                    // TODO: Output
-                    return Err(());
-                }
-            }
-        }
-
-        Ok(())
     }
 }

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::fs::Metadata;
 use std::path::{Path, PathBuf};
 use std::{env, io};
@@ -42,7 +41,10 @@ impl CtxPath {
 
         Some(Self { rel, abs }.cleaned())
     }
+}
 
+#[allow(dead_code)]
+impl CtxPath {
     #[inline]
     pub fn from_cwd<P>(path: P) -> Self
     where

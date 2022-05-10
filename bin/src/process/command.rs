@@ -1,4 +1,3 @@
-
 use shelflib::{
     action::{
         command::{self, Res},
@@ -41,4 +40,21 @@ fn map_ops(ops: Vec<command::Op>) -> Vec<Op<'static>> {
             command::Op::Command(op) => Op::Command(op),
         })
         .collect()
+}
+
+mod output {
+    use std::path::Path;
+
+    use shelflib::action::CommandAction;
+
+    use super::super::{Describe, DescribeMode};
+    use crate::ctxpath::CtxPath;
+    use crate::output::{comb::sjoin3, Pretty};
+
+    impl Describe for CommandAction {
+        #[inline]
+        fn describe(&self, _path: &CtxPath, _dest: &Path, _mode: DescribeMode) -> Pretty {
+            sjoin3("executing command '", &self.command, "'")
+        }
+    }
 }

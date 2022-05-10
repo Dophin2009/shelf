@@ -11,7 +11,11 @@ use crate::ctxpath::CtxPath;
 
 impl<'p, 'g> GraphProcessor<'p, 'g> {
     #[inline]
-    pub fn resolve_mkdir(&self, action: MkdirAction, _path: &CtxPath) -> Result<Vec<Op<'static>>, ()> {
+    pub fn resolve_mkdir(
+        &self,
+        action: MkdirAction,
+        _path: &CtxPath,
+    ) -> Result<Vec<Op<'static>>, ()> {
         let res = action.resolve();
         match res {
             Res::Normal(ops) => {
@@ -38,4 +42,22 @@ fn map_ops(ops: Vec<mkdir::Op>) -> Vec<Op<'static>> {
             mkdir::Op::Mkdir(op) => Op::Mkdir(op),
         })
         .collect()
+}
+
+mod output {
+    use std::path::{Path, };
+
+    use shelflib::action::MkdirAction;
+
+    use super::super::{describe, Describe, DescribeMode};
+    use crate::ctxpath::CtxPath;
+    use crate::output::{comb::sjoin2, Pretty};
+
+    impl Describe for MkdirAction {
+        #[inline]
+        fn describe(&self, _path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+            let path = describe::dest_relative(&self.path, dest);
+            sjoin2("creating directory", describe::mode_spath(path, mode))
+        }
+    }
 }

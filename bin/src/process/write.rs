@@ -49,3 +49,21 @@ fn map_ops(ops: Vec<write::Op>) -> Vec<Op<'static>> {
         })
         .collect()
 }
+
+mod output {
+    use std::path::{Path};
+
+    use shelflib::action::WriteAction;
+
+    use super::super::{describe, Describe, DescribeMode};
+    use crate::ctxpath::CtxPath;
+    use crate::output::{comb::sjoin2, Pretty};
+
+    impl Describe for WriteAction {
+        #[inline]
+        fn describe(&self, _path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+            let dest = describe::dest_relative(&self.dest, dest);
+            sjoin2("writing to", describe::mode_spath(dest, mode))
+        }
+    }
+}
