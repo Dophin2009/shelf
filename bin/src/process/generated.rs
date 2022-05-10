@@ -97,7 +97,7 @@ fn map_ops(ops: Vec<generated::Op>) -> Vec<Op<'static>> {
 }
 
 mod output {
-    use std::path::{Path, };
+    use std::path::Path;
 
     use shelflib::action::{JsonAction, TomlAction, YamlAction};
 

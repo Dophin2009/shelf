@@ -45,7 +45,7 @@ fn map_ops(ops: Vec<mkdir::Op>) -> Vec<Op<'static>> {
 }
 
 mod output {
-    use std::path::{Path, };
+    use std::path::Path;
 
     use shelflib::action::MkdirAction;
 

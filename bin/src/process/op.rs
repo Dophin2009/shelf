@@ -395,7 +395,7 @@ impl Describe for RmUndoOp {
 
 impl Describe for CommandOp {
     #[inline]
-    fn describe(&self, _path: &CtxPath,_dest: &Path, _mode: DescribeMode) -> Pretty {
+    fn describe(&self, _path: &CtxPath, _dest: &Path, _mode: DescribeMode) -> Pretty {
         sjoin3("executing command '", &self.command, "'")
     }
 }

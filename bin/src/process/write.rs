@@ -51,7 +51,7 @@ fn map_ops(ops: Vec<write::Op>) -> Vec<Op<'static>> {
 }
 
 mod output {
-    use std::path::{Path};
+    use std::path::Path;
 
     use shelflib::action::WriteAction;
 
