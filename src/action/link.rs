@@ -150,9 +150,7 @@ impl LinkAction {
         } else {
             // Check for existence of parent directories and add op to make parent directories if
             // they don't exist.
-            let mut ops = Vec::new();
-            mkdir::mkdir_parents_ops(dest, &mut ops);
-            let mut ops: Vec<_> = ops.into_iter().map(Op::Mkdir).collect();
+            let mut ops: Vec<_> = mkdir::mkdir_parents_ops(dest).map(Op::Mkdir).collect();
 
             ops.push(link_op);
 
@@ -206,9 +204,7 @@ impl LinkAction {
         } else {
             // Check for existence of parent directories and add op to make parent directories if
             // they don't exist.
-            let mut ops = Vec::new();
-            mkdir::mkdir_parents_ops(dest, &mut ops);
-            let mut ops: Vec<_> = ops.into_iter().map(Op::Mkdir).collect();
+            let mut ops: Vec<_> = mkdir::mkdir_parents_ops(dest).map(Op::Mkdir).collect();
 
             ops.push(copy_op);
             Ok(Res::Normal(ops))

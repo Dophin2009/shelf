@@ -83,9 +83,7 @@ impl Resolve for WriteAction {
 
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
             Ok(_) | Err(_) => {
-                let mut ops = Vec::new();
-                mkdir::mkdir_parents_ops(dest, &mut ops);
-                let mut ops: Vec<_> = ops.into_iter().map(Op::Mkdir).collect();
+                let mut ops: Vec<_> = mkdir::mkdir_parents_ops(dest).map(Op::Mkdir).collect();
 
                 // We need to first create a file before writing to it.
                 ops.push(Op::Create(CreateOp { path: dest.clone() }));

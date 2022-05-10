@@ -65,9 +65,7 @@ impl Resolve for MkdirAction {
             })])
         } else {
             let mut ops = if *parents {
-                let mut ops = Vec::new();
-                mkdir_parents_ops(path, &mut ops);
-                ops.into_iter().map(Op::Mkdir).collect()
+                mkdir_parents_ops(path).map(Op::Mkdir).collect()
             } else {
                 Vec::new()
             };
@@ -80,13 +78,15 @@ impl Resolve for MkdirAction {
 }
 
 #[inline]
-pub fn mkdir_parents_ops<P>(path: P, ops: &mut Vec<MkdirOp>)
+pub fn mkdir_parents_ops<P>(path: P) -> impl Iterator<Item = MkdirOp>
 where
     P: AsRef<Path>,
 {
-    let mut parent_opt = Some(path.as_ref());
+    let mut ops = Vec::new();
+    let mut parent_opt = path.as_ref().parent();
 
-    while let Some(parent) = parent_opt.as_ref() {
+    // TODO: Ops are added in the wrong order.
+    while let Some(parent) = parent_opt {
         // Add mkdir ops for all nonexisting parents.
         if !fse::symlink_exists(parent) {
             ops.push(MkdirOp {
@@ -96,4 +96,6 @@ where
 
         parent_opt = parent.parent();
     }
+
+    ops.into_iter().rev()
 }
