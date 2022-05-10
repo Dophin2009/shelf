@@ -176,7 +176,7 @@ impl Rollback for JournalOpAtom {
     }
 }
 
-/// Write-ahead logging for [`Op`] that permits rollback.
+/// Write-ahead logging for [`JournalOp`] that permits rollback.
 #[derive(Debug)]
 pub struct OpJournal {
     /// This struct is just a wrapper on [`Journal`].

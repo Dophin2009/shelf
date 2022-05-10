@@ -12,7 +12,7 @@ impl<T> Journal<T> {
 ///
 /// # Drop
 ///
-/// When dropped, the transaction is committed (see [`Self::commit`]).
+/// When dropped, the transaction is committed.
 #[derive(Debug)]
 pub struct Transaction<'j, T> {
     journal: &'j mut Journal<T>,

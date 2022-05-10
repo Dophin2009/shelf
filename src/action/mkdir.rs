@@ -31,7 +31,7 @@ pub enum Op {
     Mkdir(MkdirOp),
 }
 
-/// Reason for skipping [`LinkAction`].
+/// Reason for skipping [`MkdirAction`].
 #[derive(Debug, Clone)]
 pub enum Skip {
     /// Destination link already exists.

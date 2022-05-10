@@ -21,7 +21,7 @@ pub enum LinkOpError {
 }
 
 /// Operation to link a file from `src` to `dest`. It roughly corresponds to
-/// [`std::unix::fs::symlink`] on Unix and (???) on Windows.
+/// [`std::os::unix::fs::symlink`] on Unix and (???) on Windows.
 ///
 /// # Errors
 ///
