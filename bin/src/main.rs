@@ -117,7 +117,15 @@ fn process_opts(opts: Options) -> Result<ProcessorOptions, ()> {
 
     // TODO: No journal option.
     let file_safe_path = match &*bd {
-        Some(bd) => bd.data_local_dir().to_path_buf(),
+        Some(bd) => {
+            // TODO: Extract this logic.
+            let timestamp = chrono::offset::Local::now()
+                .format("%Y-%m-%d-%H-%M-%S")
+                .to_string();
+            bd.data_local_dir()
+                .join(env!("CARGO_PKG_NAME"))
+                .join(timestamp)
+        }
         None => {
             Section::error().message("couldn't determine a suitable location for auxiliary data");
             return Err(());
