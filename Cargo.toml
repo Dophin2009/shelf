@@ -9,6 +9,7 @@ repository = "https://github.com/Dophin2009/shelf.git"
 edition = "2018"
 
 [dependencies]
+fs_extra = "1.2.0"
 glob = "0.3.0"
 handlebars = "4.2.2"
 liquid = "0.26.0"

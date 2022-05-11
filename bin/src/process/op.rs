@@ -6,8 +6,8 @@ use shelflib::{
         copy::{CopyOpError, CopyUndoOpError},
         create::{CreateOpError, CreateUndoOpError},
         error::{
-            CopyError, CreateError, MkdirError, OpenError, ReadError, RemoveError, RenameError,
-            SymlinkError, WriteError,
+            CopyError, CreateError, MetadataError, MkdirError, MoveError, OpenError, ReadError,
+            ReadLinkError, RemoveError, RenameError, SymlinkError, WriteError,
         },
         journal::JournalOpFinish,
         link::{LinkOpError, LinkUndoOpError},
@@ -20,11 +20,11 @@ use shelflib::{
 };
 
 use super::{describe, Describe, DescribeMode, GraphProcessor};
+use crate::ctxpath::CtxPath;
 use crate::output::{
-    comb::{sjoin2, sjoin3, sjoin4},
+    comb::{pretty, sjoin2, sjoin3, sjoin4},
     spath, Pretty, Step,
 };
-use crate::{ctxpath::CtxPath, output::comb::pretty};
 
 impl<'p, 'g> GraphProcessor<'p, 'g> {
     #[inline]
@@ -182,13 +182,27 @@ impl<'p, 'g> GraphProcessor<'p, 'g> {
 
     process_op_impl!(process_rm_op, RmOp,
         action, op, iop, path, dest, err => match err {
-            RmOpError::Rename(err) => emit_rename_error(err, action, op, path, dest)
+            RmOpError::Rename(err) => emit_rename_error(err, action, op, path, dest),
+            RmOpError::ReadLink(err) => emit_read_link_error(err, action, op, path, dest),
+            RmOpError::Metadata(err) => emit_metadata_error(err, action, op, path, dest),
+            RmOpError::Remove(err) => emit_remove_error(err, action, op, path, dest),
+            RmOpError::Symlink(err) => emit_symlink_error(err, action, op, path, dest),
+            RmOpError::Move(err) => emit_move_error(err, action, op, path, dest),
+            RmOpError::Copy(err) => emit_copy_error(err, action, op, path, dest),
+            RmOpError::Mkdir(err) => emit_mkdir_error(err, action, op, path, dest),
         }
     );
 
     process_op_impl!(process_rm_undo_op, RmUndoOp,
         action, op, iop, path, dest, err => match err {
-            RmUndoOpError::Rename(err) => emit_rename_error(err, action, op, path, dest)
+            RmUndoOpError::Rename(err) => emit_rename_error(err, action, op, path, dest),
+            RmUndoOpError::ReadLink(err) => emit_read_link_error(err, action, op, path, dest),
+            RmUndoOpError::Metadata(err) => emit_metadata_error(err, action, op, path, dest),
+            RmUndoOpError::Remove(err) => emit_remove_error(err, action, op, path, dest),
+            RmUndoOpError::Symlink(err) => emit_symlink_error(err, action, op, path, dest),
+            RmUndoOpError::Move(err) => emit_move_error(err, action, op, path, dest),
+            RmUndoOpError::Copy(err) => emit_copy_error(err, action, op, path, dest),
+            RmUndoOpError::Mkdir(err) => emit_mkdir_error(err, action, op, path, dest),
         }
     );
 }
@@ -224,8 +238,16 @@ emit_error_impl!(emit_create_error, CreateError:
     err => sjoin2("couldn't create", spath(err.path))
 );
 
+emit_error_impl!(emit_metadata_error, MetadataError:
+    err => sjoin2("couldn't read metadata of", spath(err.path))
+);
+
 emit_error_impl!(emit_mkdir_error, MkdirError:
     err => sjoin2("couldn't create", spath(err.path))
+);
+
+emit_error_impl!(emit_move_error, MoveError:
+    err => sjoin4("couldn't move", spath(err.src), "to", spath(err.dest))
 );
 
 emit_error_impl!(emit_open_error, OpenError:
@@ -242,6 +264,10 @@ emit_error_impl!(emit_remove_error, RemoveError:
 
 emit_error_impl!(emit_rename_error, RenameError:
     err => sjoin4("couldn't rename", spath(err.src), "to", spath(err.dest))
+);
+
+emit_error_impl!(emit_read_link_error, ReadLinkError:
+    err => sjoin2("couldn't read symlink", spath(err.path))
 );
 
 emit_error_impl!(emit_write_error, WriteError:

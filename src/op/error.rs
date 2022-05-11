@@ -58,6 +58,34 @@ pub struct RenameError {
     pub inner: io::Error,
 }
 
+/// Error encountered when moving a file.
+#[derive(Debug, thiserror::Error)]
+#[error("i/o move error")]
+pub struct MoveError {
+    pub src: PathBuf,
+    pub dest: PathBuf,
+    #[source]
+    pub inner: io::Error,
+}
+
+/// Error encountered when reading file metadata.
+#[derive(Debug, thiserror::Error)]
+#[error("i/o metadata error")]
+pub struct MetadataError {
+    pub path: PathBuf,
+    #[source]
+    pub inner: io::Error,
+}
+
+/// Error encountered when reading a symlink.
+#[derive(Debug, thiserror::Error)]
+#[error("i/o read link error")]
+pub struct ReadLinkError {
+    pub path: PathBuf,
+    #[source]
+    pub inner: io::Error,
+}
+
 /// Error encountered when reading a file.
 #[derive(Debug, thiserror::Error)]
 #[error("i/o read error")]

@@ -1,11 +1,14 @@
-use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::{fs, io};
 
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
 use super::ctx::FinishCtx;
-use super::error::RenameError;
+use super::error::{
+    CopyError, MetadataError, MkdirError, MoveError, ReadLinkError, RemoveError, RenameError,
+    SymlinkError,
+};
 use super::{Finish, Rollback};
 
 sa::assert_impl_all!(RmOp: Finish<Output = RmFinish, Error = RmOpError>);
@@ -18,6 +21,20 @@ sa::assert_impl_all!(RmUndoFinish: Rollback<Output = RmOp>);
 pub enum RmOpError {
     #[error("rename error")]
     Rename(#[from] RenameError),
+    #[error("symlink read error")]
+    ReadLink(#[from] ReadLinkError),
+    #[error("metadata error")]
+    Metadata(#[from] MetadataError),
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
+    #[error("symlink error")]
+    Symlink(#[from] SymlinkError),
+    #[error("move error")]
+    Move(#[from] MoveError),
+    #[error("copy error")]
+    Copy(#[from] CopyError),
+    #[error("mkdir error")]
+    Mkdir(#[from] MkdirError),
 }
 
 /// Operation to remove a file or directory at `path`.
@@ -58,18 +75,12 @@ impl Finish for RmOp {
     type Output = RmFinish;
     type Error = RmOpError;
 
-    // TODO: What about directories? Calling `fs::create_dir` would make this two operations aaaahh
-    // this whole design sucks
     #[inline]
     fn finish(&self, ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
         let Self { path, dir } = self;
 
         let safepath = ctx.filesafe.resolve(path);
-        fs::rename(path, &safepath).map_err(|inner| RenameError {
-            src: path.clone(),
-            dest: safepath.clone(),
-            inner,
-        })?;
+        rename_with_fallback(path, &safepath)?;
 
         Ok(Self::Output {
             path: path.clone(),
@@ -103,6 +114,20 @@ impl Rollback for RmFinish {
 pub enum RmUndoOpError {
     #[error("rename error")]
     Rename(#[from] RenameError),
+    #[error("symlink read error")]
+    ReadLink(#[from] ReadLinkError),
+    #[error("metadata error")]
+    Metadata(#[from] MetadataError),
+    #[error("remove error")]
+    Remove(#[from] RemoveError),
+    #[error("symlink error")]
+    Symlink(#[from] SymlinkError),
+    #[error("move error")]
+    Move(#[from] MoveError),
+    #[error("copy error")]
+    Copy(#[from] CopyError),
+    #[error("mkdir error")]
+    Mkdir(#[from] MkdirError),
 }
 
 /// The undo of [`RmOp`] (see its documentation), created by rolling back [`RmFinish`].
@@ -138,12 +163,19 @@ impl Finish for RmUndoOp {
             safepath,
         } = self;
 
-        // TODO: Fall back to copying and removing if renaming fails (e.g. cross-device link).
-        fs::rename(safepath, path).map_err(|inner| RenameError {
-            src: safepath.clone(),
-            dest: path.clone(),
-            inner,
-        })?;
+        match rename_with_fallback(path, safepath) {
+            Ok(()) => {}
+            Err(err) => match err {
+                RmOpError::Rename(err) => return Err(err.into()),
+                RmOpError::ReadLink(err) => return Err(err.into()),
+                RmOpError::Metadata(err) => return Err(err.into()),
+                RmOpError::Remove(err) => return Err(err.into()),
+                RmOpError::Symlink(err) => return Err(err.into()),
+                RmOpError::Move(err) => return Err(err.into()),
+                RmOpError::Copy(err) => return Err(err.into()),
+                RmOpError::Mkdir(err) => return Err(err.into()),
+            },
+        }
 
         Ok(Self::Output {
             path: path.clone(),
@@ -166,12 +198,111 @@ impl Rollback for RmUndoFinish {
     }
 }
 
+#[inline]
+fn rename_with_fallback(path: &Path, safepath: &Path) -> Result<(), RmOpError> {
+    // TODO: Try to lift detection of filesystem up to action level?
+    // First try a rename, then fallback to copying and removing.
+    if fs::rename(path, &safepath).is_err() {
+        let metadata = path.symlink_metadata().map_err(|err| MetadataError {
+            path: path.to_path_buf(),
+            inner: err,
+        })?;
+        let ft = metadata.file_type();
+
+        if let Some(parent) = safepath.parent() {
+            fs::create_dir_all(parent).map_err(|err| MkdirError {
+                path: parent.to_path_buf(),
+                inner: err,
+            })?;
+        }
+
+        if ft.is_symlink() {
+            let target = fs::read_link(path).map_err(|err| ReadLinkError {
+                path: path.to_path_buf(),
+                inner: err,
+            })?;
+
+            #[cfg(not(any(unix, windows)))]
+            {
+                compile_error!("This platform doesn't support symlinks")
+            }
+
+            let symlink_res = {
+                #[cfg(unix)]
+                {
+                    use std::os::unix;
+                    unix::fs::symlink(&target, &safepath)
+                }
+
+                #[cfg(windows)]
+                {
+                    use std::os::windows;
+
+                    let is_dir = target.is_dir();
+                    let symlink_res = if target.exists() && is_dir {
+                        windows::fs::symlink_dir(&target, &safepath)
+                    } else {
+                        windows::fs::symlink_file(&target, &safepath)
+                    };
+                }
+            };
+
+            symlink_res.map_err(|err| SymlinkError {
+                src: target.clone(),
+                dest: safepath.to_path_buf(),
+                inner: err,
+            })?;
+
+            fs::remove_file(&path).map_err(|err| RemoveError {
+                path: path.to_path_buf(),
+                inner: err,
+            })?;
+        } else if ft.is_dir() {
+            if safepath.exists() {
+                let remove_res = if safepath.is_dir() {
+                    fs::remove_dir_all(&safepath)
+                } else {
+                    fs::remove_file(&safepath)
+                };
+                remove_res.map_err(|err| RemoveError {
+                    path: safepath.to_path_buf(),
+                    inner: err,
+                })?
+            }
+
+            let opts = fs_extra::dir::CopyOptions {
+                copy_inside: true,
+                ..Default::default()
+            };
+            if let Err(err) = fs_extra::dir::move_dir(path, &safepath, &opts) {
+                return Err(RmOpError::Move(MoveError {
+                    src: path.to_path_buf(),
+                    dest: safepath.to_path_buf(),
+                    inner: io::Error::new(io::ErrorKind::Other, format!("{}", err)),
+                }));
+            }
+        } else {
+            fs::copy(path, &safepath).map_err(|err| CopyError {
+                src: path.to_path_buf(),
+                dest: safepath.to_path_buf(),
+                inner: err,
+            })?;
+            fs::remove_file(path).map_err(|err| RemoveError {
+                path: path.to_path_buf(),
+                inner: err,
+            })?;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use crate::fse;
 
     use super::super::test;
-    use super::{Finish, RmOp, RmOpError, Rollback};
+    use super::{Finish, RmOp, Rollback};
 
     /// Test regular file.
     #[test]
@@ -205,18 +336,10 @@ mod test {
     fn test_nonexistent_file() -> test::Result<()> {
         test::with_tempdir(|dir, ctx| {
             let path = dir.join("a");
-            let op = RmOp {
-                path: path.clone(),
-                dir: false,
-            };
+            let op = RmOp { path, dir: false };
 
-            match op.finish(ctx) {
-                Ok(_) => panic!("op succeeded"),
-                Err(err) => match err {
-                    RmOpError::Rename(err) => {
-                        assert_eq!(err.src, path);
-                    }
-                },
+            if op.finish(ctx).is_ok() {
+                panic!("op succeeded")
             }
 
             Ok(())
