@@ -125,15 +125,15 @@ mod test {
     pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
     // Create a new file and return the path.
-    pub fn new_file<P, Q>(dir: P, path: Q) -> Result<PathBuf>
+    pub fn new_file<P, Q>(dir: P, path: Q) -> Result<(File, PathBuf)>
     where
         P: AsRef<Path>,
         Q: AsRef<Path>,
     {
         let path = dir.as_ref().join(path);
-        File::create(&path)?;
+        let file = File::create(&path)?;
 
-        Ok(path)
+        Ok((file, path))
     }
 
     pub fn with_tempdir<F>(f: F) -> Result<()>

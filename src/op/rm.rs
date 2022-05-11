@@ -171,27 +171,13 @@ mod test {
     use crate::fse;
 
     use super::super::test;
-    use super::{Finish, RmOp, Rollback};
-
-    // TODO: We need to test:
-    //  - Inside directory with insufficient permissions
-    //  - Nonexistent file
-    //  - Regular file, insufficient permissions
-    //  - Symlink, insufficient permissions
-    //  - Symlink to regular file
-    //  - Symlink to directory
-    //  - Symlink to symlink to regular file
-    //  - Symlink to symlink to regular directory
-    //  - Directory, insufficient permissions
-    //  - Directory, empty
-    //  - Directory, with regular files
-    //  - Directory, with other directories
+    use super::{Finish, RmOp, RmOpError, Rollback};
 
     /// Test regular file.
     #[test]
     fn test_regular_file() -> test::Result<()> {
         test::with_tempdir(|dir, ctx| {
-            let path = test::new_file(dir, "a")?;
+            let (_, path) = test::new_file(dir, "a")?;
 
             let op = RmOp {
                 path: path.clone(),
@@ -209,6 +195,29 @@ mod test {
 
             let op2 = undof.rollback();
             assert_eq!(op, op2);
+
+            Ok(())
+        })
+    }
+
+    /// Test for nonexistent file.
+    #[test]
+    fn test_nonexistent_file() -> test::Result<()> {
+        test::with_tempdir(|dir, ctx| {
+            let path = dir.join("a");
+            let op = RmOp {
+                path: path.clone(),
+                dir: false,
+            };
+
+            match op.finish(ctx) {
+                Ok(_) => panic!("op succeeded"),
+                Err(err) => match err {
+                    RmOpError::Rename(err) => {
+                        assert_eq!(err.src, path);
+                    }
+                },
+            }
 
             Ok(())
         })
