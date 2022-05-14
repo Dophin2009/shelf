@@ -66,10 +66,11 @@ mod output {
     impl Describe for LinkAction {
         #[inline]
         fn describe(&self, path: &CtxPath, dest: &Path, mode: DescribeMode) -> Pretty {
+            let verb = if self.copy { "copying"} else {"linking"};
             let src = describe::path_relative(&self.src, path);
             let dest = describe::dest_relative(&self.dest, dest);
             sjoin4(
-                "linking",
+                verb,
                 describe::mode_spath(src, mode),
                 "to",
                 describe::mode_spath(dest, mode),

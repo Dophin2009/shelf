@@ -101,36 +101,36 @@ macro_rules! Prefixes {
 Prefixes!(
     Fatal,
     fatal,
-    comb::pretty("fatal:").red().bold(),
-    comb::pretty(" when ").dim(),
-    comb::pretty("   as ").dim(),
+    comb::pretty("fatal: ").red().bold(),
+    comb::pretty(" when  ").dim(),
+    comb::pretty("   as  ").dim(),
     log::error
 );
 
 Prefixes!(
     Error,
     error,
-    comb::pretty("error:").red().bold(),
-    comb::pretty(" when ").dim(),
-    comb::pretty("   as ").dim(),
+    comb::pretty("error: ").red().bold(),
+    comb::pretty(" when  ").dim(),
+    comb::pretty("   as  ").dim(),
     log::error
 );
 
 Prefixes!(
     Warning,
     warning,
-    comb::pretty(" warn:").yellow().bold(),
-    comb::pretty(" when ").dim(),
-    comb::pretty("   as ").dim(),
+    comb::pretty(" warn: ").yellow().bold(),
+    comb::pretty(" when  ").dim(),
+    comb::pretty("   as  ").dim(),
     log::warn
 );
 
 Prefixes!(
     Note,
     note,
-    comb::pretty(" note:").dim().bold(),
-    comb::pretty(" when ").dim(),
-    comb::pretty("   as ").dim(),
+    comb::pretty(" note: ").dim().bold(),
+    comb::pretty(" when  ").dim(),
+    comb::pretty("   as  ").dim(),
     log::warn
 );
 
