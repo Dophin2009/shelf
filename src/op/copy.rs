@@ -1,6 +1,7 @@
-use std::fs;
 use std::path::PathBuf;
+use std::{fs, io};
 
+use fs_extra::dir::CopyOptions;
 use serde::{Deserialize, Serialize};
 use static_assertions as sa;
 
@@ -43,6 +44,8 @@ pub struct CopyOp {
     pub src: PathBuf,
     /// Path to destination of copy.
     pub dest: PathBuf,
+    /// Copying a directory.
+    pub dir: bool,
 }
 
 /// The output of [`CopyOp`]. See its documentation for information.
@@ -52,6 +55,8 @@ pub struct CopyFinish {
     pub src: PathBuf,
     /// See [`CopyOp`].
     pub dest: PathBuf,
+    /// Copying a directory.
+    pub dir: bool,
 }
 
 impl Finish for CopyOp {
@@ -60,18 +65,31 @@ impl Finish for CopyOp {
 
     #[inline]
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
-        let Self { src, dest } = self;
+        let Self { src, dest, dir } = self;
 
         // Perform copy.
-        let _ = fs::copy(src, dest).map_err(|inner| CopyError {
-            src: src.clone(),
-            dest: dest.clone(),
-            inner,
-        })?;
+        if *dir {
+            let opts = CopyOptions {
+                copy_inside: true,
+                ..Default::default()
+            };
+            fs_extra::dir::copy(src, dest, &opts).map_err(|inner| CopyError {
+                src: src.clone(),
+                dest: dest.clone(),
+                inner: io::Error::new(io::ErrorKind::Other, format!("{}", inner)),
+            })?;
+        } else {
+            fs::copy(src, dest).map_err(|inner| CopyError {
+                src: src.clone(),
+                dest: dest.clone(),
+                inner,
+            })?;
+        }
 
         Ok(Self::Output {
             src: src.clone(),
             dest: dest.clone(),
+            dir: *dir,
         })
     }
 }
@@ -81,11 +99,12 @@ impl Rollback for CopyFinish {
 
     #[inline]
     fn rollback(&self) -> Self::Output {
-        let Self { src, dest } = self;
+        let Self { src, dest, dir } = self;
 
         Self::Output {
             src: src.clone(),
             dest: dest.clone(),
+            dir: *dir,
         }
     }
 }
@@ -104,6 +123,8 @@ pub struct CopyUndoOp {
     pub src: PathBuf,
     /// See [`CopyOp`].
     pub dest: PathBuf,
+    /// Copying a directory.
+    pub dir: bool,
 }
 
 /// The output of [`CopyUndoOp`]. See its documentation for information.
@@ -113,6 +134,8 @@ pub struct CopyUndoFinish {
     pub src: PathBuf,
     /// See [`CopyOp`].
     pub dest: PathBuf,
+    /// Copying a directory.
+    pub dir: bool,
 }
 
 impl Finish for CopyUndoOp {
@@ -121,10 +144,15 @@ impl Finish for CopyUndoOp {
 
     #[inline]
     fn finish(&self, _ctx: &FinishCtx) -> Result<Self::Output, Self::Error> {
-        let Self { src, dest } = self;
+        let Self { src, dest, dir } = self;
 
         // Remove copied file.
-        let _ = fs::remove_file(dest).map_err(|inner| RemoveError {
+        let res = if *dir {
+            fs::remove_dir(dest)
+        } else {
+            fs::remove_file(dest)
+        };
+        res.map_err(|inner| RemoveError {
             path: dest.clone(),
             inner,
         })?;
@@ -132,6 +160,7 @@ impl Finish for CopyUndoOp {
         Ok(Self::Output {
             src: src.clone(),
             dest: dest.clone(),
+            dir: *dir,
         })
     }
 }
@@ -141,11 +170,12 @@ impl Rollback for CopyUndoFinish {
 
     #[inline]
     fn rollback(&self) -> Self::Output {
-        let Self { src, dest } = self;
+        let Self { src, dest, dir } = self;
 
         Self::Output {
             src: src.clone(),
             dest: dest.clone(),
+            dir: *dir,
         }
     }
 }

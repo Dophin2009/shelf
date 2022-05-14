@@ -162,7 +162,12 @@ impl LinkAction {
     fn resolve_copy(&self) -> Result<Res, Error> {
         let Self { src, dest, .. } = self;
 
-        let (overwrite, is_dir) = match fs::symlink_metadata(dest) {
+        let src_is_dir = match fs::symlink_metadata(src) {
+            Ok(meta) if meta.is_dir() => true,
+            Ok(_) | Err(_) => false,
+        };
+
+        let (overwrite_dest, dest_is_dir) = match fs::symlink_metadata(dest) {
             // For files, check the contents. If they match, we should do nothing.
             // If not, proceed with overwrite.
             Ok(meta) if meta.is_file() => {
@@ -182,7 +187,7 @@ impl LinkAction {
             // For directories and symlinks, warn about an overwrite.
             // Remove the directory, and then link.
             Ok(meta) if meta.is_dir() => (true, true),
-            Ok(meta) if meta.is_file() || meta.is_symlink() => (true, false),
+            Ok(meta) if meta.is_symlink() => (true, false),
 
             // File doesn't exist, or insufficient permissions; treat as nonexistent.
             // TODO: Treat error as error here?
@@ -192,12 +197,13 @@ impl LinkAction {
         let copy_op = Op::Copy(CopyOp {
             src: src.clone(),
             dest: dest.clone(),
+            dir: src_is_dir,
         });
-        if overwrite {
+        if overwrite_dest {
             // Add op to remove existing file if exist.
             let rm_op = Op::Rm(RmOp {
                 path: dest.clone(),
-                dir: is_dir,
+                dir: dest_is_dir,
             });
 
             Ok(Res::Overwrite(vec![rm_op, copy_op]))
