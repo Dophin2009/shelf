@@ -17,11 +17,11 @@ use mlua::{Function as LuaFunction, Lua};
 pub struct Linker {
     dest: PathBuf,
     quiet: bool,
-    verbosity: usize,
+    verbosity: u8,
 }
 
 impl Linker {
-    pub fn new<P: AsRef<Path>>(dest: P, quiet: bool, verbosity: usize) -> Self {
+    pub fn new<P: AsRef<Path>>(dest: P, quiet: bool, verbosity: u8) -> Self {
         Self {
             dest: dest.as_ref().into(),
             quiet,

@@ -11,7 +11,7 @@ use stderrlog::ColorChoice;
 #[command(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
 struct Options {
     #[arg(short, long, action = clap::ArgAction::Count, help = "Message verbosity")]
-    verbosity: usize,
+    verbosity: u8,
     #[arg(short, long, help = "Silence all output")]
     quiet: bool,
     #[arg(short, long, help = "Do not link, copy, or write files")]
@@ -25,7 +25,7 @@ fn main() -> Result<()> {
     stderrlog::new()
         .show_level(false)
         .quiet(opts.quiet)
-        .verbosity(opts.verbosity)
+        .verbosity(usize::from(opts.verbosity))
         .color(ColorChoice::Never)
         .module(module_path!())
         .init()
