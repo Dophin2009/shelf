@@ -8,13 +8,13 @@ use log::info;
 use stderrlog::ColorChoice;
 
 #[derive(Parser, Debug)]
-#[clap(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
+#[command(version = clap::crate_version!(), author = "Eric Zhao <21zhaoe@protonmail.com>")]
 struct Options {
-    #[clap(short, long, parse(from_occurrences), about = "Message verbosity")]
+    #[arg(short, long, action = clap::ArgAction::Count, help = "Message verbosity")]
     verbosity: usize,
-    #[clap(short, long, about = "Silence all output")]
+    #[arg(short, long, help = "Silence all output")]
     quiet: bool,
-    #[clap(short, long, about = "Do not link, copy, or write files")]
+    #[arg(short, long, help = "Do not link, copy, or write files")]
     noop: bool,
     packages: Vec<String>,
 }
